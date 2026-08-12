@@ -80,7 +80,7 @@ function PhaseView({ phase, row }: { phase: Phase; row: Row | null }) {
   const indexFields = fields.filter((f) => !commonKeys.includes(f.key))
   const nifty = indexFields.filter((f) => f.key.toLowerCase().includes('nifty') || f.key.includes('pcr_nifty') || f.key.includes('max_pain_nifty'))
   const sensex = indexFields.filter((f) => f.key.toLowerCase().includes('sensex') || f.key.includes('pcr_sensex') || f.key.includes('max_pain_sensex'))
-  const renderGroup = (title: string, group: typeof fields) => <section className={`metric-group ${title === 'Common market data' ? 'common-group' : ''}`}><div className="group-heading">{title !== 'Common market data' && <h3>{title}</h3>}<span>{group.filter((f) => row?.[f.key] != null && row?.[f.key] !== '').length}/{group.length}</span></div><div className="field-grid">{group.map((f) => <div className={`field-card ${row?.[f.key] == null ? 'is-empty' : ''}`} key={f.key}><span>{f.label}</span><strong className={tone(row, f.key)}>{value(row, f.key, f.pct)}</strong></div>)}</div></section>
+  const renderGroup = (title: string, group: typeof fields) => <section className={`metric-group ${title === 'Common market data' ? 'common-group' : ''}`}><div className="group-heading">{title !== 'Common market data' && <h3>{title}</h3>}</div><div className="field-grid">{group.map((f) => <div className={`field-card ${row?.[f.key] == null ? 'is-empty' : ''}`} key={f.key}><span>{f.label}</span><strong className={tone(row, f.key)}>{value(row, f.key, f.pct)}</strong></div>)}</div></section>
   return <section className="phase-view"><div className="metric-groups">{renderGroup('Common market data', common)}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div></section>
 }
 export default function Dashboard() {
