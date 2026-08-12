@@ -3,8 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'MarketView — Trading Dashboard',
+  description: 'A read-only premarket dashboard for Indian equity markets.',
   generator: 'v0.app',
   icons: {
     icon: [
