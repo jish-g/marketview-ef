@@ -1,9 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Layers3, Menu, Moon, RefreshCw, ShieldAlert, Sun } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-
+import { useEffect, useState } from 'react'
+import { Activity, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Layers3, Menu, Moon, RefreshCw, Sun } from 'lucide-react'
 type Row = Record<string, string | number | null>
 type Phase = 'premarket' | 'open' | 'mid' | 'post'
 const phases = [
@@ -26,6 +24,23 @@ const phaseFields: Record<Phase, { label: string; key: string; pct?: boolean }[]
     ['Post-market status', 'post_market_status'], ['Nifty close', 'post_close_nifty'], ['Sensex close', 'post_close_sensex'], ['Nifty closing change', 'post_change_pct_nifty', true], ['Sensex closing change', 'post_change_pct_sensex', true], ['Final breadth', 'post_advance_decline_ratio'], ['Post-market note', 'post_market_notes'], 
   ].map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
 }
+const visualRow: Row = {
+  trade_date: '2026-08-12', day_name: 'Wednesday', event_today: 'US CPI at 6:00 PM IST',
+  india_vix: 11.9, india_vix_change_pct: -2.3, gift_nifty_gap_pct: 0.79, days_to_expiry_nifty: 8, days_to_expiry_sensex: 8,
+  avg_move_5d_nifty: 132.4, avg_move_5d_sensex: 418.6, prev_day_change_pct_nifty: 0.34, prev_day_change_pct_sensex: 0.28,
+  chart_support_nifty: 24320, chart_support_sensex: 77600, chart_resistance_nifty: 24680, chart_resistance_sensex: 78800,
+  oi_support_nifty: 24400, oi_support_sensex: 78000, oi_change_support_nifty: 'Addition', oi_change_support_sensex: 'Addition',
+  oi_resistance_nifty: 24600, oi_resistance_sensex: 78800, oi_change_resistance_nifty: 'Unwinding', oi_change_resistance_sensex: 'Unwinding',
+  nifty_opening_points: 0.75, advance_decline_ratio: '38 advances / 12 declines', prev_close_nifty: 24471.7, prev_close_sensex: 78154.25,
+  gap_points_nifty: 19.4, gap_points_sensex: 109.08, atm_iv_nifty: 11, atm_iv_sensex: 15.4, atm_straddle_price_nifty: 279.55,
+  atm_straddle_price_sensex: 563, atm_straddle_delta_nifty: 0.02, atm_straddle_delta_sensex: 0.06, atm_straddle_theta_nifty: -22,
+  atm_straddle_theta_sensex: -222, pcr_nifty: 0.86, pcr_sensex: 0.75, max_pain_nifty: 24500, max_pain_sensex: 78200,
+  mid_market_status: 'Holding above opening range', mid_nifty_change_pct: 0.62, mid_sensex_change_pct: 0.48,
+  mid_advance_decline_ratio: '31 advances / 19 declines', mid_pcr_nifty: 0.91, mid_india_vix: 11.7, mid_market_notes: 'Breadth remains constructive; watch 24,600 resistance.',
+  post_market_status: 'Closed positive', post_close_nifty: 24582.4, post_close_sensex: 78422.1, post_change_pct_nifty: 0.45,
+  post_change_pct_sensex: 0.34, post_advance_decline_ratio: '34 advances / 16 declines', post_market_notes: 'Support held and volatility compressed into the close.'
+}
+
 function value(row: Row | null, key: string, pct = false) { const v = row?.[key]; if (v === null || v === undefined || v === '') return '—'; return `${pct && Number(v) > 0 ? '+' : ''}${v}${pct ? '%' : ''}` }
 function tone(row: Row | null, key: string) { const n = Number(row?.[key]); return Number.isNaN(n) || n === 0 ? '' : n > 0 ? 'positive' : 'negative' }
 function PhaseView({ phase, row }: { phase: Phase; row: Row | null }) {
@@ -34,8 +49,7 @@ function PhaseView({ phase, row }: { phase: Phase; row: Row | null }) {
   return <section className="phase-view"><div className="phase-intro"><div><p className="eyebrow">{available} of {fields.length} fields available</p><h2>{intros[phase][0]}</h2><p>{intros[phase][1]}</p></div><div className="coverage"><b>{Math.round(available / fields.length * 100)}%</b><span>source coverage</span></div></div><div className="interpretation"><BookOpen size={18} /><div><strong>How to interpret this phase</strong><p>{phase === 'premarket' ? 'A rising VIX with a negative overnight gap argues for wider ranges. OI additions at support or resistance help define where price may stall.' : phase === 'open' ? 'A gap matters when breadth confirms it. Read PCR and ATM IV together; price up with weak breadth is a fragile signal.' : phase === 'mid' ? 'Look for confirmation or divergence from the morning thesis. Treat unavailable fields as unavailable, not as zero.' : 'Separate process from outcome. Record the close and breadth before evaluating the trade idea.'}</p></div></div><div className="field-grid">{fields.map((f) => <div className={`field-card ${row?.[f.key] == null ? 'is-empty' : ''}`} key={f.key}><span>{f.label}</span><strong className={tone(row, f.key)}>{value(row, f.key, f.pct)}</strong></div>)}</div></section>
 }
 export default function Dashboard() {
-  const [phase, setPhase] = useState<Phase>('premarket'); const [rows, setRows] = useState<Row[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [dark, setDark] = useState(false); const [navOpen, setNavOpen] = useState(true); const supabase = useMemo(() => createClient(), []); const row = rows[0] ?? null
+  const [phase, setPhase] = useState<Phase>('premarket'); const [dark, setDark] = useState(false); const [navOpen, setNavOpen] = useState(true); const row = visualRow
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
-  useEffect(() => { let active = true; (async () => { setLoading(true); const result = await supabase.from('premarket_dashboard').select('*').order('trade_date', { ascending: false }); if (!active) return; if (result.error) setError(result.error.message); else setRows((result.data ?? []) as Row[]); setLoading(false) })(); return () => { active = false } }, [supabase])
-  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation"><Menu size={18} /></button><div className="brand-mark"><div className="brand-symbol"><BarChart3 size={16} /></div><div><strong>MARKETVIEW</strong><span>TRADE ANALYSIS PLATFORM</span></div></div><div className="topbar-meta"><span className="live-dot" /> MARKET SESSION <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button></div></header><div className="workspace"><aside className={`sidebar ${navOpen ? '' : 'closed'}`}><div className="side-label">SESSION MAP</div>{phases.map(({ id, label, subtitle, icon: Icon }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => setPhase(id)}><Icon size={17} /><span><strong>{label}</strong><small>{subtitle}</small></span><ChevronRight size={14} /></button>)}<div className="side-rule" /></aside><div className="content"><div className="content-head"><div><p className="eyebrow">{row?.trade_date ?? 'No current row'} · {row?.day_name ?? 'Session date'}</p><h1>{phases.find((p) => p.id === phase)?.label}</h1></div><div className="head-actions"><button className="action-button" onClick={() => location.reload()}><RefreshCw size={15} /> Refresh</button></div></div>{loading ? <div className="state-card"><RefreshCw className="spin" size={20} /> Loading external market data…</div> : error ? <div className="state-card error"><AlertTriangle size={20} />{error}</div> : !row ? <div className="state-card"><ShieldAlert size={20} /> No rows returned from public.premarket_dashboard.</div> : <PhaseView phase={phase} row={row} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> Supabase · SELECT only</span><span>Latest available: {row?.trade_date ?? '—'}</span><span>Event: {row?.event_today ?? '—'}</span></footer></div></div></main>
+  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation"><Menu size={18} /></button><div className="brand-mark"><div className="brand-symbol"><BarChart3 size={16} /></div><div><strong>MARKETVIEW</strong><span>TRADE ANALYSIS PLATFORM</span></div></div><div className="topbar-meta"><span className="live-dot" /> MARKET SESSION <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button></div></header><div className="workspace"><aside className={`sidebar ${navOpen ? '' : 'closed'}`}><div className="side-label">SESSION MAP</div>{phases.map(({ id, label, subtitle, icon: Icon }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => setPhase(id)}><Icon size={17} /><span><strong>{label}</strong><small>{subtitle}</small></span><ChevronRight size={14} /></button>)}<div className="side-rule" /></aside><div className="content"><div className="content-head"><div><p className="eyebrow">{row?.trade_date ?? 'No current row'} · {row?.day_name ?? 'Session date'}</p><h1>{phases.find((p) => p.id === phase)?.label}</h1></div><div className="head-actions"><button className="action-button" onClick={() => location.reload()}><RefreshCw size={15} /> Refresh</button></div></div><PhaseView phase={phase} row={row} /><footer className="data-footer"><span><CheckCircle2 size={14} /> Visual preview data</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
 }
