@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react'
 import { Activity, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Layers3, Menu, Moon, RefreshCw, Sun } from 'lucide-react'
 type Row = Record<string, string | number | null>
-type Phase = 'premarket' | 'open' | 'mid' | 'post'
+type Phase = 'premarket' | 'open' | 'mid' | 'post' | 'rules' | 'history'
 const phases = [
   { id: 'premarket' as Phase, label: 'Pre-market', subtitle: 'Overnight setup', icon: Clock3 },
   { id: 'open' as Phase, label: 'Market open', subtitle: 'Opening auction', icon: Activity },
   { id: 'mid' as Phase, label: 'Mid-market', subtitle: 'Intraday read', icon: Gauge },
   { id: 'post' as Phase, label: 'Post-market', subtitle: 'Review & learn', icon: Layers3 },
+  { id: 'rules' as Phase, label: 'Rules engine', subtitle: 'Interpretation guide', icon: BookOpen },
+  { id: 'history' as Phase, label: 'History', subtitle: 'Prior snapshots', icon: BarChart3 },
 ]
 const phaseFields: Record<Phase, { label: string; key: string; pct?: boolean }[]> = {
   premarket: [
@@ -43,6 +45,26 @@ const visualRow: Row = {
 
 function value(row: Row | null, key: string, pct = false) { const v = row?.[key]; if (v === null || v === undefined || v === '') return '—'; return `${pct && Number(v) > 0 ? '+' : ''}${v}${pct ? '%' : ''}` }
 function tone(row: Row | null, key: string) { const n = Number(row?.[key]); return Number.isNaN(n) || n === 0 ? '' : n > 0 ? 'positive' : 'negative' }
+const historyRows = [
+  { date: '2026-08-12', label: 'Wednesday', read: 'Constructive open', move: '+0.45%', vix: '11.9' },
+  { date: '2026-08-11', label: 'Tuesday', read: 'Range expansion', move: '-0.28%', vix: '12.4' },
+  { date: '2026-08-08', label: 'Friday', read: 'Support held', move: '+0.62%', vix: '12.1' },
+]
+
+function RulesView() {
+  const rules = [
+    ['Breadth confirms price', 'A positive index move is stronger when advances outnumber declines. Weak breadth turns a gap into a fragile signal.'],
+    ['VIX sets the range', 'Rising volatility implies wider expected movement. Reduce conviction when price direction and volatility disagree.'],
+    ['PCR needs context', 'PCR below 1 can signal call-side pressure; compare it with price, max pain, and OI levels before acting.'],
+    ['Levels create invalidation', 'Treat chart and OI support/resistance as zones. A clean break changes the thesis; a rejection supports mean reversion.'],
+  ]
+  return <section className="phase-view"><div className="phase-intro"><div><p className="eyebrow">Interpretation framework</p><h2>Rules engine</h2><p>Use these rules to turn raw market fields into a structured read, not a prediction.</p></div></div><div className="rule-grid">{rules.map(([title, copy]) => <article className="rule-card" key={title}><BookOpen size={18} /><div><strong>{title}</strong><p>{copy}</p></div></article>)}</div></section>
+}
+
+function HistoryView() {
+  return <section className="phase-view"><div className="phase-intro"><div><p className="eyebrow">Prior sessions</p><h2>History</h2><p>Compare prior snapshots to understand how the platform&apos;s read changes across sessions.</p></div></div><div className="history-list">{historyRows.map((item) => <article className="history-row" key={item.date}><div><strong>{item.date}</strong><span>{item.label}</span></div><b>{item.read}</b><span className={item.move.startsWith('+') ? 'positive' : 'negative'}>{item.move}</span><span>VIX {item.vix}</span><ChevronRight size={16} /></article>)}</div></section>
+}
+
 function PhaseView({ phase, row }: { phase: Phase; row: Row | null }) {
   const fields = phaseFields[phase]; const available = fields.filter((f) => row?.[f.key] != null && row?.[f.key] !== '').length
   const intros: Record<Phase, [string, string]> = { premarket: ['Build a market thesis before the bell', 'Use volatility, overnight pricing and positioning to define scenarios and invalidation levels.'], open: ['Read the opening auction, not just the gap', 'Opening breadth, implied volatility and the straddle tell you whether price discovery is orderly or unstable.'], mid: ['Track whether the opening thesis is holding', 'Compare intraday breadth, volatility and price with the morning hypothesis. Missing values mean the external source has not supplied this phase.'], post: ['Close the loop on the session', 'Turn the day into a repeatable review: what worked, what failed and what to carry forward.'] }
@@ -51,5 +73,5 @@ function PhaseView({ phase, row }: { phase: Phase; row: Row | null }) {
 export default function Dashboard() {
   const [phase, setPhase] = useState<Phase>('premarket'); const [dark, setDark] = useState(false); const [navOpen, setNavOpen] = useState(true); const row = visualRow
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
-  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation"><Menu size={18} /></button><div className="brand-mark"><div className="brand-symbol"><BarChart3 size={16} /></div><div><strong>MARKETVIEW</strong><span>TRADE ANALYSIS PLATFORM</span></div></div><div className="topbar-meta"><span className="live-dot" /> MARKET SESSION <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button></div></header><div className="workspace"><aside className={`sidebar ${navOpen ? '' : 'closed'}`}><div className="side-label">SESSION MAP</div>{phases.map(({ id, label, subtitle, icon: Icon }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => setPhase(id)}><Icon size={17} /><span><strong>{label}</strong><small>{subtitle}</small></span><ChevronRight size={14} /></button>)}<div className="side-rule" /></aside><div className="content"><div className="content-head"><div><p className="eyebrow">{row?.trade_date ?? 'No current row'} · {row?.day_name ?? 'Session date'}</p><h1>{phases.find((p) => p.id === phase)?.label}</h1></div><div className="head-actions"><button className="action-button" onClick={() => location.reload()}><RefreshCw size={15} /> Refresh</button></div></div><PhaseView phase={phase} row={row} /><footer className="data-footer"><span><CheckCircle2 size={14} /> Visual preview data</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
+  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation"><Menu size={18} /></button><div className="brand-mark"><div className="brand-symbol"><BarChart3 size={16} /></div><div><strong>MARKETVIEW</strong><span>TRADE ANALYSIS PLATFORM</span></div></div><div className="topbar-meta"><span className="live-dot" /> MARKET SESSION <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button></div></header><div className="workspace"><aside className={`sidebar ${navOpen ? '' : 'closed'}`}><div className="side-label">SESSION MAP</div>{phases.map(({ id, label, subtitle, icon: Icon }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => setPhase(id)}><Icon size={17} /><span><strong>{label}</strong><small>{subtitle}</small></span><ChevronRight size={14} /></button>)}<div className="side-rule" /></aside><div className="content"><div className="content-head"><div><p className="eyebrow">{row?.trade_date ?? 'No current row'} · {row?.day_name ?? 'Session date'}</p><h1>{phases.find((p) => p.id === phase)?.label}</h1></div><div className="head-actions"><button className="action-button" onClick={() => location.reload()}><RefreshCw size={15} /> Refresh</button></div></div>{phase === 'rules' ? <RulesView /> : phase === 'history' ? <HistoryView /> : <PhaseView phase={phase} row={row} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> Visual preview data</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
 }
