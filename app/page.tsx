@@ -52,13 +52,15 @@ const historyRows = [
 ]
 
 function RulesView() {
-  const rules = [
-    ['Breadth confirms price', 'A positive index move is stronger when advances outnumber declines. Weak breadth turns a gap into a fragile signal.'],
-    ['VIX sets the range', 'Rising volatility implies wider expected movement. Reduce conviction when price direction and volatility disagree.'],
-    ['PCR needs context', 'PCR below 1 can signal call-side pressure; compare it with price, max pain, and OI levels before acting.'],
-    ['Levels create invalidation', 'Treat chart and OI support/resistance as zones. A clean break changes the thesis; a rejection supports mean reversion.'],
+  const sections = [
+    { title: 'Gap %', subtitle: 'Overnight move → opening bias', rows: [['> 0.75%', 'Strong gap up', 'Expect wider opening range'], ['0.25%–0.75%', 'Normal gap up', 'Trade with confirmation'], ['−0.25%–0.25%', 'Flat', 'Wait for direction'], ['−0.75%–−0.25%', 'Normal gap down', 'Trade with confirmation'], ['< −0.75%', 'Strong gap down', 'Expect wider opening range']] },
+    { title: 'VIX level', subtitle: 'Volatility → strike selection', rows: [['Below 11', 'Theta-heavy', 'ATM only on strong momentum'], ['11–14', 'Normal', 'ATM / ITM by setup'], ['14–18', 'Elevated', 'Prefer 1-strike ITM'], ['18–22', 'High crush risk', '2-strike ITM or skip'], ['Above 22', 'Avoid fresh buys', 'Wait for normalization']] },
+    { title: 'PCR', subtitle: 'Positioning → directional context', rows: [['> 1.3', 'Oversold / bullish', 'Look for upside confirmation'], ['0.8–1.3', 'Neutral', 'Use levels and breadth'], ['< 0.8', 'Overbought / bearish', 'Look for downside confirmation']] },
+    { title: 'Max pain', subtitle: 'Spot vs strike → expiry pull', rows: [['Above by > 0.3%', 'Downward pull', 'Mean reversion risk'], ['Within ±0.3%', 'Pinning likely', 'Expect range behavior'], ['Below by > 0.3%', 'Upward pull', 'Mean reversion risk']] },
+    { title: 'Open interest', subtitle: 'OI change → level quality', rows: [['Support + Addition', 'Support strengthening', 'Breakdown less likely'], ['Support + Unwinding', 'Support weakening', 'Breakdown risk'], ['Resistance + Addition', 'Resistance strengthening', 'Breakout less likely'], ['Resistance + Unwinding', 'Resistance weakening', 'Breakout risk']] },
+    { title: 'DTE', subtitle: 'Expiry distance → gamma risk', rows: [['≤ 1', 'High gamma risk', 'Prefer spreads'], ['2–4', 'Normal', 'Standard setup'], ['> 4', 'Lower gamma risk', 'Naked options viable with conviction']] },
   ]
-  return <section className="phase-view"><div className="phase-intro"><div><p className="eyebrow">Interpretation framework</p><h2>Rules engine</h2><p>Use these rules to turn raw market fields into a structured read, not a prediction.</p></div></div><div className="rule-grid">{rules.map(([title, copy]) => <article className="rule-card" key={title}><BookOpen size={18} /><div><strong>{title}</strong><p>{copy}</p></div></article>)}</div></section>
+  return <section className="phase-view rules-view"><div className="phase-intro"><div><p className="eyebrow">Quick reference · condition → reading → action</p><h2>Rules engine</h2><p>Use the source rules as a fast decision aid. They frame bias and risk; they do not predict the market.</p></div></div><div className="rule-grid">{sections.map((section) => <article className="rule-table" key={section.title}><div className="rule-table-head"><div><strong>{section.title}</strong><span>{section.subtitle}</span></div><BookOpen size={16} /></div><div className="rule-table-labels"><span>Condition</span><span>Reading</span><span>Action</span></div>{section.rows.map(([condition, reading, action]) => <div className="rule-table-row" key={`${condition}-${reading}`}><b>{condition}</b><span>{reading}</span><span>{action}</span></div>)}</article>)}</div><div className="strategy-strip"><strong>Strategy overrides</strong><span>High-impact event → caution</span><span>DTE ≤ 1 → force spread / iron condor</span><span>Trend + high IV → debit spread</span><span>Range + high IV → credit spread</span></div></section>
 }
 
 function HistoryView() {
