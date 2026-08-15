@@ -110,7 +110,8 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const autoStrategy = normalizeStrategy(calc.strategy)
   const [strategy, setStrategy] = useState<StrategyChoice>(autoStrategy)
   useEffect(() => { setStrategy(autoStrategy) }, [autoStrategy])
-  const autoAtm = useMemo(() => resolveAtmSpot(row, instrument), [row, instrument])
+  const strikeStep = instrument === 'NIFTY' ? 50 : 100
+  const autoAtm = useMemo(() => { const raw = resolveAtmSpot(row, instrument); return raw ? Math.round(raw / strikeStep) * strikeStep : raw }, [row, instrument, strikeStep])
   const [atmSpot, setAtmSpot] = useState(String(autoAtm || ''))
   useEffect(() => { setAtmSpot(String(autoAtm || '')) }, [autoAtm])
   const [offset, setOffset] = useState('0')
@@ -126,7 +127,9 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const atmNumber = Number(atmSpot) || 0
   const [legPremiums, setLegPremiums] = useState<Record<string, string>>({})
   useEffect(() => { setLegPremiums({}) }, [strategy, instrument])
-  const legRows = legs.map((leg) => ({ ...leg, strike: atmNumber + leg.wing * effectiveWidth + offsetNumber * effectiveWidth }))
+  const [strikeOverrides, setStrikeOverrides] = useState<Record<string, string>>({})
+  useEffect(() => { setStrikeOverrides({}) }, [strategy, instrument, atmNumber, offsetNumber])
+  const legRows = legs.map((leg) => { const computed = atmNumber + leg.wing * effectiveWidth + offsetNumber * effectiveWidth; const override = strikeOverrides[leg.key]; return { ...leg, strike: override !== undefined && override !== '' ? Number(override) : computed, displayStrike: override !== undefined ? override : String(computed) } })
   const netPremium = legRows.reduce((sum, leg) => { const p = Number(legPremiums[leg.key]) || 0; return sum + (leg.side === 'Sell' ? p : -p) }, 0)
   const hasAnyPremium = legRows.some((leg) => legPremiums[leg.key] !== undefined && legPremiums[leg.key] !== '')
   const effectiveDelta = Number(delta) || 0
@@ -150,7 +153,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
     {instrument === 'NIFTY' && <div className="sync-strip"><span>Predicted <b>{calc.predicted.toFixed(1)}</b></span><span>Actual <b>{calc.open.toFixed(1)}</b></span><span>Difference <b>{calc.difference >= 0 ? '+' : ''}{calc.difference.toFixed(1)}</b></span><strong className={`sync-${sync[1]}`}>{sync[0]}</strong></div>}
     <div className="verdict-card verdict-editable">
       <span>Your strategy <i>editable</i></span>
-      <div className="verdict-controls">
+      <div className="verdict-controls verdict-controls-wide">
         <select value={strategy} onChange={(e) => setStrategy(e.target.value as StrategyChoice)} aria-label={`${instrument} strategy override`}>
           {strategyChoices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
         </select>
@@ -201,7 +204,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
         {legRows.map((leg) => <div className="leg-row" key={leg.key}>
           <span className={`leg-badge leg-${leg.side.toLowerCase()}`}>{leg.side}</span>
           <span className="leg-label">{leg.label}</span>
-          <label>Strike<input type="number" value={leg.strike} onChange={() => {}} aria-label={`${instrument} ${leg.label} strike`} /></label>
+          <label>Strike<input type="number" value={leg.displayStrike} onChange={(e) => setStrikeOverrides((p) => ({ ...p, [leg.key]: e.target.value }))} aria-label={`${instrument} ${leg.label} strike`} /></label>
           <label>Premium<input type="number" min="0" value={legPremiums[leg.key] ?? ''} onChange={(e) => setLegPremiums((p) => ({ ...p, [leg.key]: e.target.value }))} placeholder="Enter fill" aria-label={`${instrument} ${leg.label} premium`} /></label>
         </div>)}
       </div>
