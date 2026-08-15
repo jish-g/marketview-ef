@@ -144,13 +144,12 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const maxProfit = isSpreadShape ? (strategy === 'Credit Spread' ? Math.abs(netPremium * qty) : hedgeWidth * qty - Math.abs(netPremium * qty)) : null
   const bookProfit = maxProfit !== null ? maxProfit * 0.6 : null
   const bookStop = strategy === 'Credit Spread' ? Math.abs(netPremium * qty) * 0.5 : strategy === 'Debit Spread' ? Math.abs(netPremium * qty) * 0.4 : null
-  const sync = Math.abs(calc.difference) <= 5 ? ['In Sync', 'success'] : Math.abs(calc.difference) <= 15 ? ['Minor Divergence', 'warning'] : ['Diverging — check your inputs', 'danger']
   const summary = `${row.trade_date} · ${row.day_name}: ${instrument} opened ${calc.gapPct >= 0 ? '+' : ''}${calc.gapPct.toFixed(2)}% gap (${calc.open.toFixed(1)}). ${calc.bias} bias with India VIX ${calc.vix.toFixed(1)} (${calc.vix < 11 ? 'low volatility — momentum only' : calc.vix <= 14 ? 'normal volatility — ATM / ITM by setup' : 'elevated volatility — prefer defined risk'}), ${calc.dte <= 7 ? 'Weekly' : 'Monthly'} expiry in ${calc.dte} days, ${calc.iv} versus VIX, PCR ${calc.pcr.toFixed(2)}, OI support ${calc.support.toFixed(0)} (${calc.oiSupport}) / resistance ${calc.resistance.toFixed(0)} (${calc.oiResistance}), chart ${calc.chartSupport.toFixed(0)}–${calc.chartResistance.toFixed(0)}, max pain ${calc.maxPain.toFixed(0)}.`
   return <article className="verdict-instrument">
     <div className="verdict-instrument-head">
       <h3>{instrument}<button type="button" className="semantic-info verdict-info" aria-label={`${instrument} verdict details`}><Info size={14} aria-hidden="true" /><span className="semantic-tooltip" role="tooltip">{summary}</span></button></h3>
     </div>
-    {instrument === 'NIFTY' && <div className="sync-strip"><span>Predicted <b>{calc.predicted.toFixed(1)}</b></span><span>Actual <b>{calc.open.toFixed(1)}</b></span><span>Difference <b>{calc.difference >= 0 ? '+' : ''}{calc.difference.toFixed(1)}</b></span><strong className={`sync-${sync[1]}`}>{sync[0]}</strong></div>}
+    <div className="sync-strip"><span>Predicted <b>{calc.predicted.toFixed(1)}</b></span><span>Actual <b>{calc.open.toFixed(1)}</b></span><span>Difference <b>{calc.difference >= 0 ? '+' : ''}{calc.difference.toFixed(1)}</b></span></div>
     <div className="verdict-card verdict-editable">
       <span>Your strategy <i>editable</i></span>
       <div className="verdict-controls verdict-controls-wide">
@@ -163,7 +162,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
     <div className="verdict-card verdict-editable">
       <span>ATM / Strikes from ATM / Delta <i>editable</i></span>
       <div className="verdict-controls verdict-controls-triple">
-        <label>ATM spot<input type="number" value={atmSpot} onChange={(e) => setAtmSpot(e.target.value)} aria-label={`${instrument} ATM spot`} /></label>
+        <label>ATM spot<input type="number" step={strikeStep} value={atmSpot} onChange={(e) => setAtmSpot(e.target.value)} aria-label={`${instrument} ATM spot`} /></label>
         <label>Strikes from ATM<input type="number" step="1" value={offset} onChange={(e) => onOffsetChange(e.target.value)} aria-label={`${instrument} strikes from ATM`} /></label>
         <label>Delta<input type="number" min="0" max="1" step="0.01" value={delta} onChange={(e) => setDelta(e.target.value)} aria-label={`${instrument} effective delta`} /></label>
       </div>
