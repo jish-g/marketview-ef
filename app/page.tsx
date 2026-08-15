@@ -151,16 +151,14 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
     </div>
     <div className="sync-strip"><span>Predicted <b>{calc.predicted.toFixed(1)}</b></span><span>Actual <b>{calc.open.toFixed(1)}</b></span><span>Difference <b>{calc.difference >= 0 ? '+' : ''}{calc.difference.toFixed(1)}</b></span></div>
     <div className="verdict-card verdict-editable">
-      <span>Your strategy <i>editable</i></span>
       <div className="verdict-controls verdict-controls-wide">
         <select value={strategy} onChange={(e) => setStrategy(e.target.value as StrategyChoice)} aria-label={`${instrument} strategy override`}>
           {strategyChoices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
         </select>
       </div>
-      {autoStrategy !== strategy && <small>System suggested: {autoStrategy}</small>}
+      {autoStrategy !== strategy && <small className="strategy-suggestion">System suggested: {autoStrategy}</small>}
     </div>
     <div className="verdict-card verdict-editable">
-      <span>ATM / Strikes from ATM / Delta <i>editable</i></span>
       <div className="verdict-controls verdict-controls-triple">
         <label>ATM spot<input type="number" step={strikeStep} value={atmSpot} onChange={(e) => setAtmSpot(e.target.value)} aria-label={`${instrument} ATM spot`} /></label>
         <label>Strikes from ATM<input type="number" step="1" value={offset} onChange={(e) => onOffsetChange(e.target.value)} aria-label={`${instrument} strikes from ATM`} /></label>
@@ -186,24 +184,23 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
         </div>
       </div>
       <div className="verdict-card verdict-editable">
-        <span>Lots <i>editable</i></span>
         <div className="verdict-controls">
           <label>Lots<input type="number" min="0" step="1" value={lots} onChange={(e) => setLots(e.target.value)} aria-label={`${instrument} lots`} /></label>
-          <label>Qty<input type="number" value={qty} readOnly aria-label={`${instrument} computed quantity`} /></label>
+          <label>Qty<input type="text" value={qty} readOnly aria-label={`${instrument} computed quantity`} /></label>
         </div>
         <small>{lotSize} per lot for {instrument}</small>
       </div>
     </div>
     <div className="position-calculator">
       <div className="position-head">
-        <div><p className="eyebrow">Trade entry</p><strong>{strategy} · {effectiveWidth > 0 ? `${effectiveWidth} pt hedge` : 'Single leg'}</strong></div>
+        <div><p className="eyebrow">Trade entry</p><strong>{strategy}</strong></div>
         <span>Live calculation</span>
       </div>
       <div className="leg-list">
         {legRows.map((leg) => <div className="leg-row" key={leg.key}>
           <span className={`leg-badge leg-${leg.side.toLowerCase()}`}>{leg.side}</span>
           <span className="leg-label">{leg.label}</span>
-          <label>Strike<input type="number" value={leg.displayStrike} onChange={(e) => setStrikeOverrides((p) => ({ ...p, [leg.key]: e.target.value }))} aria-label={`${instrument} ${leg.label} strike`} /></label>
+          <label>Strike<input type="number" step={strikeStep} value={leg.displayStrike} onChange={(e) => setStrikeOverrides((p) => ({ ...p, [leg.key]: e.target.value }))} aria-label={`${instrument} ${leg.label} strike`} /></label>
           <label>Premium<input type="number" min="0" value={legPremiums[leg.key] ?? ''} onChange={(e) => setLegPremiums((p) => ({ ...p, [leg.key]: e.target.value }))} placeholder="Enter fill" aria-label={`${instrument} ${leg.label} premium`} /></label>
         </div>)}
       </div>
