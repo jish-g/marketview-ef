@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { createClient } from '@/lib/supabase/client'
 import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, Menu, Moon, RefreshCw, Sun } from 'lucide-react'
-type Row = Record<string, string | number | null>
+type Row = Record<string, string | number | boolean | null>
 type Phase = 'premarket' | 'open' | 'verdict' | 'mid' | 'post' | 'rules' | 'history'
 const phases = [
   { id: 'premarket' as Phase, label: 'Pre-market', subtitle: 'Overnight setup', icon: Clock3 },
@@ -15,19 +15,19 @@ const phases = [
   { id: 'rules' as Phase, label: 'Rules engine', subtitle: 'Interpretation guide', icon: BookOpen },
   { id: 'history' as Phase, label: 'History', subtitle: 'Prior snapshots', icon: BarChart3 },
 ]
-const phaseFields: Record<Phase, { label: string; key: string; pct?: boolean }[]> = {
-  premarket: [
+const phaseFields: Partial<Record<Phase, { label: string; key: string; pct?: boolean }[]>> & Pick<Record<Phase, { label: string; key: string; pct?: boolean }[]>, 'premarket' | 'open' | 'mid' | 'post'> = {
+  premarket: ([
     ['Event today', 'event_today'], ['India VIX', 'india_vix'], ['GIFT Nifty gap', 'gift_nifty_gap_pct', true], ['Expiry', 'days_to_expiry_nifty'], ['Expiry', 'days_to_expiry_sensex'], ['5D average move', 'avg_move_5d_nifty'], ['5D average move', 'avg_move_5d_sensex'], ['Prior day', 'prev_day_change_pct_nifty', true], ['Prior day', 'prev_day_change_pct_sensex', true], ['Chart Support (1D Pivot)', 'chart_support_nifty'], ['Chart Resistance (1D Pivot)', 'chart_resistance_nifty'], ['Chart Support (1D Pivot)', 'chart_support_sensex'], ['Chart Resistance (1D Pivot)', 'chart_resistance_sensex'], ['OI support', 'oi_support_nifty'], ['OI resistance', 'oi_resistance_nifty'], ['OI support', 'oi_support_sensex'], ['OI resistance', 'oi_resistance_sensex'],
-  ].map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
-  open: [
+  ] as const).map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
+  open: ([
     ['Opening points', 'nifty_opening_points'], ['Advance / decline', 'advance_decline_ratio'], ['Previous close', 'prev_close_nifty'], ['Previous close', 'prev_close_sensex'], ['Gap points', 'gap_points_nifty'], ['Gap points', 'gap_points_sensex'], ['ATM IV', 'atm_iv_nifty', true], ['ATM IV', 'atm_iv_sensex', true], ['Straddle', 'atm_straddle_price_nifty'], ['Straddle', 'atm_straddle_price_sensex'], ['Delta', 'atm_straddle_delta_nifty'], ['Delta', 'atm_straddle_delta_sensex'], ['Theta', 'atm_straddle_theta_nifty'], ['Theta', 'atm_straddle_theta_sensex'], ['PCR', 'pcr_nifty'], ['PCR', 'pcr_sensex'], ['Max pain', 'max_pain_nifty'], ['Max pain', 'max_pain_sensex'],
-  ].map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
-  mid: [
+  ] as const).map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
+  mid: ([
     ['Mid-market status', 'mid_market_status'], ['Nifty intraday change', 'mid_nifty_change_pct', true], ['Sensex intraday change', 'mid_sensex_change_pct', true], ['Mid-market breadth', 'mid_advance_decline_ratio'], ['Mid-market PCR', 'mid_pcr_nifty'], ['Mid-market VIX', 'mid_india_vix'], ['Mid-market note', 'mid_market_notes'],
-  ].map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
-  post: [
+  ] as const).map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
+  post: ([
     ['Post-market status', 'post_market_status'], ['Nifty close', 'post_close_nifty'], ['Sensex close', 'post_close_sensex'], ['Nifty closing change', 'post_change_pct_nifty', true], ['Sensex closing change', 'post_change_pct_sensex', true], ['Final breadth', 'post_advance_decline_ratio'], ['Post-market note', 'post_market_notes'], 
-  ].map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
+  ] as const).map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
 }
 const visualRow: Row = {
   trade_date: '2026-08-12', day_name: 'Wednesday', event_today: 'US CPI at 6:00 PM IST',
@@ -100,7 +100,7 @@ function legsForStrategy(strategy: StrategyChoice, bias: string): LegDef[] {
 function num(row: Row, key: string) { const n = Number(row[key]); return Number.isFinite(n) ? n : 0 }
 function strategyPhrase(strategy: string, bias: string) { const map: Record<string, string> = { 'No Trade': 'No Trade (event day)', 'Iron Condor': 'Iron Condor (range-bound, IV fair)', 'Credit Spread': 'Sell Credit Spread (range-bound, IV rich)', 'Debit Call Spread': 'Buy Call Spread (bullish, IV rich — avoid naked options)', 'Debit Put Spread': 'Buy Put Spread (bearish, IV rich — avoid naked options)', 'Naked Call': 'Buy Naked Call (bullish, IV fair)', 'Naked Put': 'Buy Naked Put (bearish, IV fair)' }; return map[strategy] ?? `${bias} setup pending calculation` }
 function advanceDeclineRatio(row: Row) { const raw = String(row.advance_decline_ratio ?? ''); const parts = raw.match(/[\d.]+/g); if (!parts || parts.length < 2) return null; const [a, d] = parts.map(Number); return d > 0 ? a / d : null }
-function breadthDirection(raw: string | number | null | undefined) { const text = String(raw ?? ''); const parts = text.match(/[\d.]+/g); if (!parts || parts.length < 2) return null; const [advances, declines] = parts.map(Number); if (advances > declines) return { label: 'Bullish breadth', arrow: '▲', tone: 'positive' }; if (declines > advances) return { label: 'Bearish breadth', arrow: '▼', tone: 'negative' }; return null }
+function breadthDirection(raw: string | number | boolean | null | undefined) { const text = String(raw ?? ''); const parts = text.match(/[\d.]+/g); if (!parts || parts.length < 2) return null; const [advances, declines] = parts.map(Number); if (advances > declines) return { label: 'Bullish breadth', arrow: '▲', tone: 'positive' }; if (declines > advances) return { label: 'Bearish breadth', arrow: '▼', tone: 'negative' }; return null }
 const midRemapKeys: Record<string, string> = { atm_iv_nifty_mid: 'atm_iv_nifty', atm_iv_sensex_mid: 'atm_iv_sensex', pcr_nifty_mid: 'pcr_nifty', pcr_sensex_mid: 'pcr_sensex', max_pain_nifty_mid: 'max_pain_nifty', max_pain_sensex_mid: 'max_pain_sensex', atm_straddle_price_nifty_mid: 'atm_straddle_price_nifty', atm_straddle_price_sensex_mid: 'atm_straddle_price_sensex', atm_straddle_delta_nifty_mid: 'atm_straddle_delta_nifty', atm_straddle_delta_sensex_mid: 'atm_straddle_delta_sensex', atm_straddle_theta_nifty_mid: 'atm_straddle_theta_nifty', atm_straddle_theta_sensex_mid: 'atm_straddle_theta_sensex', advance_decline_ratio_mid: 'advance_decline_ratio' }
 function buildMidRow(row: Row, mid: Row): Row { const overlay: Row = {}; for (const [midKey, targetKey] of Object.entries(midRemapKeys)) { if (mid[midKey] !== null && mid[midKey] !== undefined) overlay[targetKey] = mid[midKey] }; return { ...row, ...overlay, spot_nifty: mid.spot_nifty ?? null, spot_sensex: mid.spot_sensex ?? null, intraday_change_pct_nifty: mid.intraday_change_pct_nifty ?? null, intraday_change_pct_sensex: mid.intraday_change_pct_sensex ?? null } }
 function resolveAtmSpot(row: Row, instrument: Instrument): number { const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'; const direct = num(row, `spot_${suffix}`); if (direct) return direct; const prev = num(row, `prev_close_${suffix}`); const gapPoints = num(row, `gap_points_${suffix}`); if (prev && gapPoints) return prev + gapPoints; return prev }
@@ -123,7 +123,6 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const qty = (Number(lots) || 0) * lotSize
   const hedgeWidth = instrument === 'NIFTY' ? 200 : 400
   const legs = useMemo(() => legsForStrategy(strategy, calc.bias), [strategy, calc.bias])
-  const effectiveWidth = strategy === 'Naked Call' || strategy === 'Naked Put' ? 0 : hedgeWidth
   const atmNumber = Number(atmSpot) || 0
   const roundedStrike = (value: number) => Math.round(value / strikeStep) * strikeStep
   const [legPremiums, setLegPremiums] = useState<Record<string, string>>({})
@@ -283,7 +282,7 @@ function PostMarketView({ row, postSummary }: { row: Row; postSummary: Row | nul
 }
 
 function PhaseView({ phase, row }: { phase: Phase; row: Row | null }) {
-  const fields = phaseFields[phase]
+  const fields = phaseFields[phase] ?? []
   const phaseHeadings: Record<'premarket' | 'open', [string, string]> = { premarket: ['Overnight → Open setup', 'Build the market thesis'], open: ['Market Open snapshot', 'Read the opening auction'] }
   const commonKeys = ['event_today', 'india_vix', 'india_vix_change_pct', 'gift_nifty_gap_pct', 'advance_decline_ratio', 'mid_market_status', 'mid_advance_decline_ratio', 'mid_india_vix', 'mid_market_notes', 'post_market_status', 'post_advance_decline_ratio', 'post_market_notes']
   const common = fields.filter((f) => commonKeys.includes(f.key))
