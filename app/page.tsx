@@ -138,8 +138,10 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const estAggressiveTarget = calc.aggressiveTarget * effectiveDelta
   const estAggressiveStop = calc.aggressiveStop * effectiveDelta
   const isNetSeller = strategy === 'Credit Spread' || strategy === 'Iron Condor'
-  const actualTarget = hasAnyPremium ? (isNetSeller ? Math.max(0, netPremium * 0.4) : netPremium + calc.target * effectiveDelta) : null
-  const actualStop = hasAnyPremium ? (isNetSeller ? netPremium * 1.5 : Math.max(0, netPremium - calc.stop * effectiveDelta)) : null
+  const actualConservativeTarget = hasAnyPremium ? (isNetSeller ? Math.max(0, netPremium * 0.4) : netPremium + calc.target * effectiveDelta) : null
+  const actualConservativeStop = hasAnyPremium ? (isNetSeller ? netPremium * 1.5 : Math.max(0, netPremium - calc.stop * effectiveDelta)) : null
+  const actualAggressiveTarget = hasAnyPremium ? (isNetSeller ? Math.max(0, netPremium * 0.4) : netPremium + calc.aggressiveTarget * effectiveDelta) : null
+  const actualAggressiveStop = hasAnyPremium ? (isNetSeller ? netPremium * 1.5 : Math.max(0, netPremium - calc.aggressiveStop * effectiveDelta)) : null
   const isSpreadShape = strategy === 'Debit Spread' || strategy === 'Credit Spread'
   const maxProfit = isSpreadShape ? (strategy === 'Credit Spread' ? Math.abs(netPremium * qty) : hedgeWidth * qty - Math.abs(netPremium * qty)) : null
   const bookProfit = maxProfit !== null ? maxProfit * 0.6 : null
@@ -207,11 +209,27 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
       </div>
       <div className="position-outputs">
         <span>Net Premium <b>₹{netPremium.toFixed(1)}</b></span>
-        {actualTarget !== null && <span>Target (actual) <b>₹{actualTarget.toFixed(1)}</b></span>}
-        {actualStop !== null && <span>Stop-loss (actual) <b>₹{actualStop.toFixed(1)}</b></span>}
         {bookProfit !== null && <span>Book Profit <b>₹{bookProfit.toFixed(0)}</b></span>}
         {bookStop !== null && <span>Book Stop <b>₹{bookStop.toFixed(0)}</b></span>}
       </div>
+      {hasAnyPremium && <div className="verdict-card verdict-tracks actual-tracks">
+        <div className="track-columns">
+          <div className="track-column">
+            <div className="track-header"><i></i><span>Conservative</span></div>
+            <div className="track-row"><span>↑ Target (actual)</span><em>₹{actualConservativeTarget?.toFixed(1)}</em></div>
+            <div className="track-row"><span>↓ Stop-loss (actual)</span><em>₹{actualConservativeStop?.toFixed(1)}</em></div>
+            <div className="track-row"><span>↑ Target × Qty</span><em>₹{((actualConservativeTarget ?? 0) * qty).toFixed(0)}</em></div>
+            <div className="track-row"><span>↓ Stop-loss × Qty</span><em>₹{((actualConservativeStop ?? 0) * qty).toFixed(0)}</em></div>
+          </div>
+          <div className="track-column">
+            <div className="track-header"><i></i><span>Aggressive</span></div>
+            <div className="track-row"><span>↑ Target (actual)</span><em>₹{actualAggressiveTarget?.toFixed(1)}</em></div>
+            <div className="track-row"><span>↓ Stop-loss (actual)</span><em>₹{actualAggressiveStop?.toFixed(1)}</em></div>
+            <div className="track-row"><span>↑ Target × Qty</span><em>₹{((actualAggressiveTarget ?? 0) * qty).toFixed(0)}</em></div>
+            <div className="track-row"><span>↓ Stop-loss × Qty</span><em>₹{((actualAggressiveStop ?? 0) * qty).toFixed(0)}</em></div>
+          </div>
+        </div>
+      </div>}
       {!hasAnyPremium && <p className="structure-line">Enter fill premiums above to compute actual target / stop-loss and book levels.</p>}
     </div>
     <div className="verdict-rationale"><span>Rationale</span><p>{calc.bias} bias from gap direction, PCR positioning, max pain pull, and OI level action; {calc.ivRead} conditions favor {calc.strategy.toLowerCase()}.</p></div>
