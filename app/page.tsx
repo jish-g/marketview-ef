@@ -71,14 +71,152 @@ function HistoryView({ rows }: { rows: Row[] | null | undefined }) {
 type Instrument = 'NIFTY' | 'SENSEX'
 type Strike = 'ATM' | 'ITM1' | 'ITM2'
 const strikeDefaults: Record<Strike, number> = { ATM: 0.5, ITM1: 0.62, ITM2: 0.72 }
+type StrategyChoice = 'Naked Call' | 'Naked Put' | 'Debit Spread' | 'Credit Spread' | 'Iron Condor'
+const strategyChoices: StrategyChoice[] = ['Naked Call', 'Naked Put', 'Debit Spread', 'Credit Spread', 'Iron Condor']
+function normalizeStrategy(strategy: string): StrategyChoice { if (strategy === 'Debit Call Spread' || strategy === 'Debit Put Spread') return 'Debit Spread'; if (strategy === 'Naked Call') return 'Naked Call'; if (strategy === 'Naked Put') return 'Naked Put'; if (strategy === 'Credit Spread') return 'Credit Spread'; return 'Iron Condor' }
+function deltaForOffset(offset: number): number { const steps = [0.5, 0.7, 0.85, 0.95]; const step = steps[Math.min(Math.abs(offset), 3)]; if (offset === 0) return step; return offset > 0 ? step : Number((1 - step).toFixed(2)) }
+type LegDef = { key: string; label: string; side: 'Buy' | 'Sell'; wing: number }
+function legsForStrategy(strategy: StrategyChoice, bias: string): LegDef[] {
+  if (strategy === 'Naked Call') return [{ key: 'p', label: 'Buy Call', side: 'Buy', wing: 0 }]
+  if (strategy === 'Naked Put') return [{ key: 'p', label: 'Buy Put', side: 'Buy', wing: 0 }]
+  if (strategy === 'Debit Spread') {
+    const bearish = bias === 'Bearish'
+    return [
+      { key: 'lg', label: bearish ? 'Buy Put (ATM)' : 'Buy Call (ATM)', side: 'Buy', wing: 0 },
+      { key: 's', label: bearish ? 'Sell Put (hedge)' : 'Sell Call (hedge)', side: 'Sell', wing: bearish ? -1 : 1 },
+    ]
+  }
+  if (strategy === 'Credit Spread') return [
+    { key: 's', label: 'Sell Call (ATM)', side: 'Sell', wing: 0 },
+    { key: 'lg', label: 'Buy Call (hedge)', side: 'Buy', wing: 1 },
+  ]
+  return [
+    { key: 'sc', label: 'Sell Call', side: 'Sell', wing: 1 },
+    { key: 'lc', label: 'Buy Call (hedge)', side: 'Buy', wing: 2 },
+    { key: 'sp', label: 'Sell Put', side: 'Sell', wing: -1 },
+    { key: 'lp', label: 'Buy Put (hedge)', side: 'Buy', wing: -2 },
+  ]
+}
 function num(row: Row, key: string) { const n = Number(row[key]); return Number.isFinite(n) ? n : 0 }
-function strategyPhrase(strategy: string, bias: string) { const map: Record<string, string> = { 'No Trade': 'No Trade (event day)', 'Iron Condor': 'Iron Condor (range-bound, IV rich)', 'Credit Spread': 'Sell Credit Spread (range-bound, IV rich)', 'Debit Call Spread': 'Buy Call Spread (bullish, IV rich — avoid naked options)', 'Debit Put Spread': 'Buy Put Spread (bearish, IV rich — avoid naked options)', 'Naked Call': 'Buy Naked Call (bullish, IV fair)', 'Naked Put': 'Buy Naked Put (bearish, IV fair)' }; return map[strategy] ?? `${bias} setup pending calculation` }
+function strategyPhrase(strategy: string, bias: string) { const map: Record<string, string> = { 'No Trade': 'No Trade (event day)', 'Iron Condor': 'Iron Condor (range-bound, IV fair)', 'Credit Spread': 'Sell Credit Spread (range-bound, IV rich)', 'Debit Call Spread': 'Buy Call Spread (bullish, IV rich — avoid naked options)', 'Debit Put Spread': 'Buy Put Spread (bearish, IV rich — avoid naked options)', 'Naked Call': 'Buy Naked Call (bullish, IV fair)', 'Naked Put': 'Buy Naked Put (bearish, IV fair)' }; return map[strategy] ?? `${bias} setup pending calculation` }
 function advanceDeclineRatio(row: Row) { const raw = String(row.advance_decline_ratio ?? ''); const parts = raw.match(/[\d.]+/g); if (!parts || parts.length < 2) return null; const [a, d] = parts.map(Number); return d > 0 ? a / d : null }
 function breadthDirection(raw: string | number | null | undefined) { const text = String(raw ?? ''); const parts = text.match(/[\d.]+/g); if (!parts || parts.length < 2) return null; const [advances, declines] = parts.map(Number); if (advances > declines) return { label: 'Bullish breadth', arrow: '▲', tone: 'positive' }; if (declines > advances) return { label: 'Bearish breadth', arrow: '▼', tone: 'negative' }; return null }
 const midRemapKeys: Record<string, string> = { atm_iv_nifty_mid: 'atm_iv_nifty', atm_iv_sensex_mid: 'atm_iv_sensex', pcr_nifty_mid: 'pcr_nifty', pcr_sensex_mid: 'pcr_sensex', max_pain_nifty_mid: 'max_pain_nifty', max_pain_sensex_mid: 'max_pain_sensex', atm_straddle_price_nifty_mid: 'atm_straddle_price_nifty', atm_straddle_price_sensex_mid: 'atm_straddle_price_sensex', atm_straddle_delta_nifty_mid: 'atm_straddle_delta_nifty', atm_straddle_delta_sensex_mid: 'atm_straddle_delta_sensex', atm_straddle_theta_nifty_mid: 'atm_straddle_theta_nifty', atm_straddle_theta_sensex_mid: 'atm_straddle_theta_sensex', advance_decline_ratio_mid: 'advance_decline_ratio' }
 function buildMidRow(row: Row, mid: Row): Row { const overlay: Row = {}; for (const [midKey, targetKey] of Object.entries(midRemapKeys)) { if (mid[midKey] !== null && mid[midKey] !== undefined) overlay[targetKey] = mid[midKey] }; return { ...row, ...overlay, spot_nifty: mid.spot_nifty ?? null, spot_sensex: mid.spot_sensex ?? null, intraday_change_pct_nifty: mid.intraday_change_pct_nifty ?? null, intraday_change_pct_sensex: mid.intraday_change_pct_sensex ?? null } }
+function resolveAtmSpot(row: Row, instrument: Instrument): number { const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'; const direct = num(row, `spot_${suffix}`); if (direct) return direct; const prev = num(row, `prev_close_${suffix}`); const gapPoints = num(row, `gap_points_${suffix}`); if (prev && gapPoints) return prev + gapPoints; return prev }
 function calculateVerdict(row: Row, instrument: Instrument) { const n = instrument === 'NIFTY'; const suffix = n ? 'nifty' : 'sensex'; const prev = num(row, `prev_close_${suffix}`); const open = n ? num(row, 'nifty_opening_points') : 0; const gapPct = n ? num(row, 'gift_nifty_gap_pct') : num(row, 'gap_points_sensex') / prev * 100; const predicted = num(row, 'gift_nifty_gap_pct') / 100 * num(row, 'prev_close_nifty'); const difference = open - predicted; const pcr = num(row, `pcr_${suffix}`); const iv = num(row, `atm_iv_${suffix}`); const vix = num(row, 'india_vix'); const support = num(row, `oi_support_${suffix}`); const resistance = num(row, `oi_resistance_${suffix}`); const maxPain = num(row, `max_pain_${suffix}`); const oiChangeSupport = String(row[`oi_change_support_${suffix}`] ?? ''); const oiChangeResistance = String(row[`oi_change_resistance_${suffix}`] ?? ''); const adRatio = advanceDeclineRatio(row); let bullVotes = 0; let bearVotes = 0; const giftGap = num(row, 'gift_nifty_gap_pct'); if (giftGap > 0) bullVotes++; if (giftGap < 0) bearVotes++; if (pcr > 1.3) bullVotes++; if (pcr < 0.8) bearVotes++; if (oiChangeSupport === 'Addition') bullVotes++; if (oiChangeSupport === 'Unwinding') bearVotes++; if (oiChangeResistance === 'Unwinding') bullVotes++; if (oiChangeResistance === 'Addition') bearVotes++; if (adRatio !== null && adRatio > 1.5) bullVotes++; if (adRatio !== null && adRatio < 0.7) bearVotes++; const bias = bullVotes > bearVotes ? 'Bullish' : bearVotes > bullVotes ? 'Bearish' : 'Neutral'; const ivRead = iv - vix > 2 ? 'IV rich' : 'IV fair'; const range = Math.abs(gapPct) <= 0.75; const strategy = range && ivRead === 'IV fair' ? 'Iron Condor' : !range && ivRead === 'IV rich' ? (bias === 'Bullish' ? 'Debit Call Spread' : bias === 'Bearish' ? 'Debit Put Spread' : 'Iron Condor') : range && ivRead === 'IV rich' ? 'Credit Spread' : bias === 'Bullish' ? 'Naked Call' : bias === 'Bearish' ? 'Naked Put' : 'Iron Condor'; const straddle = num(row, `atm_straddle_price_${suffix}`); const dte = num(row, `days_to_expiry_${suffix}`); const avgMove5d = num(row, `avg_move_5d_${suffix}`); const estimateA = straddle / Math.sqrt(Math.max(dte, 1)); const estimateB = avgMove5d; const conservative = Math.min(estimateA, estimateB); const aggressive = Math.max(estimateA, estimateB); const target = conservative * 0.6; const stop = conservative * 0.3; const aggressiveTarget = aggressive * 0.6; const aggressiveStop = aggressive * 0.3; const strike: Strike = vix < 11 ? 'ATM' : vix <= 14 ? 'ITM1' : 'ITM2'; return { gapPct, prev, open, predicted, difference, pcr, iv, vix, support, resistance, maxPain, bias, ivRead, strategy, straddle, conservative, aggressive, target, stop, aggressiveTarget, aggressiveStop, strike, dte, oiSupport: oiChangeSupport || '—', oiResistance: oiChangeResistance || '—', chartSupport: num(row, `chart_support_${suffix}`), chartResistance: num(row, `chart_resistance_${suffix}`) } }
-function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrument }) { const calc = useMemo(() => calculateVerdict(row, instrument), [row, instrument]); const [strike, setStrike] = useState<Strike>(calc.strike); const [delta, setDelta] = useState(String(strikeDefaults[calc.strike])); const [qty, setQty] = useState(''); const [premium, setPremium] = useState(''); const isSpread = ['Debit Call Spread', 'Debit Put Spread', 'Credit Spread'].includes(calc.strategy); const width = instrument === 'NIFTY' ? 200 : 400; const premiumNumber = Number(premium) || 0; const qtyNumber = Number(qty) || 0; const effectiveDelta = Number(delta) || 0; const nakedTarget = calc.target * effectiveDelta; const nakedStop = calc.stop * effectiveDelta; const maxProfit = calc.strategy === 'Credit Spread' ? premiumNumber : width * qtyNumber - premiumNumber; const bookProfit = maxProfit * 0.6; const bookStop = calc.strategy === 'Credit Spread' ? premiumNumber * 0.5 : premiumNumber * 0.4; const capture = calc.target / width * 100; const sync = Math.abs(calc.difference) <= 5 ? ['In Sync', 'success'] : Math.abs(calc.difference) <= 15 ? ['Minor Divergence', 'warning'] : ['Diverging — check your inputs', 'danger']; const summary = `${row.trade_date} · ${row.day_name}: ${instrument} opened ${calc.gapPct >= 0 ? '+' : ''}${calc.gapPct.toFixed(2)}% gap (${calc.open.toFixed(1)}). ${calc.bias} bias with India VIX ${calc.vix.toFixed(1)} (${calc.vix < 11 ? 'low volatility — momentum only' : calc.vix <= 14 ? 'normal volatility — ATM / ITM by setup' : 'elevated volatility — prefer defined risk'}), ${calc.dte <= 7 ? 'Weekly' : 'Monthly'} expiry in ${calc.dte} days, ${calc.iv} versus VIX, PCR ${calc.pcr.toFixed(2)}, OI support ${calc.support.toFixed(0)} (${calc.oiSupport}) / resistance ${calc.resistance.toFixed(0)} (${calc.oiResistance}), chart ${calc.chartSupport.toFixed(0)}–${calc.chartResistance.toFixed(0)}, max pain ${calc.maxPain.toFixed(0)}.`; return <article className="verdict-instrument"><div className="verdict-instrument-head"><h3>{instrument}<button type="button" className="semantic-info verdict-info" aria-label={`${instrument} verdict details`}><Info size={14} aria-hidden="true" /><span className="semantic-tooltip" role="tooltip">{summary}</span></button></h3><span>{calc.bias} · {calc.strategy}</span></div>{instrument === 'NIFTY' && <div className="sync-strip"><span>Predicted <b>{calc.predicted.toFixed(1)}</b></span><span>Actual <b>{calc.open.toFixed(1)}</b></span><span>Difference <b>{calc.difference >= 0 ? '+' : ''}{calc.difference.toFixed(1)}</b></span><strong className={`sync-${sync[1]}`}>{sync[0]}</strong></div>}<div className="verdict-banner"><div><p className="eyebrow">Auto-generated strategy</p><strong>{strategyPhrase(calc.strategy, calc.bias)}</strong></div></div><div className="verdict-grid"><div className="verdict-card verdict-tracks"><div className="track-columns"><div className="track-column"><div className="track-header"><i></i><span>Conservative</span></div><strong className="track-move">{calc.conservative.toFixed(1)} pts</strong><div className="track-row"><span>↑ Target</span><b className="target-value">{calc.target.toFixed(1)} pts</b><em>₹{nakedTarget.toFixed(1)}</em></div><div className="track-row"><span>↓ Stop-loss</span><b className="stop-value">{calc.stop.toFixed(1)} pts</b><em>₹{nakedStop.toFixed(1)}</em></div></div><div className="track-column"><div className="track-header"><i></i><span>Aggressive</span></div><strong className="track-move">{calc.aggressive.toFixed(1)} pts</strong><div className="track-row"><span>↑ Target</span><b className="target-value">{calc.aggressiveTarget.toFixed(1)} pts</b><em>₹{(calc.aggressiveTarget * effectiveDelta).toFixed(1)}</em></div><div className="track-row"><span>↓ Stop-loss</span><b className="stop-value">{calc.aggressiveStop.toFixed(1)} pts</b><em>₹{(calc.aggressiveStop * effectiveDelta).toFixed(1)}</em></div></div></div></div><div className="verdict-card verdict-editable"><span>Strike / Delta <i>editable</i></span><div className="verdict-controls"><select value={strike} onChange={(e) => { const next = e.target.value as Strike; setStrike(next); setDelta(String(strikeDefaults[next])) }}><option>ATM</option><option>ITM1</option><option>ITM2</option></select><input type="number" min="0" max="1" step="0.01" value={delta} onChange={(e) => setDelta(e.target.value)} aria-label={`${instrument} effective delta`} /></div><small>Used for premium conversion above</small></div></div><div className={`position-calculator ${isSpread ? '' : 'position-disabled'}`}><div className="position-head"><div><p className="eyebrow">Position calculator</p><strong>{isSpread ? `${calc.strategy} · ${width} pt hedge` : 'Not applicable for this strategy'}</strong></div><span>{isSpread ? 'Live calculation' : 'Gray out'}</span></div>{isSpread && <><div className="position-inputs"><label>Qty<input type="number" min="0" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" /></label><label>Net Premium (₹)<input type="number" min="0" value={premium} onChange={(e) => setPremium(e.target.value)} placeholder="0" /></label></div><div className="position-outputs"><span>Max Profit <b>₹{maxProfit.toFixed(0)}</b></span><span>Book Profit at <b>₹{bookProfit.toFixed(0)}</b></span><span>Book Stop at <b>₹{bookStop.toFixed(0)}</b></span><span>Realistic Capture <b>{capture.toFixed(1)}%</b></span></div><p className="structure-line">{calc.strategy === 'Credit Spread' ? 'Sell Main' : 'Buy Main'}: {strike} leg. Hedge: {width} {calc.bias === 'Bullish' ? 'above' : 'below'} ({calc.bias === 'Bullish' ? 'Call' : 'Put'} spread). Realistic capture: {calc.target.toFixed(1)} (~{capture.toFixed(1)}% of width).</p></>}</div><div className="verdict-rationale"><span>Rationale</span><p>{calc.bias} bias from gap direction, PCR positioning, max pain pull, and OI level action; {calc.ivRead} conditions favor {calc.strategy.toLowerCase()}.</p></div></article> }
+function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrument }) {
+  const calc = useMemo(() => calculateVerdict(row, instrument), [row, instrument])
+  const autoStrategy = normalizeStrategy(calc.strategy)
+  const [strategy, setStrategy] = useState<StrategyChoice>(autoStrategy)
+  useEffect(() => { setStrategy(autoStrategy) }, [autoStrategy])
+  const autoAtm = useMemo(() => resolveAtmSpot(row, instrument), [row, instrument])
+  const [atmSpot, setAtmSpot] = useState(String(autoAtm || ''))
+  useEffect(() => { setAtmSpot(String(autoAtm || '')) }, [autoAtm])
+  const [offset, setOffset] = useState('0')
+  const [delta, setDelta] = useState(String(deltaForOffset(0)))
+  const offsetNumber = Number(offset) || 0
+  const onOffsetChange = (v: string) => { setOffset(v); const n = Number(v) || 0; setDelta(String(deltaForOffset(n))) }
+  const [lots, setLots] = useState('1')
+  const lotSize = instrument === 'NIFTY' ? 65 : 20
+  const qty = (Number(lots) || 0) * lotSize
+  const hedgeWidth = instrument === 'NIFTY' ? 200 : 400
+  const legs = useMemo(() => legsForStrategy(strategy, calc.bias), [strategy, calc.bias])
+  const effectiveWidth = strategy === 'Naked Call' || strategy === 'Naked Put' ? 0 : hedgeWidth
+  const atmNumber = Number(atmSpot) || 0
+  const [legPremiums, setLegPremiums] = useState<Record<string, string>>({})
+  useEffect(() => { setLegPremiums({}) }, [strategy, instrument])
+  const legRows = legs.map((leg) => ({ ...leg, strike: atmNumber + leg.wing * effectiveWidth + offsetNumber * effectiveWidth }))
+  const netPremium = legRows.reduce((sum, leg) => { const p = Number(legPremiums[leg.key]) || 0; return sum + (leg.side === 'Sell' ? p : -p) }, 0)
+  const hasAnyPremium = legRows.some((leg) => legPremiums[leg.key] !== undefined && legPremiums[leg.key] !== '')
+  const effectiveDelta = Number(delta) || 0
+  const estTarget = calc.target * effectiveDelta
+  const estStop = calc.stop * effectiveDelta
+  const estAggressiveTarget = calc.aggressiveTarget * effectiveDelta
+  const estAggressiveStop = calc.aggressiveStop * effectiveDelta
+  const isNetSeller = strategy === 'Credit Spread' || strategy === 'Iron Condor'
+  const actualTarget = hasAnyPremium ? (isNetSeller ? Math.max(0, netPremium * 0.4) : netPremium + calc.target * effectiveDelta) : null
+  const actualStop = hasAnyPremium ? (isNetSeller ? netPremium * 1.5 : Math.max(0, netPremium - calc.stop * effectiveDelta)) : null
+  const isSpreadShape = strategy === 'Debit Spread' || strategy === 'Credit Spread'
+  const maxProfit = isSpreadShape ? (strategy === 'Credit Spread' ? Math.abs(netPremium * qty) : hedgeWidth * qty - Math.abs(netPremium * qty)) : null
+  const bookProfit = maxProfit !== null ? maxProfit * 0.6 : null
+  const bookStop = strategy === 'Credit Spread' ? Math.abs(netPremium * qty) * 0.5 : strategy === 'Debit Spread' ? Math.abs(netPremium * qty) * 0.4 : null
+  const sync = Math.abs(calc.difference) <= 5 ? ['In Sync', 'success'] : Math.abs(calc.difference) <= 15 ? ['Minor Divergence', 'warning'] : ['Diverging — check your inputs', 'danger']
+  const summary = `${row.trade_date} · ${row.day_name}: ${instrument} opened ${calc.gapPct >= 0 ? '+' : ''}${calc.gapPct.toFixed(2)}% gap (${calc.open.toFixed(1)}). ${calc.bias} bias with India VIX ${calc.vix.toFixed(1)} (${calc.vix < 11 ? 'low volatility — momentum only' : calc.vix <= 14 ? 'normal volatility — ATM / ITM by setup' : 'elevated volatility — prefer defined risk'}), ${calc.dte <= 7 ? 'Weekly' : 'Monthly'} expiry in ${calc.dte} days, ${calc.iv} versus VIX, PCR ${calc.pcr.toFixed(2)}, OI support ${calc.support.toFixed(0)} (${calc.oiSupport}) / resistance ${calc.resistance.toFixed(0)} (${calc.oiResistance}), chart ${calc.chartSupport.toFixed(0)}–${calc.chartResistance.toFixed(0)}, max pain ${calc.maxPain.toFixed(0)}.`
+  return <article className="verdict-instrument">
+    <div className="verdict-instrument-head">
+      <h3>{instrument}<button type="button" className="semantic-info verdict-info" aria-label={`${instrument} verdict details`}><Info size={14} aria-hidden="true" /><span className="semantic-tooltip" role="tooltip">{summary}</span></button></h3>
+    </div>
+    {instrument === 'NIFTY' && <div className="sync-strip"><span>Predicted <b>{calc.predicted.toFixed(1)}</b></span><span>Actual <b>{calc.open.toFixed(1)}</b></span><span>Difference <b>{calc.difference >= 0 ? '+' : ''}{calc.difference.toFixed(1)}</b></span><strong className={`sync-${sync[1]}`}>{sync[0]}</strong></div>}
+    <div className="verdict-card verdict-editable">
+      <span>Your strategy <i>editable</i></span>
+      <div className="verdict-controls">
+        <select value={strategy} onChange={(e) => setStrategy(e.target.value as StrategyChoice)} aria-label={`${instrument} strategy override`}>
+          {strategyChoices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
+        </select>
+      </div>
+      {autoStrategy !== strategy && <small>System suggested: {autoStrategy}</small>}
+    </div>
+    <div className="verdict-card verdict-editable">
+      <span>ATM / Strikes from ATM / Delta <i>editable</i></span>
+      <div className="verdict-controls verdict-controls-triple">
+        <label>ATM spot<input type="number" value={atmSpot} onChange={(e) => setAtmSpot(e.target.value)} aria-label={`${instrument} ATM spot`} /></label>
+        <label>Strikes from ATM<input type="number" step="1" value={offset} onChange={(e) => onOffsetChange(e.target.value)} aria-label={`${instrument} strikes from ATM`} /></label>
+        <label>Delta<input type="number" min="0" max="1" step="0.01" value={delta} onChange={(e) => setDelta(e.target.value)} aria-label={`${instrument} effective delta`} /></label>
+      </div>
+      <small>Delta auto-fills from the strike-offset step table; editing a leg&apos;s strike below will not resync it — only changing &quot;Strikes from ATM&quot; does.</small>
+    </div>
+    <div className="verdict-grid">
+      <div className="verdict-card verdict-tracks">
+        <div className="track-columns">
+          <div className="track-column">
+            <div className="track-header"><i></i><span>Conservative</span></div>
+            <strong className="track-move">{calc.conservative.toFixed(1)} pts</strong>
+            <div className="track-row"><span>↑ Target (est.)</span><b className="target-value">{calc.target.toFixed(1)} pts</b><em>₹{estTarget.toFixed(1)}</em></div>
+            <div className="track-row"><span>↓ Stop-loss (est.)</span><b className="stop-value">{calc.stop.toFixed(1)} pts</b><em>₹{estStop.toFixed(1)}</em></div>
+          </div>
+          <div className="track-column">
+            <div className="track-header"><i></i><span>Aggressive</span></div>
+            <strong className="track-move">{calc.aggressive.toFixed(1)} pts</strong>
+            <div className="track-row"><span>↑ Target (est.)</span><b className="target-value">{calc.aggressiveTarget.toFixed(1)} pts</b><em>₹{estAggressiveTarget.toFixed(1)}</em></div>
+            <div className="track-row"><span>↓ Stop-loss (est.)</span><b className="stop-value">{calc.aggressiveStop.toFixed(1)} pts</b><em>₹{estAggressiveStop.toFixed(1)}</em></div>
+          </div>
+        </div>
+      </div>
+      <div className="verdict-card verdict-editable">
+        <span>Lots <i>editable</i></span>
+        <div className="verdict-controls">
+          <label>Lots<input type="number" min="0" step="1" value={lots} onChange={(e) => setLots(e.target.value)} aria-label={`${instrument} lots`} /></label>
+          <label>Qty<input type="number" value={qty} readOnly aria-label={`${instrument} computed quantity`} /></label>
+        </div>
+        <small>{lotSize} per lot for {instrument}</small>
+      </div>
+    </div>
+    <div className="position-calculator">
+      <div className="position-head">
+        <div><p className="eyebrow">Trade entry</p><strong>{strategy} · {effectiveWidth > 0 ? `${effectiveWidth} pt hedge` : 'Single leg'}</strong></div>
+        <span>Live calculation</span>
+      </div>
+      <div className="leg-list">
+        {legRows.map((leg) => <div className="leg-row" key={leg.key}>
+          <span className={`leg-badge leg-${leg.side.toLowerCase()}`}>{leg.side}</span>
+          <span className="leg-label">{leg.label}</span>
+          <label>Strike<input type="number" value={leg.strike} onChange={() => {}} aria-label={`${instrument} ${leg.label} strike`} /></label>
+          <label>Premium<input type="number" min="0" value={legPremiums[leg.key] ?? ''} onChange={(e) => setLegPremiums((p) => ({ ...p, [leg.key]: e.target.value }))} placeholder="Enter fill" aria-label={`${instrument} ${leg.label} premium`} /></label>
+        </div>)}
+      </div>
+      <div className="position-outputs">
+        <span>Net Premium <b>₹{netPremium.toFixed(1)}</b></span>
+        {actualTarget !== null && <span>Target (actual) <b>₹{actualTarget.toFixed(1)}</b></span>}
+        {actualStop !== null && <span>Stop-loss (actual) <b>₹{actualStop.toFixed(1)}</b></span>}
+        {bookProfit !== null && <span>Book Profit <b>₹{bookProfit.toFixed(0)}</b></span>}
+        {bookStop !== null && <span>Book Stop <b>₹{bookStop.toFixed(0)}</b></span>}
+      </div>
+      {!hasAnyPremium && <p className="structure-line">Enter fill premiums above to compute actual target / stop-loss and book levels.</p>}
+    </div>
+    <div className="verdict-rationale"><span>Rationale</span><p>{calc.bias} bias from gap direction, PCR positioning, max pain pull, and OI level action; {calc.ivRead} conditions favor {calc.strategy.toLowerCase()}.</p></div>
+  </article>
+}
 function VerdictView({ row }: { row: Row }) { const eventFlag = useMemo(() => highImpactEvent(row.event_today as string | null), [row.event_today]); return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open</p><h2>Verdict</h2></div><span>Calculated strategy</span></div>{eventFlag && <div className="event-caution"><AlertTriangle size={16} /><span><strong>{eventFlag.name}</strong> — high impact event at {eventFlag.time}. Trade with caution.</span></div>}<div className="verdict-instruments"><VerdictInstrument row={row} instrument="NIFTY" /><VerdictInstrument row={row} instrument="SENSEX" /></div></section> }
 function OutcomeBadge({ label, target, sl }: { label: string; target?: boolean; sl?: boolean }) { const text = target === true ? 'Target hit' : sl === true ? 'SL hit' : target === false && sl === false ? 'Neither' : 'Not yet available'; const cls = target === true ? 'outcome-hit' : sl === true ? 'outcome-stop' : 'outcome-neutral'; return <div className={`outcome-badge ${cls}`}><span>{label}</span><strong>{text}</strong></div> }
 function MidVerdictInstrument({ mid, instrument }: { mid: Row; instrument: Instrument }) { const calc = useMemo(() => calculateVerdict(mid, instrument), [mid, instrument]); const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'; const spotKey = `spot_${suffix}`; const changeKey = `intraday_change_pct_${suffix}`; const effectiveDelta = strikeDefaults[calc.strike]; const nakedTarget = calc.target * effectiveDelta; const nakedStop = calc.stop * effectiveDelta; return <article className="verdict-instrument"><div className="verdict-instrument-head"><h3>{instrument}</h3><span>{calc.bias} · {calc.strategy}</span></div><div className="sync-strip"><span>Spot <b>{value(mid, spotKey)}</b></span><span>Intraday change <b className={tone(mid, changeKey)}>{value(mid, changeKey, true)}</b></span></div><div className="verdict-banner"><div><p className="eyebrow">Midday strategy read</p><strong>{strategyPhrase(calc.strategy, calc.bias)}</strong></div></div><div className="verdict-grid"><div className="verdict-card verdict-tracks"><div className="track-columns"><div className="track-column"><div className="track-header"><i></i><span>Conservative</span></div><strong className="track-move">{calc.conservative.toFixed(1)} pts</strong><div className="track-row"><span>↑ Target</span><b className="target-value">{calc.target.toFixed(1)} pts</b><em>₹{(calc.target * effectiveDelta).toFixed(1)}</em></div><div className="track-row"><span>↓ Stop-loss</span><b className="stop-value">{calc.stop.toFixed(1)} pts</b><em>₹{(calc.stop * effectiveDelta).toFixed(1)}</em></div></div><div className="track-column"><div className="track-header"><i></i><span>Aggressive</span></div><strong className="track-move">{calc.aggressive.toFixed(1)} pts</strong><div className="track-row"><span>↑ Target</span><b className="target-value">{calc.aggressiveTarget.toFixed(1)} pts</b><em>₹{(calc.aggressiveTarget * effectiveDelta).toFixed(1)}</em></div><div className="track-row"><span>↓ Stop-loss</span><b className="stop-value">{calc.aggressiveStop.toFixed(1)} pts</b><em>₹{(calc.aggressiveStop * effectiveDelta).toFixed(1)}</em></div></div></div></div></div></article> }
