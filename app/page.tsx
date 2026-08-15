@@ -71,30 +71,30 @@ function HistoryView({ rows }: { rows: Row[] | null | undefined }) {
 type Instrument = 'NIFTY' | 'SENSEX'
 type Strike = 'ATM' | 'ITM1' | 'ITM2'
 const strikeDefaults: Record<Strike, number> = { ATM: 0.5, ITM1: 0.62, ITM2: 0.72 }
-type StrategyChoice = 'Naked Call' | 'Naked Put' | 'Debit Spread' | 'Credit Spread' | 'Iron Condor'
-const strategyChoices: StrategyChoice[] = ['Naked Call', 'Naked Put', 'Debit Spread', 'Credit Spread', 'Iron Condor']
+type StrategyChoice = 'Naked Call' | 'Naked Put' | 'Debit Spread' | 'Credit Spread' | 'Iron Condor' | 'Custom'
+const strategyChoices: StrategyChoice[] = ['Naked Call', 'Naked Put', 'Debit Spread', 'Credit Spread', 'Iron Condor', 'Custom']
 function normalizeStrategy(strategy: string): StrategyChoice { if (strategy === 'Debit Call Spread' || strategy === 'Debit Put Spread') return 'Debit Spread'; if (strategy === 'Naked Call') return 'Naked Call'; if (strategy === 'Naked Put') return 'Naked Put'; if (strategy === 'Credit Spread') return 'Credit Spread'; return 'Iron Condor' }
 function deltaForOffset(offset: number): number { const steps = [0.5, 0.7, 0.85, 0.95]; const step = steps[Math.min(Math.abs(offset), 3)]; if (offset === 0) return step; return offset > 0 ? step : Number((1 - step).toFixed(2)) }
 type LegDef = { key: string; label: string; side: 'Buy' | 'Sell'; wing: number }
 function legsForStrategy(strategy: StrategyChoice, bias: string): LegDef[] {
-  if (strategy === 'Naked Call') return [{ key: 'p', label: 'Buy Call', side: 'Buy', wing: 0 }]
-  if (strategy === 'Naked Put') return [{ key: 'p', label: 'Buy Put', side: 'Buy', wing: 0 }]
+  if (strategy === 'Naked Call') return [{ key: 'p', label: 'Buy Call', side: 'Buy', wing: bias === 'Bearish' ? -1 : 1 }]
+  if (strategy === 'Naked Put') return [{ key: 'p', label: 'Buy Put', side: 'Buy', wing: bias === 'Bullish' ? 1 : -1 }]
   if (strategy === 'Debit Spread') {
     const bearish = bias === 'Bearish'
     return [
       { key: 'lg', label: bearish ? 'Buy Put (ATM)' : 'Buy Call (ATM)', side: 'Buy', wing: 0 },
-      { key: 's', label: bearish ? 'Sell Put (hedge)' : 'Sell Call (hedge)', side: 'Sell', wing: bearish ? -1 : 1 },
+      { key: 's', label: bearish ? 'Sell Put (primary)' : 'Sell Call (primary)', side: 'Sell', wing: bearish ? -1 : 1 },
     ]
   }
   if (strategy === 'Credit Spread') return [
-    { key: 's', label: 'Sell Call (ATM)', side: 'Sell', wing: 0 },
-    { key: 'lg', label: 'Buy Call (hedge)', side: 'Buy', wing: 1 },
+    { key: 's', label: 'Sell Call (primary)', side: 'Sell', wing: 1 },
+    { key: 'lg', label: 'Buy Call (ATM)', side: 'Buy', wing: 0 },
   ]
   return [
     { key: 'sc', label: 'Sell Call', side: 'Sell', wing: 1 },
-    { key: 'lc', label: 'Buy Call (hedge)', side: 'Buy', wing: 2 },
+    { key: 'lc', label: 'Buy Call (hedge)', side: 'Buy', wing: 1 },
     { key: 'sp', label: 'Sell Put', side: 'Sell', wing: -1 },
-    { key: 'lp', label: 'Buy Put (hedge)', side: 'Buy', wing: -2 },
+    { key: 'lp', label: 'Buy Put (hedge)', side: 'Buy', wing: -1 },
   ]
 }
 function num(row: Row, key: string) { const n = Number(row[key]); return Number.isFinite(n) ? n : 0 }
@@ -125,27 +125,38 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const legs = useMemo(() => legsForStrategy(strategy, calc.bias), [strategy, calc.bias])
   const effectiveWidth = strategy === 'Naked Call' || strategy === 'Naked Put' ? 0 : hedgeWidth
   const atmNumber = Number(atmSpot) || 0
+  const roundedStrike = (value: number) => Math.round(value / strikeStep) * strikeStep
   const [legPremiums, setLegPremiums] = useState<Record<string, string>>({})
   useEffect(() => { setLegPremiums({}) }, [strategy, instrument])
   const [strikeOverrides, setStrikeOverrides] = useState<Record<string, string>>({})
   useEffect(() => { setStrikeOverrides({}) }, [strategy, instrument, atmNumber, offsetNumber])
-  const legRows = legs.map((leg) => { const computed = atmNumber + leg.wing * effectiveWidth + offsetNumber * effectiveWidth; const override = strikeOverrides[leg.key]; return { ...leg, strike: override !== undefined && override !== '' ? Number(override) : computed, displayStrike: override !== undefined ? override : String(computed) } })
+  const computedStrike = (leg: LegDef) => {
+    const shiftedAtm = atmNumber + offsetNumber * strikeStep
+    if (strategy === 'Naked Call' || strategy === 'Naked Put') return shiftedAtm
+    if (strategy === 'Debit Spread' || strategy === 'Credit Spread') return leg.wing === 0 ? atmNumber : shiftedAtm
+    const shortStrike = shiftedAtm
+    if (leg.key === 'sc' || leg.key === 'sp') return shortStrike
+    if (leg.key === 'lc') return shortStrike + hedgeWidth
+    if (leg.key === 'lp') return shortStrike - hedgeWidth
+    return shortStrike
+  }
+  const legRows = legs.map((leg) => { const computed = roundedStrike(computedStrike(leg)); const override = strategy === 'Custom' ? strikeOverrides[leg.key] : undefined; return { ...leg, strike: override !== undefined && override !== '' ? Number(override) : computed, displayStrike: override !== undefined && override !== '' ? override : String(computed) } })
   const netPremium = legRows.reduce((sum, leg) => { const p = Number(legPremiums[leg.key]) || 0; return sum + (leg.side === 'Sell' ? p : -p) }, 0)
-  const hasAnyPremium = legRows.some((leg) => legPremiums[leg.key] !== undefined && legPremiums[leg.key] !== '')
+  const hasAnyPremium = legRows.some((leg) => Number(legPremiums[leg.key]) !== 0)
   const effectiveDelta = Number(delta) || 0
   const estTarget = calc.target * effectiveDelta
   const estStop = calc.stop * effectiveDelta
   const estAggressiveTarget = calc.aggressiveTarget * effectiveDelta
   const estAggressiveStop = calc.aggressiveStop * effectiveDelta
-  const isNetSeller = strategy === 'Credit Spread' || strategy === 'Iron Condor'
+  const isNetSeller = strategy === 'Credit Spread' || strategy === 'Iron Condor' || strategy === 'Custom'
   const actualConservativeTarget = hasAnyPremium ? (isNetSeller ? Math.max(0, netPremium * 0.4) : netPremium + calc.target * effectiveDelta) : null
   const actualConservativeStop = hasAnyPremium ? (isNetSeller ? netPremium * 1.5 : Math.max(0, netPremium - calc.stop * effectiveDelta)) : null
   const actualAggressiveTarget = hasAnyPremium ? (isNetSeller ? Math.max(0, netPremium * 0.4) : netPremium + calc.aggressiveTarget * effectiveDelta) : null
   const actualAggressiveStop = hasAnyPremium ? (isNetSeller ? netPremium * 1.5 : Math.max(0, netPremium - calc.aggressiveStop * effectiveDelta)) : null
-  const isSpreadShape = strategy === 'Debit Spread' || strategy === 'Credit Spread'
-  const maxProfit = isSpreadShape ? (strategy === 'Credit Spread' ? Math.abs(netPremium * qty) : hedgeWidth * qty - Math.abs(netPremium * qty)) : null
-  const bookProfit = maxProfit !== null ? maxProfit * 0.6 : null
-  const bookStop = strategy === 'Credit Spread' ? Math.abs(netPremium * qty) * 0.5 : strategy === 'Debit Spread' ? Math.abs(netPremium * qty) * 0.4 : null
+  const bookProfitConservative = actualConservativeTarget === null ? null : actualConservativeTarget * qty * 0.6
+  const bookStopConservative = actualConservativeStop === null ? null : actualConservativeStop * qty * 0.4
+  const bookProfitAggressive = actualAggressiveTarget === null ? null : actualAggressiveTarget * qty * 0.6
+  const bookStopAggressive = actualAggressiveStop === null ? null : actualAggressiveStop * qty * 0.4
   const sync = Math.abs(calc.difference) <= 5 ? ['In Sync', 'success', 'Prediction is tracking the actual open.'] : Math.abs(calc.difference) <= 15 ? ['Minor Divergence', 'warning', 'Prediction is slightly away from the actual open.'] : ['Diverging', 'danger', 'Prediction is materially away from the actual open.']
   const summary = `${row.trade_date} · ${row.day_name}: ${instrument} opened ${calc.gapPct >= 0 ? '+' : ''}${calc.gapPct.toFixed(2)}% gap (${calc.open.toFixed(1)}). ${calc.bias} bias with India VIX ${calc.vix.toFixed(1)} (${calc.vix < 11 ? 'low volatility — momentum only' : calc.vix <= 14 ? 'normal volatility — ATM / ITM by setup' : 'elevated volatility — prefer defined risk'}), ${calc.dte <= 7 ? 'Weekly' : 'Monthly'} expiry in ${calc.dte} days, ${calc.iv} versus VIX, PCR ${calc.pcr.toFixed(2)}, OI support ${calc.support.toFixed(0)} (${calc.oiSupport}) / resistance ${calc.resistance.toFixed(0)} (${calc.oiResistance}), chart ${calc.chartSupport.toFixed(0)}–${calc.chartResistance.toFixed(0)}, max pain ${calc.maxPain.toFixed(0)}.`
   return <article className="verdict-instrument">
@@ -153,17 +164,21 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
       <h3>{instrument}<button type="button" className="semantic-info verdict-info" aria-label={`${instrument} verdict details`}><Info size={14} aria-hidden="true" /><span className="semantic-tooltip" role="tooltip">{summary}</span></button></h3>
     </div>
     <div className="sync-strip"><span>Predicted <b>{calc.predicted.toFixed(1)}</b></span><span>Actual <b>{calc.open.toFixed(1)}</b></span><span>Difference <b>{calc.difference >= 0 ? '+' : ''}{calc.difference.toFixed(1)}</b></span><strong className={`sync-${sync[1]}`}>{sync[0]}</strong><small>{sync[2]}</small></div>
-    <div className="verdict-card verdict-editable">
-      <div className="verdict-controls verdict-controls-wide">
-        <select value={strategy} onChange={(e) => setStrategy(e.target.value as StrategyChoice)} aria-label={`${instrument} strategy override`}>
-          {strategyChoices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
-        </select>
+    <div className="verdict-card verdict-strategy-summary">
+      <div className="verdict-strategy-box">
+        <span className="eyebrow">Your strategy</span>
+        <div className="verdict-controls verdict-controls-wide">
+          <select value={strategy} onChange={(e) => setStrategy(e.target.value as StrategyChoice)} aria-label={`${instrument} strategy override`}>
+            {strategyChoices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
+          </select>
+        </div>
+        {autoStrategy !== strategy && <small className="strategy-suggestion">System suggested: {autoStrategy}</small>}
       </div>
-      {autoStrategy !== strategy && <small className="strategy-suggestion">System suggested: {autoStrategy}</small>}
+      <div className="day-summary"><span className="eyebrow">Day summary</span><p>{summary}</p></div>
     </div>
     <div className="verdict-card verdict-editable">
       <div className="verdict-controls verdict-controls-triple">
-        <label>ATM spot<input type="number" step={strikeStep} value={atmSpot} onChange={(e) => setAtmSpot(e.target.value)} aria-label={`${instrument} ATM spot`} /></label>
+        <label>ATM spot<input type="number" step={strikeStep} value={atmSpot} onChange={(e) => setAtmSpot(e.target.value === '' ? '' : String(roundedStrike(Number(e.target.value))))} aria-label={`${instrument} ATM spot`} /></label>
         <label>Strikes from ATM<input type="number" step="1" value={offset} onChange={(e) => onOffsetChange(e.target.value)} aria-label={`${instrument} strikes from ATM`} /></label>
         <label>Delta<input type="number" min="0" max="1" step="0.01" value={delta} onChange={(e) => setDelta(e.target.value)} aria-label={`${instrument} effective delta`} /></label>
       </div>
@@ -203,14 +218,12 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
         {legRows.map((leg) => <div className="leg-row" key={leg.key}>
           <span className={`leg-badge leg-${leg.side.toLowerCase()}`}>{leg.side}</span>
           <span className="leg-label">{leg.label}</span>
-          <label>Strike<input type="number" step={strikeStep} value={leg.displayStrike} onChange={(e) => setStrikeOverrides((p) => ({ ...p, [leg.key]: e.target.value }))} aria-label={`${instrument} ${leg.label} strike`} /></label>
+          <label>Strike<input type="number" step={strikeStep} value={leg.displayStrike} onChange={(e) => setStrikeOverrides((p) => ({ ...p, [leg.key]: e.target.value === '' ? '' : String(roundedStrike(Number(e.target.value))) }))} aria-label={`${instrument} ${leg.label} strike`} /></label>
           <label>Premium<input type="number" min="0" value={legPremiums[leg.key] ?? ''} onChange={(e) => setLegPremiums((p) => ({ ...p, [leg.key]: e.target.value }))} placeholder="Enter fill" aria-label={`${instrument} ${leg.label} premium`} /></label>
         </div>)}
       </div>
       <div className="position-outputs">
         <span>Net Premium ({isNetSeller ? 'received' : 'paid'}) <b>{hasAnyPremium ? `₹${netPremium.toFixed(1)}` : 'Not entered yet'}</b></span>
-        {bookProfit !== null && <span>Book Profit <b>₹{bookProfit.toFixed(0)}</b></span>}
-        {bookStop !== null && <span>Book Stop <b>₹{bookStop.toFixed(0)}</b></span>}
       </div>
       {hasAnyPremium && <div className="verdict-card verdict-tracks actual-tracks">
         <div className="track-columns">
@@ -228,6 +241,12 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
             <div className="track-row actual-target"><span>↑ Target × Qty</span><em>₹{((actualAggressiveTarget ?? 0) * qty).toFixed(0)}</em></div>
             <div className="track-row actual-stop"><span>↓ Stop-loss × Qty</span><em>₹{((actualAggressiveStop ?? 0) * qty).toFixed(0)}</em></div>
           </div>
+        </div>
+      </div>}
+      {hasAnyPremium && <div className="verdict-card verdict-tracks actual-tracks book-levels">
+        <div className="track-columns">
+          <div className="track-column"><div className="track-header"><i></i><span>Conservative</span></div><div className="track-row actual-target"><span>Book profit at</span><em>₹{bookProfitConservative?.toFixed(0)}</em></div><div className="track-row actual-stop"><span>Book stop at</span><em>₹{bookStopConservative?.toFixed(0)}</em></div></div>
+          <div className="track-column"><div className="track-header"><i></i><span>Aggressive</span></div><div className="track-row actual-target"><span>Book profit at</span><em>₹{bookProfitAggressive?.toFixed(0)}</em></div><div className="track-row actual-stop"><span>Book stop at</span><em>₹{bookStopAggressive?.toFixed(0)}</em></div></div>
         </div>
       </div>}
       {!hasAnyPremium && <p className="structure-line">Enter fill premiums above to compute actual target / stop-loss and book levels.</p>}
