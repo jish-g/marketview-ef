@@ -208,7 +208,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
         </div>)}
       </div>
       <div className="position-outputs">
-        <span>Net Premium <b>₹{netPremium.toFixed(1)}</b></span>
+        <span>Net Premium ({isNetSeller ? 'received' : 'paid'}) <b>{hasAnyPremium ? `₹${netPremium.toFixed(1)}` : 'Not entered yet'}</b></span>
         {bookProfit !== null && <span>Book Profit <b>₹{bookProfit.toFixed(0)}</b></span>}
         {bookStop !== null && <span>Book Stop <b>₹{bookStop.toFixed(0)}</b></span>}
       </div>
@@ -216,17 +216,17 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
         <div className="track-columns">
           <div className="track-column">
             <div className="track-header"><i></i><span>Conservative</span></div>
-            <div className="track-row"><span>↑ Target (actual)</span><em>₹{actualConservativeTarget?.toFixed(1)}</em></div>
-            <div className="track-row"><span>↓ Stop-loss (actual)</span><em>₹{actualConservativeStop?.toFixed(1)}</em></div>
-            <div className="track-row"><span>↑ Target × Qty</span><em>₹{((actualConservativeTarget ?? 0) * qty).toFixed(0)}</em></div>
-            <div className="track-row"><span>↓ Stop-loss × Qty</span><em>₹{((actualConservativeStop ?? 0) * qty).toFixed(0)}</em></div>
+            <div className="track-row actual-target"><span>↑ Target (actual)</span><em>₹{actualConservativeTarget?.toFixed(1)}</em></div>
+            <div className="track-row actual-stop"><span>↓ Stop-loss (actual)</span><em>₹{actualConservativeStop?.toFixed(1)}</em></div>
+            <div className="track-row actual-target"><span>↑ Target × Qty</span><em>₹{((actualConservativeTarget ?? 0) * qty).toFixed(0)}</em></div>
+            <div className="track-row actual-stop"><span>↓ Stop-loss × Qty</span><em>₹{((actualConservativeStop ?? 0) * qty).toFixed(0)}</em></div>
           </div>
           <div className="track-column">
             <div className="track-header"><i></i><span>Aggressive</span></div>
-            <div className="track-row"><span>↑ Target (actual)</span><em>₹{actualAggressiveTarget?.toFixed(1)}</em></div>
-            <div className="track-row"><span>↓ Stop-loss (actual)</span><em>₹{actualAggressiveStop?.toFixed(1)}</em></div>
-            <div className="track-row"><span>↑ Target × Qty</span><em>₹{((actualAggressiveTarget ?? 0) * qty).toFixed(0)}</em></div>
-            <div className="track-row"><span>↓ Stop-loss × Qty</span><em>₹{((actualAggressiveStop ?? 0) * qty).toFixed(0)}</em></div>
+            <div className="track-row actual-target"><span>↑ Target (actual)</span><em>₹{actualAggressiveTarget?.toFixed(1)}</em></div>
+            <div className="track-row actual-stop"><span>↓ Stop-loss (actual)</span><em>₹{actualAggressiveStop?.toFixed(1)}</em></div>
+            <div className="track-row actual-target"><span>↑ Target × Qty</span><em>₹{((actualAggressiveTarget ?? 0) * qty).toFixed(0)}</em></div>
+            <div className="track-row actual-stop"><span>↓ Stop-loss × Qty</span><em>₹{((actualAggressiveStop ?? 0) * qty).toFixed(0)}</em></div>
           </div>
         </div>
       </div>}
