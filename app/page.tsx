@@ -114,7 +114,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const autoAtm = useMemo(() => { const raw = resolveAtmSpot(row, instrument); return raw ? Math.round(raw / strikeStep) * strikeStep : raw }, [row, instrument, strikeStep])
   const [atmSpot, setAtmSpot] = useState(String(autoAtm || ''))
   useEffect(() => { setAtmSpot(String(autoAtm || '')) }, [autoAtm])
-  const defaultOffsetForStrategy = (s: StrategyChoice) => (s === 'Iron Condor' || s === 'Custom' ? 4 : 0)
+  const defaultOffsetForStrategy = (s: StrategyChoice) => (s === 'Iron Condor' || s === 'Custom' ? (instrument === 'NIFTY' ? 6 : 5) : 0)
   const [offset, setOffset] = useState(String(defaultOffsetForStrategy(strategy)))
   const [delta, setDelta] = useState(String(deltaForOffset(defaultOffsetForStrategy(strategy))))
   useEffect(() => { const d = defaultOffsetForStrategy(strategy); setOffset(String(d)); setDelta(String(deltaForOffset(d))) }, [strategy])
@@ -123,7 +123,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const [lots, setLots] = useState('1')
   const lotSize = instrument === 'NIFTY' ? 65 : 20
   const qty = (Number(lots) || 0) * lotSize
-  const defaultHedgeWidth = instrument === 'NIFTY' ? 200 : 400
+  const defaultHedgeWidth = instrument === 'NIFTY' ? 200 : 300
   const [hedgeWidthInput, setHedgeWidthInput] = useState(String(defaultHedgeWidth))
   useEffect(() => { setHedgeWidthInput(String(defaultHedgeWidth)) }, [defaultHedgeWidth])
   const hedgeWidth = Number(hedgeWidthInput) || defaultHedgeWidth
