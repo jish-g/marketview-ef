@@ -91,8 +91,8 @@ function legsForStrategy(strategy: StrategyChoice, bias: string): LegDef[] {
     { key: 'lg', label: 'Buy Call (ATM)', side: 'Buy', wing: 0 },
   ]
   return [
-    { key: 'sc', label: 'Sell Call', side: 'Sell', wing: 1 },
     { key: 'lc', label: 'Buy Call (hedge)', side: 'Buy', wing: 1 },
+    { key: 'sc', label: 'Sell Call', side: 'Sell', wing: 1 },
     { key: 'sp', label: 'Sell Put', side: 'Sell', wing: -1 },
     { key: 'lp', label: 'Buy Put (hedge)', side: 'Buy', wing: -1 },
   ]
