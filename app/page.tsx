@@ -87,10 +87,11 @@ function legsForStrategy(strategy: StrategyChoice, bias: string, side: Side): Le
   if (strategy === 'Naked Call') return [{ key: 'p', label: 'Buy Call', side: 'Buy', wing: bias === 'Bearish' ? -1 : 1 }]
   if (strategy === 'Naked Put') return [{ key: 'p', label: 'Buy Put', side: 'Buy', wing: bias === 'Bullish' ? 1 : -1 }]
   if (strategy === 'Debit Spread') {
+    // Debit Spread buys the near-ATM leg and sells the far leg (opposite of Credit Spread's Sell-near/Buy-far shape).
     const isPut = side === 'Put'
     return [
-      { key: 'lg', label: isPut ? 'Buy Put (hedge)' : 'Buy Call (hedge)', side: 'Buy', wing: 0 },
-      { key: 's', label: isPut ? 'Sell Put (primary)' : 'Sell Call (primary)', side: 'Sell', wing: isPut ? -1 : 1 },
+      { key: 's', label: isPut ? 'Buy Put (primary)' : 'Buy Call (primary)', side: 'Buy', wing: isPut ? -1 : 1 },
+      { key: 'lg', label: isPut ? 'Sell Put (hedge)' : 'Sell Call (hedge)', side: 'Sell', wing: 0 },
     ]
   }
   if (strategy === 'Credit Spread') {
