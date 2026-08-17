@@ -192,10 +192,14 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const estAggressiveTarget = calc.aggressiveTarget * effectiveDelta
   const estAggressiveStop = calc.aggressiveStop * effectiveDelta
   const isNetSeller = strategy === 'Credit Spread' || strategy === 'Iron Condor' || strategy === 'Custom'
-  const actualConservativeTarget = hasAnyPremium ? (isNetSeller ? Math.max(0, netPremium * 0.4) : netPremium + calc.target * effectiveDelta) : null
-  const actualConservativeStop = hasAnyPremium ? (isNetSeller ? netPremium * 1.5 : Math.max(0, netPremium - calc.stop * effectiveDelta)) : null
-  const actualAggressiveTarget = hasAnyPremium ? (isNetSeller ? Math.max(0, netPremium * 0.4) : netPremium + calc.aggressiveTarget * effectiveDelta) : null
-  const actualAggressiveStop = hasAnyPremium ? (isNetSeller ? netPremium * 1.5 : Math.max(0, netPremium - calc.aggressiveStop * effectiveDelta)) : null
+  // Net-buyer strategies (Naked Call, Naked Put, Debit Spread) store Net Premium as a negative cost. Express
+  // Target/Stop-loss as signed P&L relative to that cost basis (|Net Premium|) rather than adding/subtracting
+  // the cushion from the raw negative value — Stop-loss is intentionally not floored at 0 here.
+  const costBasis = Math.abs(netPremium)
+  const actualConservativeTarget = hasAnyPremium ? (isNetSeller ? Math.max(0, netPremium * 0.4) : calc.target * effectiveDelta - costBasis) : null
+  const actualConservativeStop = hasAnyPremium ? (isNetSeller ? netPremium * 1.5 : calc.stop * effectiveDelta - costBasis) : null
+  const actualAggressiveTarget = hasAnyPremium ? (isNetSeller ? Math.max(0, netPremium * 0.4) : calc.aggressiveTarget * effectiveDelta - costBasis) : null
+  const actualAggressiveStop = hasAnyPremium ? (isNetSeller ? netPremium * 1.5 : calc.aggressiveStop * effectiveDelta - costBasis) : null
   const bookProfitConservative = actualConservativeTarget === null ? null : actualConservativeTarget * qty * 0.6
   const bookStopConservative = actualConservativeStop === null ? null : actualConservativeStop * qty * 0.4
   const bookProfitAggressive = actualAggressiveTarget === null ? null : actualAggressiveTarget * qty * 0.6
