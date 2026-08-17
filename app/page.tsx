@@ -72,26 +72,34 @@ function HistoryView({ rows }: { rows: Row[] | null | undefined }) {
 
 type Instrument = 'NIFTY' | 'SENSEX'
 type Strike = 'ATM' | 'ITM1' | 'ITM2'
+type Side = 'Call' | 'Put'
 const strikeDefaults: Record<Strike, number> = { ATM: 0.5, ITM1: 0.62, ITM2: 0.72 }
 type StrategyChoice = 'Naked Call' | 'Naked Put' | 'Debit Spread' | 'Credit Spread' | 'Iron Condor' | 'Custom'
 const strategyChoices: StrategyChoice[] = ['Naked Call', 'Naked Put', 'Debit Spread', 'Credit Spread', 'Iron Condor', 'Custom']
 function normalizeStrategy(strategy: string): StrategyChoice { if (strategy === 'Debit Call Spread' || strategy === 'Debit Put Spread') return 'Debit Spread'; if (strategy === 'Naked Call') return 'Naked Call'; if (strategy === 'Naked Put') return 'Naked Put'; if (strategy === 'Credit Spread') return 'Credit Spread'; return 'Iron Condor' }
-function deltaForOffset(offset: number): number { const steps = [0.5, 0.7, 0.85, 0.95]; const step = steps[Math.min(Math.abs(offset), 3)]; if (offset === 0) return step; return offset > 0 ? step : Number((1 - step).toFixed(2)) }
+// Strike placement convention: Call strike = ATM + offset (positive offset → further OTM), Put strike = ATM − offset (positive offset → further OTM).
+// Higher delta = deeper ITM, lower delta = further OTM, so positive offset must map to the LOW delta tier and negative offset to the HIGH delta tier.
+function deltaForOffset(offset: number): number { const steps = [0.5, 0.7, 0.85, 0.95]; const step = steps[Math.min(Math.abs(offset), 3)]; if (offset === 0) return step; return offset > 0 ? Number((1 - step).toFixed(2)) : step }
 type LegDef = { key: string; label: string; side: 'Buy' | 'Sell'; wing: number }
-function legsForStrategy(strategy: StrategyChoice, bias: string): LegDef[] {
+// `side` (Call/Put) is the single source of truth for Debit/Credit Spread leg construction — driven by the
+// user-facing toggle, not a hidden bias check, so the toggle is what actually controls which side gets built.
+function legsForStrategy(strategy: StrategyChoice, bias: string, side: Side): LegDef[] {
   if (strategy === 'Naked Call') return [{ key: 'p', label: 'Buy Call', side: 'Buy', wing: bias === 'Bearish' ? -1 : 1 }]
   if (strategy === 'Naked Put') return [{ key: 'p', label: 'Buy Put', side: 'Buy', wing: bias === 'Bullish' ? 1 : -1 }]
   if (strategy === 'Debit Spread') {
-    const bearish = bias === 'Bearish'
+    const isPut = side === 'Put'
     return [
-      { key: 'lg', label: bearish ? 'Buy Put (hedge)' : 'Buy Call (hedge)', side: 'Buy', wing: 0 },
-      { key: 's', label: bearish ? 'Sell Put (primary)' : 'Sell Call (primary)', side: 'Sell', wing: bearish ? -1 : 1 },
+      { key: 'lg', label: isPut ? 'Buy Put (hedge)' : 'Buy Call (hedge)', side: 'Buy', wing: 0 },
+      { key: 's', label: isPut ? 'Sell Put (primary)' : 'Sell Call (primary)', side: 'Sell', wing: isPut ? -1 : 1 },
     ]
   }
-  if (strategy === 'Credit Spread') return [
-    { key: 's', label: 'Sell Call (primary)', side: 'Sell', wing: 1 },
-    { key: 'lg', label: 'Buy Call (hedge)', side: 'Buy', wing: 0 },
-  ]
+  if (strategy === 'Credit Spread') {
+    const isPut = side === 'Put'
+    return [
+      { key: 's', label: isPut ? 'Sell Put (primary)' : 'Sell Call (primary)', side: 'Sell', wing: isPut ? -1 : 1 },
+      { key: 'lg', label: isPut ? 'Buy Put (hedge)' : 'Buy Call (hedge)', side: 'Buy', wing: 0 },
+    ]
+  }
   return [
     { key: 'lc', label: 'Buy Call (hedge)', side: 'Buy', wing: 1 },
     { key: 'sc', label: 'Sell Call', side: 'Sell', wing: 1 },
@@ -116,7 +124,9 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const autoAtm = useMemo(() => { const raw = resolveAtmSpot(row, instrument); return raw ? Math.round(raw / strikeStep) * strikeStep : raw }, [row, instrument, strikeStep])
   const [atmSpot, setAtmSpot] = useState(String(autoAtm || ''))
   useEffect(() => { setAtmSpot(String(autoAtm || '')) }, [autoAtm])
-  const defaultOffsetForStrategy = (s: StrategyChoice) => (s === 'Iron Condor' || s === 'Custom' ? (instrument === 'NIFTY' ? 6 : 5) : 0)
+  // Iron Condor / Custom default to 4 strikes away from ATM (offset 4 = 200 pts NIFTY / 400 pts SENSEX), so the
+  // short legs never default to plain ATM.
+  const defaultOffsetForStrategy = (s: StrategyChoice) => (s === 'Iron Condor' || s === 'Custom' ? 4 : 0)
   const [offset, setOffset] = useState(String(defaultOffsetForStrategy(strategy)))
   const [delta, setDelta] = useState(String(deltaForOffset(defaultOffsetForStrategy(strategy))))
   useEffect(() => { const d = defaultOffsetForStrategy(strategy); setOffset(String(d)); setDelta(String(deltaForOffset(d))) }, [strategy])
@@ -129,26 +139,35 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const [hedgeWidthInput, setHedgeWidthInput] = useState(String(defaultHedgeWidth))
   useEffect(() => { setHedgeWidthInput(String(defaultHedgeWidth)) }, [defaultHedgeWidth])
   const hedgeWidth = Number(hedgeWidthInput) || defaultHedgeWidth
-  const legs = useMemo(() => legsForStrategy(strategy, calc.bias), [strategy, calc.bias])
+  // Side toggle (Call side / Put side) for Debit/Credit Spread. Defaults from today's Bias but is the actual
+  // driver of leg construction from here on — fully user-overridable via the toggle below.
+  const defaultSide: Side = calc.bias === 'Bearish' ? 'Put' : 'Call'
+  const [side, setSide] = useState<Side>(defaultSide)
+  useEffect(() => { setSide(defaultSide) }, [defaultSide])
+  const legs = useMemo(() => legsForStrategy(strategy, calc.bias, side), [strategy, calc.bias, side])
   const atmNumber = Number(atmSpot) || 0
   const roundedStrike = (value: number) => Math.round(value / strikeStep) * strikeStep
   const [legPremiums, setLegPremiums] = useState<Record<string, string>>({})
   useEffect(() => { setLegPremiums({}) }, [strategy, instrument])
   const [strikeOverrides, setStrikeOverrides] = useState<Record<string, string>>({})
   useEffect(() => { setStrikeOverrides({}) }, [strategy, instrument, atmNumber, offsetNumber])
+  // Call strike = ATM + offset (further OTM as offset grows), Put strike = ATM − offset (further OTM as offset
+  // grows). Call and Put legs must never share the same shifted strike.
+  const callStrike = atmNumber + offsetNumber * strikeStep
+  const putStrike = atmNumber - offsetNumber * strikeStep
   const computedStrike = (leg: LegDef) => {
-    const shiftedAtm = atmNumber + offsetNumber * strikeStep
-    if (strategy === 'Naked Call' || strategy === 'Naked Put') return shiftedAtm
+    if (strategy === 'Naked Call') return callStrike
+    if (strategy === 'Naked Put') return putStrike
     if (strategy === 'Debit Spread' || strategy === 'Credit Spread') {
-      if (leg.wing !== 0) return shiftedAtm
-      const primaryWing = legs.find((l) => l.wing !== 0)?.wing ?? 1
-      return shiftedAtm + (primaryWing > 0 ? hedgeWidth : -hedgeWidth)
+      const primary = side === 'Put' ? putStrike : callStrike
+      if (leg.wing !== 0) return primary
+      return side === 'Put' ? primary - hedgeWidth : primary + hedgeWidth
     }
-    const shortStrike = shiftedAtm
-    if (leg.key === 'sc' || leg.key === 'sp') return shortStrike
-    if (leg.key === 'lc') return shortStrike + hedgeWidth
-    if (leg.key === 'lp') return shortStrike - hedgeWidth
-    return shortStrike
+    if (leg.key === 'sc') return callStrike
+    if (leg.key === 'sp') return putStrike
+    if (leg.key === 'lc') return callStrike + hedgeWidth
+    if (leg.key === 'lp') return putStrike - hedgeWidth
+    return callStrike
   }
   const legRows = legs.map((leg) => { const computed = roundedStrike(computedStrike(leg)); const override = strategy === 'Custom' ? strikeOverrides[leg.key] : undefined; return { ...leg, strike: override !== undefined && override !== '' ? Number(override) : computed, displayStrike: override !== undefined && override !== '' ? override : String(computed) } })
   const netPremium = legRows.reduce((sum, leg) => { const p = Number(legPremiums[leg.key]) || 0; return sum + (leg.side === 'Sell' ? p : -p) }, 0)
@@ -181,6 +200,10 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
           <select value={strategy} onChange={(e) => setStrategy(e.target.value as StrategyChoice)} aria-label={`${instrument} strategy override`}>
             {strategyChoices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
           </select>
+          {(strategy === 'Debit Spread' || strategy === 'Credit Spread') && <div className="side-toggle" role="group" aria-label={`${instrument} spread side`}>
+            <button type="button" className={side === 'Call' ? 'is-active' : ''} aria-pressed={side === 'Call'} onClick={() => setSide('Call')}>Call side</button>
+            <button type="button" className={side === 'Put' ? 'is-active' : ''} aria-pressed={side === 'Put'} onClick={() => setSide('Put')}>Put side</button>
+          </div>}
         </div>
         {autoStrategy !== strategy && <small className="strategy-suggestion">System suggested: {autoStrategy}</small>}
       </div>
