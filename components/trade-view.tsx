@@ -77,7 +77,7 @@ function TradeCard({ instrument, trade, legs, rationale, mutate }: { instrument:
   </article>
 }
 
-export default function TradePage() {
+export function TradeView() {
   const supabase = useMemo(() => createClient(), [])
   const tradeDate = todayIST()
   const { data, error, mutate } = useSWR(['trade-page', tradeDate], async () => {
@@ -97,7 +97,7 @@ export default function TradePage() {
   const rationale = (instrument: Instrument) => data?.snapshot ? calculateVerdict(data.snapshot, instrument) as Row : undefined
   const rows = [...trades].sort((a, b) => `${b.trade_date}-${b.instrument}`.localeCompare(`${a.trade_date}-${a.instrument}`))
 
-  return <main className="trade-page phase-view">
+  return <section className="phase-view trade-page">
     <div className="review-section-head"><div><p className="eyebrow">Execution desk</p><h2>Trade</h2></div><span>{tradeDate}</span></div>
     {error && <p className="history-empty">Unable to load trade data right now.</p>}
     <div className="trade-grid">
@@ -122,5 +122,5 @@ export default function TradePage() {
         </article>)}
       </div>}
     </section>
-  </main>
+  </section>
 }
