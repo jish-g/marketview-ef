@@ -65,8 +65,8 @@ function TradeCard({ instrument, trade, legs, rationale, mutate }: { instrument:
     </div>
     {isOpen ? (
       <div className="trade-actions">
-        <button type="button" className="action-button" onClick={() => record('target')} disabled={saving}><CheckCircle2 size={14} /> Mark Target Hit</button>
-        <button type="button" className="action-button" onClick={() => record('stop')} disabled={saving}><ArrowDown size={14} /> Mark Stop-loss Hit</button>
+        <button type="button" className="action-button action-button-success" onClick={() => record('target')} disabled={saving}><CheckCircle2 size={14} /> Mark Target Hit</button>
+        <button type="button" className="action-button action-button-danger" onClick={() => record('stop')} disabled={saving}><ArrowDown size={14} /> Mark Stop-loss Hit</button>
       </div>
     ) : (
       <div className="trade-confirmation">
@@ -92,7 +92,19 @@ export function TradeView() {
   }, { revalidateOnFocus: false })
   const trades = data?.trades ?? []
   const todayTrades = trades.filter((trade) => trade.trade_date === tradeDate)
-  const summary = useMemo(() => { const closed = trades.filter((trade) => trade.outcome !== 'open'); const targets = closed.filter((trade) => trade.outcome === 'target').length; const stops = closed.filter((trade) => trade.outcome === 'stop').length; return { total: closed.length, targets, stops, winRate: closed.length ? (targets / closed.length) * 100 : 0 } }, [trades])
+  const summary = useMemo(() => {
+    const closed = trades.filter((trade) => trade.outcome !== 'open')
+    const targets = closed.filter((trade) => trade.outcome === 'target').length
+    const stops = closed.filter((trade) => trade.outcome === 'stop').length
+    const pnl = trades.reduce((sum, trade) => {
+      const netPremium = Number(trade.net_premium) || 0
+      const qty = Number(trade.qty) || 0
+      if (trade.outcome === 'target') return sum + netPremium * qty * 0.6
+      if (trade.outcome === 'stop') return sum - netPremium * qty * 0.4
+      return sum
+    }, 0)
+    return { total: closed.length, targets, stops, winRate: closed.length ? (targets / closed.length) * 100 : 0, pnl }
+  }, [trades])
   const getTrade = (instrument: Instrument) => todayTrades.find((trade) => trade.instrument === instrument)
   const rationale = (instrument: Instrument) => data?.snapshot ? calculateVerdict(data.snapshot, instrument) as Row : undefined
   const rows = [...trades].sort((a, b) => `${b.trade_date}-${b.instrument}`.localeCompare(`${a.trade_date}-${a.instrument}`))
@@ -110,6 +122,7 @@ export function TradeView() {
         <div className="field-card"><span>Target hit count</span><strong>{summary.targets}</strong></div>
         <div className="field-card"><span>Stop-loss hit count</span><strong>{summary.stops}</strong></div>
         <div className="field-card"><span>Win rate %</span><strong>{summary.winRate.toFixed(0)}%</strong></div>
+        <div className="field-card"><span>Total P&amp;L</span><strong><em className={`breadth-flag ${summary.pnl >= 0 ? 'positive' : 'negative'}`}>{summary.pnl >= 0 ? '+' : '−'}₹{Math.abs(summary.pnl).toFixed(0)}</em></strong></div>
       </div>
       {rows.length === 0 ? <p className="history-empty">No past trades recorded yet.</p> : <div className="history-list">
         <div className="history-row history-head trade-log-row" aria-hidden="true"><span>Date</span><span>Instrument</span><span>Strategy</span><span>Net Premium</span><span>Outcome</span></div>
