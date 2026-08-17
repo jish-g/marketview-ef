@@ -82,13 +82,13 @@ function legsForStrategy(strategy: StrategyChoice, bias: string): LegDef[] {
   if (strategy === 'Debit Spread') {
     const bearish = bias === 'Bearish'
     return [
-      { key: 'lg', label: bearish ? 'Buy Put (ATM)' : 'Buy Call (ATM)', side: 'Buy', wing: 0 },
+      { key: 'lg', label: bearish ? 'Buy Put (hedge)' : 'Buy Call (hedge)', side: 'Buy', wing: 0 },
       { key: 's', label: bearish ? 'Sell Put (primary)' : 'Sell Call (primary)', side: 'Sell', wing: bearish ? -1 : 1 },
     ]
   }
   if (strategy === 'Credit Spread') return [
     { key: 's', label: 'Sell Call (primary)', side: 'Sell', wing: 1 },
-    { key: 'lg', label: 'Buy Call (ATM)', side: 'Buy', wing: 0 },
+    { key: 'lg', label: 'Buy Call (hedge)', side: 'Buy', wing: 0 },
   ]
   return [
     { key: 'lc', label: 'Buy Call (hedge)', side: 'Buy', wing: 1 },
@@ -114,14 +114,19 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const autoAtm = useMemo(() => { const raw = resolveAtmSpot(row, instrument); return raw ? Math.round(raw / strikeStep) * strikeStep : raw }, [row, instrument, strikeStep])
   const [atmSpot, setAtmSpot] = useState(String(autoAtm || ''))
   useEffect(() => { setAtmSpot(String(autoAtm || '')) }, [autoAtm])
-  const [offset, setOffset] = useState('0')
-  const [delta, setDelta] = useState(String(deltaForOffset(0)))
+  const defaultOffsetForStrategy = (s: StrategyChoice) => (s === 'Iron Condor' || s === 'Custom' ? 4 : 0)
+  const [offset, setOffset] = useState(String(defaultOffsetForStrategy(strategy)))
+  const [delta, setDelta] = useState(String(deltaForOffset(defaultOffsetForStrategy(strategy))))
+  useEffect(() => { const d = defaultOffsetForStrategy(strategy); setOffset(String(d)); setDelta(String(deltaForOffset(d))) }, [strategy])
   const offsetNumber = Number(offset) || 0
   const onOffsetChange = (v: string) => { setOffset(v); const n = Number(v) || 0; setDelta(String(deltaForOffset(n))) }
   const [lots, setLots] = useState('1')
   const lotSize = instrument === 'NIFTY' ? 65 : 20
   const qty = (Number(lots) || 0) * lotSize
-  const hedgeWidth = instrument === 'NIFTY' ? 200 : 400
+  const defaultHedgeWidth = instrument === 'NIFTY' ? 200 : 400
+  const [hedgeWidthInput, setHedgeWidthInput] = useState(String(defaultHedgeWidth))
+  useEffect(() => { setHedgeWidthInput(String(defaultHedgeWidth)) }, [defaultHedgeWidth])
+  const hedgeWidth = Number(hedgeWidthInput) || defaultHedgeWidth
   const legs = useMemo(() => legsForStrategy(strategy, calc.bias), [strategy, calc.bias])
   const atmNumber = Number(atmSpot) || 0
   const roundedStrike = (value: number) => Math.round(value / strikeStep) * strikeStep
@@ -132,7 +137,11 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const computedStrike = (leg: LegDef) => {
     const shiftedAtm = atmNumber + offsetNumber * strikeStep
     if (strategy === 'Naked Call' || strategy === 'Naked Put') return shiftedAtm
-    if (strategy === 'Debit Spread' || strategy === 'Credit Spread') return leg.wing === 0 ? atmNumber : shiftedAtm
+    if (strategy === 'Debit Spread' || strategy === 'Credit Spread') {
+      if (leg.wing !== 0) return shiftedAtm
+      const primaryWing = legs.find((l) => l.wing !== 0)?.wing ?? 1
+      return shiftedAtm + (primaryWing > 0 ? hedgeWidth : -hedgeWidth)
+    }
     const shortStrike = shiftedAtm
     if (leg.key === 'sc' || leg.key === 'sp') return shortStrike
     if (leg.key === 'lc') return shortStrike + hedgeWidth
@@ -180,6 +189,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
         <label>ATM spot<input type="number" step={strikeStep} value={atmSpot} onChange={(e) => setAtmSpot(e.target.value === '' ? '' : String(roundedStrike(Number(e.target.value))))} aria-label={`${instrument} ATM spot`} /></label>
         <label>Strikes from ATM<input type="number" step="1" value={offset} onChange={(e) => onOffsetChange(e.target.value)} aria-label={`${instrument} strikes from ATM`} /></label>
         <label>Delta<input type="number" min="0" max="1" step="0.01" value={delta} onChange={(e) => setDelta(e.target.value)} aria-label={`${instrument} effective delta`} /></label>
+        {strategy !== 'Naked Call' && strategy !== 'Naked Put' && <label>Hedge width<input type="number" step={strikeStep} value={hedgeWidthInput} onChange={(e) => setHedgeWidthInput(e.target.value === '' ? '' : String(roundedStrike(Number(e.target.value))))} aria-label={`${instrument} hedge width`} /></label>}
       </div>
       <small>Delta auto-fills from the strike-offset step table; editing a leg&apos;s strike below will not resync it — only changing &quot;Strikes from ATM&quot; does.</small>
     </div>
