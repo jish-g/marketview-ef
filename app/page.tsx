@@ -192,18 +192,19 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const estAggressiveTarget = calc.aggressiveTarget * effectiveDelta
   const estAggressiveStop = calc.aggressiveStop * effectiveDelta
   const isNetSeller = strategy === 'Credit Spread' || strategy === 'Iron Condor' || strategy === 'Custom'
-  // Net-buyer strategies (Naked Call, Naked Put, Debit Spread) do NOT use Net Premium in Target/Stop-loss at
-  // all — these are premium-invariant (points × delta only), matching the Estimate card's values exactly
-  // regardless of what premium is entered. Net Premium remains seller-only P&L basis for Credit Spread /
-  // Iron Condor / Custom, which are untouched below.
-  const actualConservativeTarget = hasAnyPremium ? (isNetSeller ? Math.max(0, netPremium * 0.4) : calc.target * effectiveDelta) : null
-  const actualConservativeStop = hasAnyPremium ? (isNetSeller ? netPremium * 1.5 : calc.stop * effectiveDelta) : null
-  const actualAggressiveTarget = hasAnyPremium ? (isNetSeller ? Math.max(0, netPremium * 0.4) : calc.aggressiveTarget * effectiveDelta) : null
-  const actualAggressiveStop = hasAnyPremium ? (isNetSeller ? netPremium * 1.5 : calc.aggressiveStop * effectiveDelta) : null
-  const bookProfitConservative = actualConservativeTarget === null ? null : actualConservativeTarget * qty * 0.6
-  const bookStopConservative = actualConservativeStop === null ? null : actualConservativeStop * qty * 0.4
-  const bookProfitAggressive = actualAggressiveTarget === null ? null : actualAggressiveTarget * qty * 0.6
-  const bookStopAggressive = actualAggressiveStop === null ? null : actualAggressiveStop * qty * 0.4
+  // Credit Spread / Iron Condor split Net Premium into distinct Conservative vs Aggressive pairs (60/40 and
+  // 75/25) so the two columns diverge like the buyer-side strategies do via Expected Move, and Target now
+  // exceeds Stop-loss in both columns. Custom keeps the older single 0.4/1.5 pair (out of scope for this
+  // change). Naked Call/Naked Put/Debit Spread remain premium-invariant (points × delta only), untouched here.
+  const isSpreadSeller = strategy === 'Credit Spread' || strategy === 'Iron Condor'
+  const actualConservativeTarget = hasAnyPremium ? (isSpreadSeller ? netPremium * 0.6 : isNetSeller ? Math.max(0, netPremium * 0.4) : calc.target * effectiveDelta) : null
+  const actualConservativeStop = hasAnyPremium ? (isSpreadSeller ? netPremium * 0.4 : isNetSeller ? netPremium * 1.5 : calc.stop * effectiveDelta) : null
+  const actualAggressiveTarget = hasAnyPremium ? (isSpreadSeller ? netPremium * 0.75 : isNetSeller ? Math.max(0, netPremium * 0.4) : calc.aggressiveTarget * effectiveDelta) : null
+  const actualAggressiveStop = hasAnyPremium ? (isSpreadSeller ? netPremium * 0.25 : isNetSeller ? netPremium * 1.5 : calc.aggressiveStop * effectiveDelta) : null
+  const bookProfitConservative = actualConservativeTarget === null ? null : isSpreadSeller ? actualConservativeTarget * qty : actualConservativeTarget * qty * 0.6
+  const bookStopConservative = actualConservativeStop === null ? null : isSpreadSeller ? actualConservativeStop * qty : actualConservativeStop * qty * 0.4
+  const bookProfitAggressive = actualAggressiveTarget === null ? null : isSpreadSeller ? actualAggressiveTarget * qty : actualAggressiveTarget * qty * 0.6
+  const bookStopAggressive = actualAggressiveStop === null ? null : isSpreadSeller ? actualAggressiveStop * qty : actualAggressiveStop * qty * 0.4
   const sync = Math.abs(calc.difference) <= 5 ? ['In Sync', 'success', 'Prediction is tracking the actual open.'] : Math.abs(calc.difference) <= 15 ? ['Minor Divergence', 'warning', 'Prediction is slightly away from the actual open.'] : ['Diverging', 'danger', 'Prediction is materially away from the actual open.']
   const summary = `${row.trade_date} · ${row.day_name}: ${instrument} opened ${calc.gapPct >= 0 ? '+' : ''}${calc.gapPct.toFixed(2)}% gap (${calc.open.toFixed(1)}). ${calc.bias} bias with India VIX ${calc.vix.toFixed(1)} (${calc.vix < 11 ? 'low volatility — momentum only' : calc.vix <= 14 ? 'normal volatility — ATM / ITM by setup' : 'elevated volatility — prefer defined risk'}), ${calc.dte <= 7 ? 'Weekly' : 'Monthly'} expiry in ${calc.dte} days, ${calc.iv} versus VIX, PCR ${calc.pcr.toFixed(2)}, OI support ${calc.support.toFixed(0)} (${calc.oiSupport}) / resistance ${calc.resistance.toFixed(0)} (${calc.oiResistance}), chart ${calc.chartSupport.toFixed(0)}–${calc.chartResistance.toFixed(0)}, max pain ${calc.maxPain.toFixed(0)}.`
   return <article className="verdict-instrument">
