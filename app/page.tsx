@@ -116,18 +116,78 @@ const midRemapKeys: Record<string, string> = { atm_iv_nifty_mid: 'atm_iv_nifty',
 function buildMidRow(row: Row, mid: Row): Row { const overlay: Row = {}; for (const [midKey, targetKey] of Object.entries(midRemapKeys)) { if (mid[midKey] !== null && mid[midKey] !== undefined) overlay[targetKey] = mid[midKey] }; return { ...row, ...overlay, spot_nifty: mid.spot_nifty ?? null, spot_sensex: mid.spot_sensex ?? null, intraday_change_pct_nifty: mid.intraday_change_pct_nifty ?? null, intraday_change_pct_sensex: mid.intraday_change_pct_sensex ?? null } }
 function resolveAtmSpot(row: Row, instrument: Instrument): number { const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'; const direct = num(row, `spot_${suffix}`); if (direct) return direct; const prev = num(row, `prev_close_${suffix}`); const gapPoints = num(row, `gap_points_${suffix}`); if (prev && gapPoints) return prev + gapPoints; return prev }
 export function calculateVerdict(row: Row, instrument: Instrument) { const n = instrument === 'NIFTY'; const suffix = n ? 'nifty' : 'sensex'; const prev = num(row, `prev_close_${suffix}`); const open = n ? num(row, 'nifty_opening_points') : 0; const gapPct = n ? num(row, 'gift_nifty_gap_pct') : num(row, 'gap_points_sensex') / prev * 100; const predicted = num(row, 'gift_nifty_gap_pct') / 100 * num(row, 'prev_close_nifty'); const difference = open - predicted; const pcr = num(row, `pcr_${suffix}`); const iv = num(row, `atm_iv_${suffix}`); const vix = num(row, 'india_vix'); const support = num(row, `oi_support_${suffix}`); const resistance = num(row, `oi_resistance_${suffix}`); const maxPain = num(row, `max_pain_${suffix}`); const oiChangeSupport = String(row[`oi_change_support_${suffix}`] ?? ''); const oiChangeResistance = String(row[`oi_change_resistance_${suffix}`] ?? ''); const adRatio = advanceDeclineRatio(row); let bullVotes = 0; let bearVotes = 0; const giftGap = num(row, 'gift_nifty_gap_pct'); if (giftGap > 0) bullVotes++; if (giftGap < 0) bearVotes++; if (pcr > 1.3) bullVotes++; if (pcr < 0.8) bearVotes++; if (oiChangeSupport === 'Addition') bullVotes++; if (oiChangeSupport === 'Unwinding') bearVotes++; if (oiChangeResistance === 'Unwinding') bullVotes++; if (oiChangeResistance === 'Addition') bearVotes++; if (adRatio !== null && adRatio > 1.5) bullVotes++; if (adRatio !== null && adRatio < 0.7) bearVotes++; const bias = bullVotes > bearVotes ? 'Bullish' : bearVotes > bullVotes ? 'Bearish' : 'Neutral'; const ivRead = iv - vix > 2 ? 'IV rich' : 'IV fair'; const range = Math.abs(gapPct) <= 0.75; const strategy = range && ivRead === 'IV fair' ? 'Iron Condor' : !range && ivRead === 'IV rich' ? (bias === 'Bullish' ? 'Debit Call Spread' : bias === 'Bearish' ? 'Debit Put Spread' : 'Iron Condor') : range && ivRead === 'IV rich' ? 'Credit Spread' : bias === 'Bullish' ? 'Naked Call' : bias === 'Bearish' ? 'Naked Put' : 'Iron Condor'; const straddle = num(row, `atm_straddle_price_${suffix}`); const dte = num(row, `days_to_expiry_${suffix}`); const avgMove5d = num(row, `avg_move_5d_${suffix}`); const estimateA = straddle / Math.sqrt(Math.max(dte, 1)); const estimateB = avgMove5d; const conservative = Math.min(estimateA, estimateB); const aggressive = Math.max(estimateA, estimateB); const target = conservative * 0.6; const stop = conservative * 0.3; const aggressiveTarget = aggressive * 0.6; const aggressiveStop = aggressive * 0.3; const strike: Strike = vix < 11 ? 'ATM' : vix <= 14 ? 'ITM1' : 'ITM2'; return { gapPct, prev, open, predicted, difference, pcr, iv, vix, support, resistance, maxPain, bias, ivRead, strategy, straddle, conservative, aggressive, target, stop, aggressiveTarget, aggressiveStop, strike, dte, oiSupport: oiChangeSupport || '—', oiResistance: oiChangeResistance || '—', chartSupport: num(row, `chart_support_${suffix}`), chartResistance: num(row, `chart_resistance_${suffix}`) } }
-// Builds a one-line auto-generated narration from the already-computed verdict fields — reuses calc.bias rather
-// than recomputing it, and uses no new data beyond gap/VIX/PCR/OI/max pain/expiry already available on calc.
-function narrateBias(calc: ReturnType<typeof calculateVerdict>) {
-  const gapAbs = Math.abs(calc.gapPct)
-  const gapClause = gapAbs < 0.3 ? `flat gap (${calc.gapPct >= 0 ? '' : '-'}${gapAbs.toFixed(2)}%)` : calc.gapPct >= 0 ? `gap-up of ${calc.gapPct.toFixed(2)}%` : `gap-down of ${gapAbs.toFixed(2)}%`
-  const vixClause = calc.vix < 13 ? `low VIX (${calc.vix.toFixed(1)}) signals limited expected movement` : calc.vix <= 18 ? `VIX (${calc.vix.toFixed(1)}) is in a normal range, allowing for moderate movement` : `elevated VIX (${calc.vix.toFixed(1)}) signals scope for a sharper move than usual`
-  const pcrClause = calc.bias === 'Neutral' ? `PCR ${calc.pcr.toFixed(2)} suggests balanced positioning` : calc.bias === 'Bullish' ? `PCR ${calc.pcr.toFixed(2)} leans toward put-side hedging over call-writing` : `PCR ${calc.pcr.toFixed(2)} leans toward call-writing pressure`
-  const supportClause = calc.oiSupport === 'Addition' ? `OI addition at support (${calc.support.toFixed(0)}) shows the floor being defended` : calc.oiSupport === 'Unwinding' ? `OI unwinding at support (${calc.support.toFixed(0)}) suggests the floor is weakening` : null
-  const resistanceClause = calc.oiResistance === 'Addition' ? `OI addition at resistance (${calc.resistance.toFixed(0)}) shows the ceiling being defended` : calc.oiResistance === 'Unwinding' ? `OI unwinding at resistance (${calc.resistance.toFixed(0)}) suggests the ceiling may give way` : null
-  const oiClause = calc.bias === 'Neutral' ? [supportClause, resistanceClause].filter(Boolean).join(' and ') || 'OI action at both levels is mixed' : calc.bias === 'Bullish' ? supportClause || resistanceClause || 'OI action is mixed' : resistanceClause || supportClause || 'OI action is mixed'
-  const expiryClause = calc.dte <= 1 ? ` With expiry in ${calc.dte} day(s), expect price to gravitate toward max pain (${calc.maxPain.toFixed(0)}).` : ''
-  return `${calc.bias} — ${gapClause}, ${vixClause}, ${pcrClause}, ${oiClause}.${expiryClause}`
+// Raw (non-defaulted) numeric read of a premarket_dashboard column — returns null when the source field is
+// missing so callers can omit a reasoning line rather than fabricating a value from a 0 default.
+function rawNum(row: Row, key: string): number | null { const v = row[key]; if (v === null || v === undefined || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null }
+// Builds the rules-based reasoning block for the Day Summary panel: one line per category, each stating the
+// input number, the band it matched, and the interpretation — built only from existing premarket_dashboard
+// columns (plus the new spot_nifty/spot_sensex columns for the Max Pain line). Any missing source field
+// causes that specific line to be omitted rather than guessed. Supersedes the old narrateBias function.
+function reasoningLines(row: Row, calc: ReturnType<typeof calculateVerdict>, instrument: Instrument): string[] {
+  const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
+  const lines: string[] = []
+
+  // 1. Gap — reuses the same gap % already shown in paragraph one (calc.gapPct), gated on its raw source
+  // columns so a missing source still omits the line rather than showing a fabricated "0%".
+  const gapSourceOk = instrument === 'NIFTY' ? rawNum(row, 'gift_nifty_gap_pct') !== null : rawNum(row, 'gap_points_sensex') !== null && rawNum(row, 'prev_close_sensex') !== null
+  if (gapSourceOk) {
+    const gapPct = calc.gapPct
+    const gapLabel = gapPct > 0.75 ? 'Strong gap up' : gapPct >= 0.25 ? 'Normal gap up' : gapPct >= -0.25 ? 'Flat' : gapPct >= -0.75 ? 'Normal gap down' : 'Strong gap down'
+    lines.push(`Gap is ${gapPct >= 0 ? '+' : ''}${gapPct.toFixed(2)}%, a ${gapLabel}.`)
+  }
+
+  // 2. IV vs VIX
+  const ivRaw = rawNum(row, `atm_iv_${suffix}`)
+  const vixRaw = rawNum(row, 'india_vix')
+  if (ivRaw !== null && vixRaw !== null) {
+    const delta = ivRaw - vixRaw
+    const label = delta < 0 ? 'Slightly cheap — mildly favorable, trade per VIX rule' : delta < 3 ? 'Fairly priced — trade normally' : 'Overpriced premium — move closer to ATM or skip'
+    lines.push(`ATM IV (${ivRaw.toFixed(1)}%) is ${Math.abs(delta).toFixed(1)} pts ${delta >= 0 ? 'above' : 'below'} VIX (${vixRaw.toFixed(1)}%) — ${label}.`)
+  }
+
+  // 3. VIX level (single shared value across both instruments)
+  if (vixRaw !== null) {
+    const [label, strikeLabel] = vixRaw < 11 ? ['Trade with caution — small premiums, theta-heavy', 'ATM only on strong momentum'] : vixRaw < 14 ? ['Normal conditions, ideal for buying', 'standard rule (ATM / ITM by setup)'] : vixRaw < 18 ? ['Elevated — premiums are richer', 'prefer 1-strike ITM to reduce IV exposure'] : vixRaw < 22 ? ['High — IV crush risk', '2-strike ITM only, or skip trade'] : ['Avoid fresh option buys', 'wait for VIX to normalize']
+    lines.push(`VIX at ${vixRaw.toFixed(1)} — ${label}. Strike guidance: ${strikeLabel}.`)
+  }
+
+  // 4. PCR
+  const pcrRaw = rawNum(row, `pcr_${suffix}`)
+  if (pcrRaw !== null) {
+    const label = pcrRaw > 1.3 ? 'Oversold / bullish bias (excess puts written)' : pcrRaw >= 0.8 ? 'Neutral' : 'Overbought / bearish bias (excess calls written)'
+    lines.push(`PCR ${pcrRaw.toFixed(2)} — ${label}.`)
+  }
+
+  // 5. Max pain — requires the new spot_nifty/spot_sensex column to be populated (Market Open task). Never
+  // falls back to prev_close or any other field when spot is null — the line is simply omitted.
+  const spotRaw = rawNum(row, `spot_${suffix}`)
+  const maxPainRaw = rawNum(row, `max_pain_${suffix}`)
+  if (spotRaw !== null && maxPainRaw !== null && maxPainRaw !== 0) {
+    const distancePct = ((spotRaw - maxPainRaw) / maxPainRaw) * 100
+    const [direction, label] = distancePct > 0.3 ? ['above', 'Downward pull likely toward expiry'] : distancePct >= -0.3 ? ['near', 'Pinning likely'] : ['below', 'Upward pull likely toward expiry']
+    lines.push(`Spot (${spotRaw.toFixed(0)}) is ${Math.abs(distancePct).toFixed(2)}% ${direction} max pain (${maxPainRaw.toFixed(0)}) — ${label}.`)
+  }
+
+  // 6. OI change — omit entirely unless both support and resistance OI change readings are valid.
+  const oiChangeSupport = String(row[`oi_change_support_${suffix}`] ?? '')
+  const oiChangeResistance = String(row[`oi_change_resistance_${suffix}`] ?? '')
+  const oiSupportRaw = rawNum(row, `oi_support_${suffix}`)
+  const oiResistanceRaw = rawNum(row, `oi_resistance_${suffix}`)
+  const validOiChange = (v: string) => v === 'Addition' || v === 'Unwinding'
+  if (validOiChange(oiChangeSupport) && validOiChange(oiChangeResistance) && oiSupportRaw !== null && oiResistanceRaw !== null) {
+    const supportLabel = oiChangeSupport === 'Addition' ? 'Support strengthening' : 'Support weakening — breakdown risk'
+    const resistanceLabel = oiChangeResistance === 'Addition' ? 'Resistance strengthening' : 'Resistance weakening — breakout risk'
+    lines.push(`Support OI ${oiChangeSupport.toLowerCase()} at ${oiSupportRaw.toFixed(0)} (${supportLabel}); resistance OI ${oiChangeResistance.toLowerCase()} at ${oiResistanceRaw.toFixed(0)} (${resistanceLabel}).`)
+  }
+
+  // 7. Days to expiry
+  const dteRaw = rawNum(row, `days_to_expiry_${suffix}`)
+  if (dteRaw !== null) {
+    const label = dteRaw <= 1 ? 'High gamma risk — prefer spreads over naked options' : dteRaw <= 4 ? 'Normal' : 'Lower gamma risk — naked options viable if conviction high'
+    lines.push(`${dteRaw} day${dteRaw === 1 ? '' : 's'} to expiry — ${label}.`)
+  }
+
+  return lines
 }
 function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrument }) {
   const calc = useMemo(() => calculateVerdict(row, instrument), [row, instrument])
@@ -226,7 +286,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
         </div>
         {autoStrategy !== strategy && <small className="strategy-suggestion">System suggested: {autoStrategy}</small>}
       </div>
-      <div className="day-summary"><span className="eyebrow">Day summary</span><p>{summary}</p><p className="bias-narration">{narrateBias(calc)}</p></div>
+      <div className="day-summary"><span className="eyebrow">Day summary</span><p>{summary}</p><div className="bias-reasoning">{reasoningLines(row, calc, instrument).map((line, i) => <p className="reasoning-line" key={i}>{line}</p>)}</div></div>
     </div>
     <div className="verdict-card verdict-editable">
       <div className="verdict-controls verdict-controls-triple">
