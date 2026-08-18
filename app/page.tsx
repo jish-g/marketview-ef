@@ -119,79 +119,94 @@ export function calculateVerdict(row: Row, instrument: Instrument) { const n = i
 // Raw (non-defaulted) numeric read of a premarket_dashboard column — returns null when the source field is
 // missing so callers can omit a reasoning line rather than fabricating a value from a 0 default.
 function rawNum(row: Row, key: string): number | null { const v = row[key]; if (v === null || v === undefined || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null }
-// Builds the rules-based reasoning block for the Day Summary panel: one line per category, each stating the
-// input number, the band it matched, and the interpretation — built only from existing premarket_dashboard
-// columns (plus the new spot_nifty/spot_sensex columns for the Max Pain line). Any missing source field
-// causes that specific line to be omitted rather than guessed. Supersedes the old narrateBias function.
-function reasoningLines(row: Row, calc: ReturnType<typeof calculateVerdict>, instrument: Instrument): string[] {
+type BiasLabel = 'Strong Bullish' | 'Bullish' | 'Neutral' | 'Bearish' | 'Strong Bearish'
+type IvCondition = 'Cheap' | 'Normal' | 'Expensive'
+// STAGE 1 — Market Bias: weighted-signal score (Gap/OI/PCR/MaxPain) with DTE-dependent weights, replacing the
+// old vote-count `calc.bias` for display/strategy-selection purposes. `calc.bias` itself is left untouched
+// since it still drives leg wing/side placement (out of scope here per strike/hedge placement logic).
+function computeMarketBias(row: Row, calc: ReturnType<typeof calculateVerdict>, instrument: Instrument) {
   const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
-  const lines: string[] = []
-
-  // 1. Gap — reuses the same gap % already shown in paragraph one (calc.gapPct), gated on its raw source
-  // columns so a missing source still omits the line rather than showing a fabricated "0%".
-  const gapSourceOk = instrument === 'NIFTY' ? rawNum(row, 'gift_nifty_gap_pct') !== null : rawNum(row, 'gap_points_sensex') !== null && rawNum(row, 'prev_close_sensex') !== null
-  if (gapSourceOk) {
-    const gapPct = calc.gapPct
-    const gapLabel = gapPct > 0.75 ? 'Strong gap up' : gapPct >= 0.25 ? 'Normal gap up' : gapPct >= -0.25 ? 'Flat' : gapPct >= -0.75 ? 'Normal gap down' : 'Strong gap down'
-    lines.push(`Gap is ${gapPct >= 0 ? '+' : ''}${gapPct.toFixed(2)}%, a ${gapLabel}.`)
-  }
-
-  // 2. IV vs VIX
-  const ivRaw = rawNum(row, `atm_iv_${suffix}`)
-  const vixRaw = rawNum(row, 'india_vix')
-  if (ivRaw !== null && vixRaw !== null) {
-    const delta = ivRaw - vixRaw
-    const label = delta < 0 ? 'Slightly cheap — mildly favorable, trade per VIX rule' : delta < 3 ? 'Fairly priced — trade normally' : 'Overpriced premium — move closer to ATM or skip'
-    lines.push(`ATM IV (${ivRaw.toFixed(1)}%) is ${Math.abs(delta).toFixed(1)} pts ${delta >= 0 ? 'above' : 'below'} VIX (${vixRaw.toFixed(1)}%) — ${label}.`)
-  }
-
-  // 3. VIX level (single shared value across both instruments)
-  if (vixRaw !== null) {
-    const [label, strikeLabel] = vixRaw < 11 ? ['Trade with caution — small premiums, theta-heavy', 'ATM only on strong momentum'] : vixRaw < 14 ? ['Normal conditions, ideal for buying', 'standard rule (ATM / ITM by setup)'] : vixRaw < 18 ? ['Elevated — premiums are richer', 'prefer 1-strike ITM to reduce IV exposure'] : vixRaw < 22 ? ['High — IV crush risk', '2-strike ITM only, or skip trade'] : ['Avoid fresh option buys', 'wait for VIX to normalize']
-    lines.push(`VIX at ${vixRaw.toFixed(1)} — ${label}. Strike guidance: ${strikeLabel}.`)
-  }
-
-  // 4. PCR
-  const pcrRaw = rawNum(row, `pcr_${suffix}`)
-  if (pcrRaw !== null) {
-    const label = pcrRaw > 1.3 ? 'Oversold / bullish bias (excess puts written)' : pcrRaw >= 0.8 ? 'Neutral' : 'Overbought / bearish bias (excess calls written)'
-    lines.push(`PCR ${pcrRaw.toFixed(2)} — ${label}.`)
-  }
-
-  // 5. Max pain — requires the new spot_nifty/spot_sensex column to be populated (Market Open task). Never
-  // falls back to prev_close or any other field when spot is null — the line is simply omitted.
+  const gapPct = calc.gapPct
+  const gapScore = gapPct > 0.75 ? 2 : gapPct >= 0.25 ? 1 : gapPct >= -0.25 ? 0 : gapPct >= -0.75 ? -1 : -2
+  const pcr = calc.pcr
+  const pcrScore = pcr > 1.3 ? 2 : pcr >= 0.8 ? 0 : -2
+  const oiSupportScore = calc.oiSupport === 'Addition' ? 1 : calc.oiSupport === 'Unwinding' ? -1 : 0
+  const oiResistanceScore = calc.oiResistance === 'Addition' ? -1 : calc.oiResistance === 'Unwinding' ? 1 : 0
+  const oiScore = Math.max(-2, Math.min(2, oiSupportScore + oiResistanceScore))
+  // Max Pain score requires the new spot_{nifty|sensex} column; if null, its score is simply 0 rather than
+  // blocking the rest of the weighted sum.
   const spotRaw = rawNum(row, `spot_${suffix}`)
-  const maxPainRaw = rawNum(row, `max_pain_${suffix}`)
-  if (spotRaw !== null && maxPainRaw !== null && maxPainRaw !== 0) {
-    const distancePct = ((spotRaw - maxPainRaw) / maxPainRaw) * 100
-    const [direction, label] = distancePct > 0.3 ? ['above', 'Downward pull likely toward expiry'] : distancePct >= -0.3 ? ['near', 'Pinning likely'] : ['below', 'Upward pull likely toward expiry']
-    lines.push(`Spot (${spotRaw.toFixed(0)}) is ${Math.abs(distancePct).toFixed(2)}% ${direction} max pain (${maxPainRaw.toFixed(0)}) — ${label}.`)
+  const maxPainScore = spotRaw !== null && calc.maxPain ? (((spotRaw - calc.maxPain) / calc.maxPain) * 100 < -0.3 ? 1 : ((spotRaw - calc.maxPain) / calc.maxPain) * 100 > 0.3 ? -1 : 0) : 0
+  const dte = calc.dte
+  const weights = dte > 3 ? { gap: 0.45, oi: 0.25, pcr: 0.2, maxPain: 0.1 } : { gap: 0.25, oi: 0.45, pcr: 0.2, maxPain: 0.1 }
+  const score = gapScore * weights.gap + oiScore * weights.oi + pcrScore * weights.pcr + maxPainScore * weights.maxPain
+  const label: BiasLabel = score >= 1.25 ? 'Strong Bullish' : score >= 0.5 ? 'Bullish' : score > -0.5 ? 'Neutral' : score > -1.25 ? 'Bearish' : 'Strong Bearish'
+  return { score, label }
+}
+// STAGE 2 — Option Readiness: combines VIX level and ATM-IV-vs-VIX into one score (resolving the old
+// contradiction of two separate VIX/IV lines), plus a DTE component. Also derives IV Condition for Stage 3.
+function computeOptionReadiness(calc: ReturnType<typeof calculateVerdict>) {
+  const vix = calc.vix
+  const vixScore = vix >= 11 && vix < 14 ? 2 : vix < 11 ? 1 : vix < 18 ? 0 : vix < 22 ? -1 : -2
+  const delta = calc.iv - vix
+  const ivVixScore = Math.abs(delta) <= 1 ? 1 : delta < 0 ? 2 : -1
+  const dte = calc.dte
+  const dteScore = dte <= 1 ? -1 : dte <= 4 ? 2 : 1
+  const score = vixScore + ivVixScore + dteScore
+  const label = score >= 4 ? 'Good to Buy' : score >= 1 ? 'Caution' : 'Avoid'
+  const ivCondition: IvCondition = Math.abs(delta) <= 1 ? 'Normal' : delta < 0 ? 'Cheap' : 'Expensive'
+  return { score, label, ivCondition }
+}
+// STAGE 3 — Strategy Recommendation: Bias label + IV Condition + VIX + DTE lookup, with a DTE/VIX safety
+// filter applied after the initial pick (downgrade naked options near expiry; block fresh buying if VIX>22).
+function computeStrategyRecommendation(biasLabel: BiasLabel, ivCondition: IvCondition, vix: number, dte: number) {
+  const vixNormal = vix >= 11 && vix <= 18
+  let recommendation: string
+  let reason: string
+  if (biasLabel === 'Strong Bullish' || biasLabel === 'Bullish') {
+    if (vix > 18) { recommendation = 'Put Credit Spread'; reason = `bullish bias but VIX (${vix.toFixed(1)}) is high, so selling premium instead of buying` }
+    else if (ivCondition === 'Expensive') { recommendation = 'Put Credit Spread'; reason = 'bullish bias with expensive IV, so selling premium instead of buying' }
+    else if (biasLabel === 'Strong Bullish' && ivCondition === 'Cheap' && vixNormal) { recommendation = 'Naked Call'; reason = 'strong bullish bias with cheap IV and normal VIX' }
+    else { recommendation = 'Call Debit Spread'; reason = `${biasLabel.toLowerCase()} bias with ${ivCondition.toLowerCase()} IV` }
+  } else if (biasLabel === 'Strong Bearish' || biasLabel === 'Bearish') {
+    if (vix > 18) { recommendation = 'Call Credit Spread'; reason = `bearish bias but VIX (${vix.toFixed(1)}) is high, so selling premium instead of buying` }
+    else if (ivCondition === 'Expensive') { recommendation = 'Call Credit Spread'; reason = 'bearish bias with expensive IV, so selling premium instead of buying' }
+    else if (biasLabel === 'Strong Bearish' && ivCondition === 'Cheap' && vixNormal) { recommendation = 'Naked Put'; reason = 'strong bearish bias with cheap IV and normal VIX' }
+    else { recommendation = 'Put Debit Spread'; reason = `${biasLabel.toLowerCase()} bias with ${ivCondition.toLowerCase()} IV` }
+  } else {
+    if (vix > 18) { recommendation = 'Iron Condor'; reason = `neutral bias with high VIX (${vix.toFixed(1)}), so a defined-risk neutral trade` }
+    else if (ivCondition === 'Cheap') { recommendation = 'No Trade'; reason = 'neutral bias with cheap IV — no edge to sell premium and no directional conviction to buy' }
+    else { recommendation = 'Iron Condor'; reason = `neutral bias with ${ivCondition.toLowerCase()} IV` }
   }
-
-  // 6. OI change — omit entirely unless both support and resistance OI change readings are valid.
-  const oiChangeSupport = String(row[`oi_change_support_${suffix}`] ?? '')
-  const oiChangeResistance = String(row[`oi_change_resistance_${suffix}`] ?? '')
-  const oiSupportRaw = rawNum(row, `oi_support_${suffix}`)
-  const oiResistanceRaw = rawNum(row, `oi_resistance_${suffix}`)
-  const validOiChange = (v: string) => v === 'Addition' || v === 'Unwinding'
-  if (validOiChange(oiChangeSupport) && validOiChange(oiChangeResistance) && oiSupportRaw !== null && oiResistanceRaw !== null) {
-    const supportLabel = oiChangeSupport === 'Addition' ? 'Support strengthening' : 'Support weakening — breakdown risk'
-    const resistanceLabel = oiChangeResistance === 'Addition' ? 'Resistance strengthening' : 'Resistance weakening — breakout risk'
-    lines.push(`Support OI ${oiChangeSupport.toLowerCase()} at ${oiSupportRaw.toFixed(0)} (${supportLabel}); resistance OI ${oiChangeResistance.toLowerCase()} at ${oiResistanceRaw.toFixed(0)} (${resistanceLabel}).`)
-  }
-
-  // 7. Days to expiry
-  const dteRaw = rawNum(row, `days_to_expiry_${suffix}`)
-  if (dteRaw !== null) {
-    const label = dteRaw <= 1 ? 'High gamma risk — prefer spreads over naked options' : dteRaw <= 4 ? 'Normal' : 'Lower gamma risk — naked options viable if conviction high'
-    lines.push(`${dteRaw} day${dteRaw === 1 ? '' : 's'} to expiry — ${label}.`)
-  }
-
-  return lines
+  if (dte <= 1 && recommendation === 'Naked Call') { recommendation = 'Call Debit Spread'; reason += `, downgraded from Naked Call since DTE is ${dte} (avoid naked options near expiry)` }
+  if (dte <= 1 && recommendation === 'Naked Put') { recommendation = 'Put Debit Spread'; reason += `, downgraded from Naked Put since DTE is ${dte} (avoid naked options near expiry)` }
+  if (vix > 22 && (recommendation === 'Naked Call' || recommendation === 'Naked Put' || recommendation === 'Call Debit Spread' || recommendation === 'Put Debit Spread')) { recommendation = 'No Trade'; reason += `, overridden since VIX (${vix.toFixed(1)}) is above 22 (avoid fresh option buying)` }
+  return { recommendation, reason }
+}
+// Maps a Stage 3 recommendation string to the existing strategy dropdown + Call/Put side toggle. "No Trade"
+// does not change the underlying strategy value — it falls back to Iron Condor as a neutral placeholder and
+// instead flags `noTrade` so the UI can show the banner without disabling the manual dropdown.
+function mapRecommendationToStrategy(recommendation: string): { strategy: StrategyChoice; side?: Side; noTrade: boolean } {
+  if (recommendation === 'Naked Call') return { strategy: 'Naked Call', noTrade: false }
+  if (recommendation === 'Naked Put') return { strategy: 'Naked Put', noTrade: false }
+  if (recommendation === 'Call Debit Spread') return { strategy: 'Debit Spread', side: 'Call', noTrade: false }
+  if (recommendation === 'Put Debit Spread') return { strategy: 'Debit Spread', side: 'Put', noTrade: false }
+  if (recommendation === 'Put Credit Spread') return { strategy: 'Credit Spread', side: 'Put', noTrade: false }
+  if (recommendation === 'Call Credit Spread') return { strategy: 'Credit Spread', side: 'Call', noTrade: false }
+  if (recommendation === 'Iron Condor') return { strategy: 'Iron Condor', noTrade: false }
+  return { strategy: 'Iron Condor', noTrade: true }
 }
 function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrument }) {
   const calc = useMemo(() => calculateVerdict(row, instrument), [row, instrument])
-  const autoStrategy = normalizeStrategy(calc.strategy)
+  // 3-stage Bias / Option Readiness / Strategy Recommendation framework now drives autoStrategy (replacing the
+  // old normalizeStrategy(calc.strategy) vote-based pick). calc.bias/calc.strategy themselves are left intact
+  // since calc.bias still drives leg wing/side placement (strike/hedge placement logic, out of scope here).
+  const marketBias = useMemo(() => computeMarketBias(row, calc, instrument), [row, calc, instrument])
+  const optionReadiness = useMemo(() => computeOptionReadiness(calc), [calc])
+  const strategyRec = useMemo(() => computeStrategyRecommendation(marketBias.label, optionReadiness.ivCondition, calc.vix, calc.dte), [marketBias, optionReadiness, calc])
+  const mappedStrategy = useMemo(() => mapRecommendationToStrategy(strategyRec.recommendation), [strategyRec])
+  const autoStrategy = mappedStrategy.strategy
+  const isNoTrade = mappedStrategy.noTrade
   const [strategy, setStrategy] = useState<StrategyChoice>(autoStrategy)
   useEffect(() => { setStrategy(autoStrategy) }, [autoStrategy])
   const strikeStep = instrument === 'NIFTY' ? 50 : 100
@@ -213,9 +228,10 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const [hedgeWidthInput, setHedgeWidthInput] = useState(String(defaultHedgeWidth))
   useEffect(() => { setHedgeWidthInput(String(defaultHedgeWidth)) }, [defaultHedgeWidth])
   const hedgeWidth = Number(hedgeWidthInput) || defaultHedgeWidth
-  // Side toggle (Call side / Put side) for Debit/Credit Spread. Defaults from today's Bias but is the actual
-  // driver of leg construction from here on — fully user-overridable via the toggle below.
-  const defaultSide: Side = calc.bias === 'Bearish' ? 'Put' : 'Call'
+  // Side toggle (Call side / Put side) for Debit/Credit Spread. Defaults from the Stage 3 recommendation's
+  // mapped side when the recommendation is itself a Debit/Credit Spread, else from today's Bias — but is the
+  // actual driver of leg construction from here on, fully user-overridable via the toggle below.
+  const defaultSide: Side = mappedStrategy.side ?? (calc.bias === 'Bearish' ? 'Put' : 'Call')
   const [side, setSide] = useState<Side>(defaultSide)
   useEffect(() => { setSide(defaultSide) }, [defaultSide])
   const legs = useMemo(() => legsForStrategy(strategy, calc.bias, side), [strategy, calc.bias, side])
@@ -275,6 +291,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
     <div className="verdict-card verdict-strategy-summary">
       <div className="verdict-strategy-box">
         <span className="eyebrow">Your strategy</span>
+        {isNoTrade && <p className="no-trade-banner" role="status">No Trade recommended today — market readiness is low. You can still select a strategy manually below.</p>}
         <div className="verdict-controls verdict-controls-wide">
           <select value={strategy} onChange={(e) => setStrategy(e.target.value as StrategyChoice)} aria-label={`${instrument} strategy override`}>
             {strategyChoices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
@@ -286,7 +303,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
         </div>
         {autoStrategy !== strategy && <small className="strategy-suggestion">System suggested: {autoStrategy}</small>}
       </div>
-      <div className="day-summary"><span className="eyebrow">Day summary</span><p>{summary}</p><div className="bias-reasoning">{reasoningLines(row, calc, instrument).map((line, i) => <p className="reasoning-line" key={i}>{line}</p>)}</div></div>
+      <div className="day-summary"><span className="eyebrow">Day summary</span><p>{summary}</p><div className="bias-reasoning"><p className="reasoning-line"><strong>Market Bias:</strong> {marketBias.label} (score {marketBias.score.toFixed(2)})</p><p className="reasoning-line"><strong>Option Readiness:</strong> {optionReadiness.label} (score {optionReadiness.score})</p><p className="reasoning-line"><strong>Strategy Recommendation:</strong> {strategyRec.recommendation}, because {strategyRec.reason}.</p></div></div>
     </div>
     <div className="verdict-card verdict-editable">
       <div className="verdict-controls verdict-controls-triple">
