@@ -175,8 +175,9 @@ function computeStrategyRecommendation(biasLabel: BiasLabel, ivCondition: IvCond
     else { recommendation = 'Put Debit Spread'; reason = `${biasLabel.toLowerCase()} bias with ${ivCondition.toLowerCase()} IV` }
   } else {
     if (vix > 18) { recommendation = 'Iron Condor'; reason = `neutral bias with high VIX (${vix.toFixed(1)}), so a defined-risk neutral trade` }
+    else if (ivCondition === 'Expensive') { recommendation = 'Iron Condor'; reason = 'neutral bias with expensive IV — enough extra premium to justify selling a defined-risk neutral trade' }
     else if (ivCondition === 'Cheap') { recommendation = 'No Trade'; reason = 'neutral bias with cheap IV — no edge to sell premium and no directional conviction to buy' }
-    else { recommendation = 'Iron Condor'; reason = `neutral bias with ${ivCondition.toLowerCase()} IV` }
+    else { recommendation = 'No Trade'; reason = 'neutral bias with fairly-priced IV — no extra premium to justify selling, and no directional edge to buy' }
   }
   if (dte <= 1 && recommendation === 'Naked Call') { recommendation = 'Call Debit Spread'; reason += `, downgraded from Naked Call since DTE is ${dte} (avoid naked options near expiry)` }
   if (dte <= 1 && recommendation === 'Naked Put') { recommendation = 'Put Debit Spread'; reason += `, downgraded from Naked Put since DTE is ${dte} (avoid naked options near expiry)` }
