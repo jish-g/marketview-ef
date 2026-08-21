@@ -291,7 +291,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
     <div className="verdict-card verdict-strategy-summary">
       <div className="verdict-strategy-box">
         <span className="eyebrow">Your strategy</span>
-        {isNoTrade && <p className="no-trade-banner" role="status">No Trade recommended today — market readiness is low. You can still select a strategy manually below.</p>}
+        {isNoTrade && <p className="no-trade-banner" role="status">No Trade recommended today — {strategyRec.reason}. You can still select a strategy manually below.</p>}
         <div className="verdict-controls verdict-controls-wide">
           <select value={strategy} onChange={(e) => setStrategy(e.target.value as StrategyChoice)} aria-label={`${instrument} strategy override`}>
             {strategyChoices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
