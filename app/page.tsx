@@ -55,15 +55,60 @@ function gapBandLabel(gapPct: number) { if (gapPct > 0.75) return 'Strong Gap Up
 function highImpactEvent(eventToday: string | null | undefined) { const text = String(eventToday ?? ''); if (!text.includes('(High')) return null; const match = text.match(/^(.*?)\s*\(High,\s*([^)]+)\)/); if (!match) return null; return { name: match[1].trim(), time: match[2].trim() } }
 
 function RulesView() {
-  const sections = [
-    { title: 'Gap %', subtitle: 'Overnight move → opening bias', rows: [['> 0.75%', 'Strong gap up', 'Expect wider opening range'], ['0.25%–0.75%', 'Normal gap up', 'Trade with confirmation'], ['−0.25%–0.25%', 'Flat', 'Wait for direction'], ['−0.75%–−0.25%', 'Normal gap down', 'Trade with confirmation'], ['< −0.75%', 'Strong gap down', 'Expect wider opening range']] },
-    { title: 'VIX level', subtitle: 'Volatility → strike selection', rows: [['Below 11', 'Theta-heavy', 'ATM only on strong momentum'], ['11–14', 'Normal', 'ATM / ITM by setup'], ['14–18', 'Elevated', 'Prefer 1-strike ITM'], ['18–22', 'High crush risk', '2-strike ITM or skip'], ['Above 22', 'Avoid fresh buys', 'Wait for normalization']] },
-    { title: 'PCR', subtitle: 'Positioning → directional context', rows: [['> 1.3', 'Oversold / bullish', 'Look for upside confirmation'], ['0.8–1.3', 'Neutral', 'Use levels and breadth'], ['< 0.8', 'Overbought / bearish', 'Look for downside confirmation']] },
-    { title: 'Max pain', subtitle: 'Spot vs strike → expiry pull', rows: [['Above by > 0.3%', 'Downward pull', 'Mean reversion risk'], ['Within ±0.3%', 'Pinning likely', 'Expect range behavior'], ['Below by > 0.3%', 'Upward pull', 'Mean reversion risk']] },
-    { title: 'Open interest', subtitle: 'OI change → level quality', rows: [['Support + Addition', 'Support strengthening', 'Breakdown less likely'], ['Support + Unwinding', 'Support weakening', 'Breakdown risk'], ['Resistance + Addition', 'Resistance strengthening', 'Breakout less likely'], ['Resistance + Unwinding', 'Resistance weakening', 'Breakout risk']] },
-    { title: 'DTE', subtitle: 'Expiry distance → gamma risk', rows: [['≤ 1', 'High gamma risk', 'Prefer spreads'], ['2–4', 'Normal', 'Standard setup'], ['> 4', 'Lower gamma risk', 'Naked options viable with conviction']] },
+  // Stage 1 — Market Bias: weighted Gap/OI/PCR/Max Pain signal, replacing the old flat gap/VIX/PCR/max-pain/OI/DTE
+  // rule cards and the 5-signal majority-vote bias (which included advance/decline ratio) with the framework
+  // actually implemented in computeMarketBias/computeOptionReadiness/computeStrategyRecommendation.
+  const stage1 = [
+    { title: 'Gap %', subtitle: 'Overnight move · weight 45% (DTE > 3) / 25% (DTE ≤ 3)', rows: [['> 0.75%', 'Strong gap up', 'Score +2'], ['0.25% – 0.75%', 'Normal gap up', 'Score +1'], ['−0.25% to 0.25%', 'Flat', 'Score 0'], ['−0.75% to −0.25%', 'Normal gap down', 'Score −1'], ['< −0.75%', 'Strong gap down', 'Score −2']] },
+    { title: 'PCR', subtitle: 'Positioning · weight 20%', rows: [['> 1.30', 'Oversold / bullish', 'Score +2'], ['0.80 – 1.30', 'Neutral', 'Score 0'], ['< 0.80', 'Overbought / bearish', 'Score −2']] },
+    { title: 'Max pain', subtitle: 'Spot vs strike · weight 10%', rows: [['Spot below by > 0.3%', 'Upward pull expected', 'Score +1'], ['Within ±0.3%', 'Pinning likely', 'Score 0'], ['Spot above by > 0.3%', 'Downward pull expected', 'Score −1']] },
+    { title: 'OI structure', subtitle: 'Support/resistance change · weight 25% (DTE > 3) / 45% (DTE ≤ 3)', rows: [['Support: Addition', 'Support strengthening', '+1'], ['Support: Unwinding', 'Support weakening', '−1'], ['Resistance: Addition', 'Resistance strengthening', '−1'], ['Resistance: Unwinding', 'Resistance weakening', '+1']] },
   ]
-  return <section className="phase-view rules-view"><div className="phase-intro rules-header"><div><p className="eyebrow">Quick reference · condition → reading → action</p><h2>Rules engine</h2></div><a className="detailed-read-link" href="/rules">Detailed read <ChevronRight size={15} /></a></div><div className="rule-grid">{sections.map((section) => <article className="rule-table" key={section.title}><div className="rule-table-head"><div><strong>{section.title}</strong><span>{section.subtitle}</span></div><BookOpen size={16} /></div><div className="rule-table-labels"><span>Condition</span><span>Reading</span><span>Action</span></div>{section.rows.map(([condition, reading, action]) => <div className="rule-table-row" key={`${condition}-${reading}`}><b>{condition}</b><span>{reading}</span><span>{action}</span></div>)}</article>)}</div><div className="strategy-strip"><strong>Strategy overrides</strong><span>High-impact event → caution</span><span>DTE ≤ 1 → force spread / iron condor</span><span>Trend + high IV → debit spread</span><span>Range + high IV → credit spread</span></div></section>
+  // Stage 2 — Option Readiness: combined VIX-level + IV-vs-VIX score plus a DTE component (replacing the old
+  // fixed ±2-point IV/VIX threshold and the separate, uncombined VIX-level rule card).
+  const stage2 = [
+    { title: 'VIX score', subtitle: 'India VIX level', rows: [['11 – 14', 'Ideal, low-risk premium', 'Score +2'], ['Below 11', 'Thin, theta-heavy premium', 'Score +1'], ['14 – 18', 'Elevated premium', 'Score 0'], ['18 – 22', 'High, crush risk', 'Score −1'], ['Above 22', 'Blocks fresh buying only', 'Score −2']] },
+    { title: 'IV vs VIX', subtitle: 'ATM IV relative to VIX', rows: [['IV < VIX × 0.9', 'Cheap', 'Score +2'], ['IV ≤ VIX × 1.1', 'Normal', 'Score +1'], ['IV > VIX × 1.1', 'Expensive', 'Score −1']] },
+    { title: 'DTE score', subtitle: 'Days to expiry', rows: [['2 – 4', 'Ideal window', 'Score +2'], ['> 4', 'Lower gamma risk', 'Score +1'], ['≤ 1', 'High gamma risk', 'Score −1']] },
+  ]
+  // Stage 3 — Strategy Recommendation: Bias band × IV Condition × VIX × DTE, replacing the old Trend-vs-Range +
+  // IV lookup with its DTE≤1-forces-spread and high-impact-event overrides (neither reflects live logic today).
+  const stage3Rows: [string, string, string][] = [
+    ['Bullish + Cheap IV + Good to Buy (normal VIX)', 'Strong conviction, attractively priced', 'Naked Call (→ Call Debit Spread if DTE ≤ 1)'],
+    ['Bullish + Cheap/Normal IV', 'Directional edge, fairly priced', 'Call Debit Spread'],
+    ['Bullish + Expensive IV, or high VIX', 'Bullish but premium too rich to buy', 'Put Credit Spread'],
+    ['Bearish + Cheap IV + Good to Buy (normal VIX)', 'Strong conviction, attractively priced', 'Naked Put (→ Put Debit Spread if DTE ≤ 1)'],
+    ['Bearish + Cheap/Normal IV', 'Directional edge, fairly priced', 'Put Debit Spread'],
+    ['Bearish + Expensive IV, or high VIX', 'Bearish but premium too rich to buy', 'Call Credit Spread'],
+    ['Neutral + Cheap IV', 'No edge to sell, no conviction to buy', 'No Trade / Wait'],
+    ['Neutral + Normal IV', 'Fairly priced, no directional edge', 'No Trade / Wait'],
+    ['Neutral + Expensive IV', 'Enough premium to justify selling', 'Iron Condor'],
+    ['Neutral + High VIX', 'Elevated risk, defined-risk only', 'Iron Condor'],
+  ]
+  const formulas: [string, string, string][] = [
+    ['GIFT Nifty predicted open', 'Predicted (points) = GIFT Nifty gap % ÷ 100 × NIFTY previous close', 'Difference = actual opening gap (points) − predicted. SENSEX has no equivalent leading indicator.'],
+    ['Expected move (Conservative / Aggressive)', 'Option-implied = ATM straddle price ÷ √max(DTE, 1)', 'Historical = 5-day average daily range (High − Low). Conservative = smaller of the two; Aggressive = larger.'],
+    ['Target / stop-loss', 'Buyer strategies (Naked Call/Put, Debit Spread): Target/Stop = expected move (points) × strike\u2019s effective delta', 'Net premium plays no role for buyers. Seller strategies (Credit Spread, Iron Condor): Conservative Target = Net Premium × 60%, Conservative Stop = Net Premium × 40%; Aggressive Target = Net Premium × 75%, Aggressive Stop = Net Premium × 25%.'],
+    ['Book profit / book stop', 'Buyer strategies: Book Profit = Target (points) × Qty × 60%; Book Stop = Stop (points) × Qty × 40%', 'Seller strategies: Book Profit = Target × Qty; Book Stop = Stop × Qty — no extra split, since the 60/40–75/25 split already happened at the Target/Stop-loss level.'],
+  ]
+  return <section className="phase-view rules-view">
+    <div className="phase-intro rules-header"><div><p className="eyebrow">Quick reference · bias score → readiness score → strategy</p><h2>Rules engine</h2></div><a className="detailed-read-link" href="/rules">Detailed read <ChevronRight size={15} /></a></div>
+
+    <p className="eyebrow rules-stage-label">Stage 1 · Market bias</p>
+    <div className="rule-grid">{stage1.map((section) => <article className="rule-table" key={section.title}><div className="rule-table-head"><div><strong>{section.title}</strong><span>{section.subtitle}</span></div><BookOpen size={16} /></div><div className="rule-table-labels"><span>Condition</span><span>Reading</span><span>Score</span></div>{section.rows.map(([condition, reading, action]) => <div className="rule-table-row" key={`${condition}-${reading}`}><b>{condition}</b><span>{reading}</span><span>{action}</span></div>)}</article>)}</div>
+    <div className="strategy-strip"><strong>Final bias bands</strong><span>+1.25 to +2.00 Strong Bullish</span><span>+0.50 to +1.24 Bullish</span><span>−0.49 to +0.49 Neutral</span><span>−0.50 to −1.24 Bearish</span><span>−1.25 to −2.00 Strong Bearish</span></div>
+
+    <p className="eyebrow rules-stage-label">Stage 2 · Option readiness</p>
+    <div className="rule-grid">{stage2.map((section) => <article className="rule-table" key={section.title}><div className="rule-table-head"><div><strong>{section.title}</strong><span>{section.subtitle}</span></div><BookOpen size={16} /></div><div className="rule-table-labels"><span>Condition</span><span>Reading</span><span>Score</span></div>{section.rows.map(([condition, reading, action]) => <div className="rule-table-row" key={`${condition}-${reading}`}><b>{condition}</b><span>{reading}</span><span>{action}</span></div>)}</article>)}</div>
+    <div className="strategy-strip"><strong>Readiness bands</strong><span>+4 to +6 Good to Buy</span><span>+1 to +3 Caution</span><span>≤ 0 Avoid — forces No Trade regardless of bias</span></div>
+
+    <p className="eyebrow rules-stage-label">Stage 3 · Strategy recommendation</p>
+    <article className="rule-table"><div className="rule-table-head"><div><strong>Bias + IV condition + VIX/DTE</strong><span>Matched against the Stage 1 and Stage 2 outputs</span></div><BookOpen size={16} /></div><div className="rule-table-labels"><span>Condition</span><span>Reading</span><span>Recommendation</span></div>{stage3Rows.map(([condition, reading, action]) => <div className="rule-table-row" key={condition}><b>{condition}</b><span>{reading}</span><span>{action}</span></div>)}</article>
+    <div className="strategy-strip"><strong>Safety filters</strong><span>Readiness = Avoid → No Trade regardless of bias</span><span>VIX &gt; 22 blocks fresh premium-buying only — credit/selling strategies stay allowed</span><span>DTE ≤ 1 downgrades Naked Call/Put to the matching Debit Spread</span><span>Each &quot;No Trade&quot; shows its own specific reason (e.g. cheap IV vs. fairly-priced IV), not one generic message</span></div>
+
+    <p className="eyebrow rules-stage-label">Predicted open, expected move &amp; targets</p>
+    <div className="formula-grid">{formulas.map(([title, formula, note]) => <article className="formula-card" key={title}><p className="eyebrow">{title}</p><strong>{formula}</strong><span>{note}</span></article>)}</div>
+  </section>
 }
 
 function HistoryView({ rows }: { rows: Row[] | null | undefined }) {
