@@ -111,8 +111,81 @@ function RulesView() {
   </section>
 }
 
-function HistoryView({ rows }: { rows: Row[] | null | undefined }) {
-  return <section className="phase-view"><div className="phase-intro"><div><p className="eyebrow">Prior sessions</p><h2>History</h2></div></div>{rows && rows.length > 0 && <div className="history-row history-head" aria-hidden="true"><span>Date</span><span>Gap read</span><span>Gap %</span><span>VIX</span><span>Close %</span><span /></div>}<div className="history-list">{!rows ? <p className="history-empty">Loading history…</p> : rows.length === 0 ? <p className="history-empty">No history rows available yet.</p> : rows.map((item) => { const gapRaw = item.gift_nifty_gap_pct; const gapNum = Number(gapRaw); const hasGap = gapRaw !== null && gapRaw !== undefined && gapRaw !== '' && !Number.isNaN(gapNum); return <article className="history-row" key={String(item.trade_date)}><div><strong>{item.trade_date}</strong><span>{item.day_name ?? '—'}</span></div><b>{hasGap ? gapBandLabel(gapNum) : '—'}</b><span className={tone(item, 'gift_nifty_gap_pct')}>{value(item, 'gift_nifty_gap_pct', true)}</span><span>VIX {value(item, 'india_vix')}</span><span className={tone(item, 'day_change_pct_nifty')}>Close {value(item, 'day_change_pct_nifty', true)}</span><ChevronRight size={16} /></article> })}</div></section>
+// Per-day extras History needs beyond the premarket_dashboard row itself, keyed by trade_date.
+type HistoryExtras = { rows: Row[]; mid: Record<string, Row>; post: Record<string, Row>; trade: Record<string, Row> }
+
+function historyOutcomeRead(trade: Row | undefined) {
+  const outcome = trade?.outcome
+  if (outcome === 'target') return { label: 'Target Hit', cls: 'outcome-hit' }
+  if (outcome === 'stop') return { label: 'SL Hit', cls: 'outcome-stop' }
+  if (outcome === 'open') return { label: 'Trade still open', cls: 'outcome-neutral' }
+  return { label: 'No trade logged', cls: 'outcome-neutral' }
+}
+
+// One trading day told as a 4-beat story: Opening (real gap), Expected (fresh morning-call recompute),
+// Through the day (fresh midday recompute vs. the morning call), Close (actual outcome). Beats 2 and 3 are
+// recomputed here with the same computeMarketBias/computeOptionReadiness/computeStrategyRecommendation
+// functions the Verdict and Mid-market pages use — never read from the stale stored bias/strategy columns.
+function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid: Row | undefined; post: Row | undefined; trade: Row | undefined }) {
+  const instrument: Instrument = 'NIFTY'
+
+  // Beat 1 — Opening: NIFTY's own real opening gap (gap_points_nifty / prev_close_nifty), not GIFT Nifty's
+  // predicted overnight gap.
+  const prevClose = num(row, 'prev_close_nifty')
+  const gapPoints = num(row, 'gap_points_nifty')
+  const hasOpening = row.prev_close_nifty != null && row.gap_points_nifty != null
+  const openGapPct = prevClose ? (gapPoints / prevClose) * 100 : 0
+
+  // Beat 2 — Expected: the morning call, recomputed fresh from this row's own morning inputs.
+  const morningCalc = useMemo(() => calculateVerdict(row, instrument), [row])
+  const morningBias = useMemo(() => computeMarketBias(row, morningCalc, instrument), [row, morningCalc])
+  const morningReadiness = useMemo(() => computeOptionReadiness(morningCalc), [morningCalc])
+  const morningStrategy = useMemo(() => computeStrategyRecommendation(morningBias.label, morningReadiness.ivCondition, morningCalc.vix, morningCalc.dte), [morningBias, morningReadiness, morningCalc])
+
+  // Beat 3 — Through the day: midday read, recomputed fresh the same way from midmarket_snapshot's raw
+  // inputs merged over the morning row (buildMidRow), then compared against the Beat 2 result to decide
+  // whether it actually shifted.
+  const mid = useMemo(() => (midSnapshot ? buildMidRow(row, midSnapshot) : null), [row, midSnapshot])
+  const midCalc = useMemo(() => (mid ? calculateVerdict(mid, instrument) : null), [mid])
+  const midBias = useMemo(() => (mid && midCalc ? computeMarketBias(mid, midCalc, instrument) : null), [mid, midCalc])
+  const midReadiness = useMemo(() => (midCalc ? computeOptionReadiness(midCalc) : null), [midCalc])
+  const midStrategy = useMemo(() => (midBias && midReadiness && midCalc ? computeStrategyRecommendation(midBias.label, midReadiness.ivCondition, midCalc.vix, midCalc.dte) : null), [midBias, midReadiness, midCalc])
+  const hasMidday = Boolean(mid && midBias && midStrategy)
+  const shifted = midBias && midStrategy ? (midBias.label !== morningBias.label || midStrategy.recommendation !== morningStrategy.recommendation) : false
+
+  // Beat 4 — Close: postmarket_summary as-is (day_change_pct_nifty already reflects the corrected net_change
+  // calculation), plus the actual logged auto_trades outcome for the day — not a range-based estimate.
+  const outcome = historyOutcomeRead(trade)
+
+  return <article className="history-day-card">
+    <div className="history-day-head">
+      <div><strong>{row.trade_date}</strong><span>{row.day_name ?? '—'}</span></div>
+      {post && <span className={`history-close-pill ${tone(post, 'day_change_pct_nifty')}`}>{value(post, 'day_change_pct_nifty', true)}</span>}
+    </div>
+    <div className="history-beats">
+      <div className="history-beat">
+        <span className="history-beat-label">Opening</span>
+        {hasOpening ? <p><b className={openGapPct >= 0 ? 'positive' : 'negative'}>{openGapPct >= 0 ? '+' : ''}{openGapPct.toFixed(2)}%</b> gap ({gapPoints.toFixed(1)} pts) — {gapBandLabel(openGapPct)}</p> : <p className="history-beat-empty">No opening data recorded</p>}
+      </div>
+      <div className="history-beat">
+        <span className="history-beat-label">Expected</span>
+        <p><b>{morningBias.label}</b> bias · {morningStrategy.recommendation}</p>
+      </div>
+      <div className="history-beat">
+        <span className="history-beat-label">Through the day</span>
+        {hasMidday && midBias && midStrategy ? <p><b className={shifted ? 'is-shifted' : ''}>{midBias.label}</b> bias · {midStrategy.recommendation}<br /><span className="history-beat-note">{shifted ? 'Shifted since the morning call' : 'Unchanged since the morning call'}</span></p> : <p className="history-beat-empty">No midday snapshot recorded</p>}
+      </div>
+      <div className="history-beat">
+        <span className="history-beat-label">Close</span>
+        {post ? <p>Close <b className={tone(post, 'day_change_pct_nifty')}>{value(post, 'day_change_pct_nifty', true)}</b>, high/low {value(post, 'day_high_nifty')} / {value(post, 'day_low_nifty')}<br /><span className={outcome.cls}>{outcome.label}</span></p> : <p className="history-beat-empty">Post-market data not available</p>}
+      </div>
+    </div>
+  </article>
+}
+
+function HistoryView({ data }: { data: HistoryExtras | null | undefined }) {
+  const rows = data?.rows
+  return <section className="phase-view"><div className="phase-intro"><div><p className="eyebrow">Prior sessions</p><h2>History</h2></div></div><div className="history-list history-days">{!rows ? <p className="history-empty">Loading history…</p> : rows.length === 0 ? <p className="history-empty">No history rows available yet.</p> : rows.map((row) => <HistoryDayCard key={String(row.trade_date)} row={row} mid={data?.mid[String(row.trade_date)]} post={data?.post[String(row.trade_date)]} trade={data?.trade[String(row.trade_date)]} />)}</div></section>
 }
 
 type Instrument = 'NIFTY' | 'SENSEX'
@@ -499,21 +572,32 @@ export default function Dashboard() {
   const [phase, setPhase] = useState<Phase>('premarket'); const [dark, setDark] = useState(false); const [navOpen, setNavOpen] = useState(true); const [liveDate, setLiveDate] = useState(''); const [liveDay, setLiveDay] = useState(''); const [liveTime, setLiveTime] = useState('')
   const supabase = useMemo(() => createClient(), [])
   const { data: liveRow } = useSWR<Row | null>('premarket-dashboard', async () => { const { data, error } = await supabase.from('premarket_dashboard').select('*').order('trade_date', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data as Row | null }, { revalidateOnFocus: false })
-  const { data: historyRows } = useSWR<Row[] | null>('premarket-dashboard-history', async () => {
+  const { data: historyData } = useSWR<HistoryExtras | null>('premarket-dashboard-history', async () => {
     const { data: dashboardRows, error } = await supabase.from('premarket_dashboard').select('*').order('trade_date', { ascending: false }).limit(15)
     if (error) throw error
     const rows = (dashboardRows ?? []) as Row[]
     const tradeDates = rows.map((r) => r.trade_date).filter((d): d is string => typeof d === 'string')
-    if (tradeDates.length === 0) return rows
-    const { data: postRows, error: postError } = await supabase.from('postmarket_summary').select('trade_date, day_change_pct_nifty').in('trade_date', tradeDates)
+    if (tradeDates.length === 0) return { rows, mid: {}, post: {}, trade: {} }
+    const [{ data: midRows, error: midError }, { data: postRows, error: postError }, { data: tradeRows, error: tradeError }] = await Promise.all([
+      supabase.from('midmarket_snapshot').select('*').in('trade_date', tradeDates),
+      supabase.from('postmarket_summary').select('*').in('trade_date', tradeDates),
+      supabase.from('auto_trades').select('trade_date, instrument, outcome').in('trade_date', tradeDates),
+    ])
+    if (midError) throw midError
     if (postError) throw postError
-    const closeByDate = new Map((postRows ?? []).map((p: Row) => [p.trade_date, p.day_change_pct_nifty]))
-    return rows.map((r) => ({ ...r, day_change_pct_nifty: closeByDate.get(r.trade_date) ?? null }))
+    if (tradeError) throw tradeError
+    const mid: Record<string, Row> = {}
+    for (const m of (midRows ?? []) as Row[]) { const d = String(m.trade_date ?? ''); if (d) mid[d] = m }
+    const post: Record<string, Row> = {}
+    for (const p of (postRows ?? []) as Row[]) { const d = String(p.trade_date ?? ''); if (d) post[d] = p }
+    const trade: Record<string, Row> = {}
+    for (const t of (tradeRows ?? []) as Row[]) { const d = String(t.trade_date ?? ''); if (d && t.instrument === 'NIFTY') trade[d] = t }
+    return { rows, mid, post, trade }
   }, { revalidateOnFocus: false })
   const row = liveRow ? Object.fromEntries(Object.keys(visualRow).map((key) => [key, liveRow[key] ?? visualRow[key]])) as Row : visualRow
   const { data: midSnapshot } = useSWR<Row | null>(row.trade_date ? ['midmarket-snapshot', row.trade_date] : null, async () => { const { data, error } = await supabase.from('midmarket_snapshot').select('*').eq('trade_date', row.trade_date).order('trade_date', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data as Row | null }, { revalidateOnFocus: false })
   const { data: postSummary } = useSWR<Row | null>(row.trade_date ? ['postmarket-summary', row.trade_date] : null, async () => { const { data, error } = await supabase.from('postmarket_summary').select('*').eq('trade_date', row.trade_date).order('trade_date', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data as Row | null }, { revalidateOnFocus: false })
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   useEffect(() => { const updateClock = () => { const now = new Date(); const options = { timeZone: 'Asia/Kolkata' } as const; setLiveDate(new Intl.DateTimeFormat('en-IN', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)); setLiveDay(new Intl.DateTimeFormat('en-IN', { ...options, weekday: 'long' }).format(now)); setLiveTime(new Intl.DateTimeFormat('en-IN', { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(now)) }; updateClock(); const timer = window.setInterval(updateClock, 1000); return () => window.clearInterval(timer) }, [])
-  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation"><Menu size={18} /></button><div className="brand-mark"><div className="brand-symbol"><BarChart3 size={16} /></div><div><strong>MARKETVIEW</strong><span>TRADE ANALYSIS PLATFORM</span></div></div><span className="topbar-date">{liveDate || row?.trade_date || 'No current row'} · {liveDay || row?.day_name || 'Session date'} · {liveTime || '—'} IST</span><div className="topbar-meta"><button className="icon-button" onClick={() => location.reload()} aria-label="Refresh dashboard"><RefreshCw size={16} /></button><button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button></div></header><div className="workspace"><aside className={`sidebar ${navOpen ? '' : 'closed'}`}><div className="side-label">SESSION MAP</div>{phases.map(({ id, label, subtitle, icon: Icon }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => setPhase(id)}><Icon size={17} /><span><strong>{label}</strong><small>{subtitle}</small></span><ChevronRight size={14} /></button>)}<div className="side-rule" /></aside><div className="content">{phase === 'rules' ? <RulesView /> : phase === 'history' ? <HistoryView rows={historyRows} /> : phase === 'verdict' ? <VerdictView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midSnapshot={midSnapshot} /> : phase === 'trade' ? <TradeView /> : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} /> : <PhaseView phase={phase} row={row} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
+  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation"><Menu size={18} /></button><div className="brand-mark"><div className="brand-symbol"><BarChart3 size={16} /></div><div><strong>MARKETVIEW</strong><span>TRADE ANALYSIS PLATFORM</span></div></div><span className="topbar-date">{liveDate || row?.trade_date || 'No current row'} · {liveDay || row?.day_name || 'Session date'} · {liveTime || '—'} IST</span><div className="topbar-meta"><button className="icon-button" onClick={() => location.reload()} aria-label="Refresh dashboard"><RefreshCw size={16} /></button><button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button></div></header><div className="workspace"><aside className={`sidebar ${navOpen ? '' : 'closed'}`}><div className="side-label">SESSION MAP</div>{phases.map(({ id, label, subtitle, icon: Icon }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => setPhase(id)}><Icon size={17} /><span><strong>{label}</strong><small>{subtitle}</small></span><ChevronRight size={14} /></button>)}<div className="side-rule" /></aside><div className="content">{phase === 'rules' ? <RulesView /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midSnapshot={midSnapshot} /> : phase === 'trade' ? <TradeView /> : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} /> : <PhaseView phase={phase} row={row} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
 }
