@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { BarChart3, Moon, Sun } from 'lucide-react'
 import { createAuthClient } from '@/lib/supabase/auth-client'
@@ -75,6 +76,10 @@ export default function LoginPage() {
           <button type="submit" className="action-button action-button-success login-submit" disabled={loading}>
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
+
+          <p className="login-lede mt-3.5 text-center">
+            Need an account? <Link href="/signup" className="text-foreground underline">Sign up</Link>
+          </p>
         </form>
       </section>
     </main>
