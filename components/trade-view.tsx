@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { CheckCircle2, ArrowDown, RotateCcw } from 'lucide-react'
-import { calculateVerdict } from '@/app/page'
+import { calculateVerdict } from '@/app/dashboard/page'
 import { createClient } from '@/lib/supabase/client'
 
 type Row = Record<string, string | number | boolean | null>
