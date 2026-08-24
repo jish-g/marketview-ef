@@ -41,6 +41,20 @@ export default function LandingPage() {
         <h1 className="landing-wordmark">MARKETCUE</h1>
         <p className="landing-tagline">Market Intelligence, Not Just Market Data</p>
         <p className="landing-lede">Everyone gives you data. We read it.</p>
+
+        <div className="landing-verdict-card" aria-label="Sample verdict card">
+          <div className="landing-verdict-head">
+            <span className="eyebrow">Sample verdict</span>
+            <h3>NIFTY</h3>
+          </div>
+          <div className="landing-verdict-badges">
+            <span className="landing-verdict-badge landing-verdict-badge-danger">Bearish</span>
+            <span className="landing-verdict-badge landing-verdict-badge-warning">Caution</span>
+          </div>
+          <strong className="landing-verdict-strategy">Put Credit Spread</strong>
+          <p className="landing-verdict-reasoning">Bearish bias with expensive IV, so selling premium instead of buying.</p>
+        </div>
+
         <Link href="/dashboard" className="detailed-read-link landing-cta">Enter Dashboard <ArrowRight size={15} /></Link>
       </section>
 
@@ -48,6 +62,28 @@ export default function LandingPage() {
         <p className="eyebrow">Why MarketCue</p>
         <p>Raw options data — gap, OI, PCR, max pain, IV, VIX — is available everywhere and looks the same on every terminal. The edge isn&apos;t access to data, it&apos;s reading it the same disciplined way every session.</p>
         <p>MarketCue runs that data through a 3-stage framework — Bias, Option Readiness, Strategy Recommendation — to produce one verdict instead of six charts to interpret yourself.</p>
+      </section>
+
+      <section className="landing-comparison">
+        <p className="eyebrow">Raw data vs. our read</p>
+        <div className="landing-comparison-grid">
+          <div className="landing-comparison-col landing-comparison-raw">
+            <span className="side-label">What every terminal shows you</span>
+            <ul className="landing-raw-list">
+              <li><span>Gap</span><b>-0.42%</b></li>
+              <li><span>PCR</span><b>0.91</b></li>
+              <li><span>Max pain</span><b>24300</b></li>
+              <li><span>ATM IV</span><b>14.2</b></li>
+              <li><span>India VIX</span><b>12.6</b></li>
+              <li><span>OI resistance</span><b>Addition</b></li>
+            </ul>
+          </div>
+          <div className="landing-comparison-col landing-comparison-read">
+            <span className="side-label">What we tell you</span>
+            <strong className="landing-comparison-headline">Bearish · Caution</strong>
+            <p>Put Credit Spread. One read, one decision.</p>
+          </div>
+        </div>
       </section>
 
       <section className="landing-differentiators">
