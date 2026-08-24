@@ -29,7 +29,7 @@ export default function LandingPage() {
       <header className="landing-topbar">
         <div className="brand-mark">
           <div className="brand-symbol"><BarChart3 size={16} /></div>
-          <div><strong>MARKETCUE</strong><span>TRADE ANALYSIS PLATFORM</span></div>
+          <div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div>
         </div>
         <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">
           {dark ? <Sun size={16} /> : <Moon size={16} />}
@@ -38,7 +38,7 @@ export default function LandingPage() {
 
       <section className="landing-hero">
         <p className="eyebrow">Market Intelligence Platform</p>
-        <h1 className="landing-wordmark">MARKETCUE</h1>
+        <h1 className="landing-wordmark">MarketCue</h1>
         <p className="landing-tagline">Market Intelligence, Not Just Market Data</p>
         <p className="landing-lede">Everyone gives you data. We read it.</p>
 
