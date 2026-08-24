@@ -4,7 +4,7 @@ import Script from 'next/script'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'MarketView — Trading Dashboard',
+  title: 'MarketCue — Trading Dashboard',
   description: 'A read-only premarket dashboard for Indian equity markets.',
   generator: 'v0.app',
   icons: {

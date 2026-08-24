@@ -29,7 +29,7 @@ export default function LandingPage() {
       <header className="landing-topbar">
         <div className="brand-mark">
           <div className="brand-symbol"><BarChart3 size={16} /></div>
-          <div><strong>MARKETVIEW</strong><span>TRADE ANALYSIS PLATFORM</span></div>
+          <div><strong>MARKETCUE</strong><span>TRADE ANALYSIS PLATFORM</span></div>
         </div>
         <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">
           {dark ? <Sun size={16} /> : <Moon size={16} />}
@@ -38,16 +38,16 @@ export default function LandingPage() {
 
       <section className="landing-hero">
         <p className="eyebrow">Market Intelligence Platform</p>
-        <h1 className="landing-wordmark">MARKETVIEW</h1>
+        <h1 className="landing-wordmark">MARKETCUE</h1>
         <p className="landing-tagline">Market Intelligence, Not Just Market Data</p>
         <p className="landing-lede">Everyone gives you data. We read it.</p>
         <Link href="/dashboard" className="detailed-read-link landing-cta">Enter Dashboard <ArrowRight size={15} /></Link>
       </section>
 
       <section className="landing-positioning">
-        <p className="eyebrow">Why MarketView</p>
+        <p className="eyebrow">Why MarketCue</p>
         <p>Raw options data — gap, OI, PCR, max pain, IV, VIX — is available everywhere and looks the same on every terminal. The edge isn&apos;t access to data, it&apos;s reading it the same disciplined way every session.</p>
-        <p>MarketView runs that data through a 3-stage framework — Bias, Option Readiness, Strategy Recommendation — to produce one verdict instead of six charts to interpret yourself.</p>
+        <p>MarketCue runs that data through a 3-stage framework — Bias, Option Readiness, Strategy Recommendation — to produce one verdict instead of six charts to interpret yourself.</p>
       </section>
 
       <section className="landing-differentiators">
