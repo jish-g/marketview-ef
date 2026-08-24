@@ -192,8 +192,8 @@ type Instrument = 'NIFTY' | 'SENSEX'
 type Strike = 'ATM' | 'ITM1' | 'ITM2'
 type Side = 'Call' | 'Put'
 const strikeDefaults: Record<Strike, number> = { ATM: 0.5, ITM1: 0.62, ITM2: 0.72 }
-type StrategyChoice = 'Naked Call' | 'Naked Put' | 'Debit Spread' | 'Credit Spread' | 'Iron Condor' | 'Custom'
-const strategyChoices: StrategyChoice[] = ['Naked Call', 'Naked Put', 'Debit Spread', 'Credit Spread', 'Iron Condor', 'Custom']
+type StrategyChoice = 'Naked Call' | 'Naked Put' | 'Debit Spread' | 'Credit Spread' | 'Iron Condor' | 'Custom' | 'No Trade'
+const strategyChoices: StrategyChoice[] = ['No Trade', 'Naked Call', 'Naked Put', 'Debit Spread', 'Credit Spread', 'Iron Condor', 'Custom']
 function normalizeStrategy(strategy: string): StrategyChoice { if (strategy === 'Debit Call Spread' || strategy === 'Debit Put Spread') return 'Debit Spread'; if (strategy === 'Naked Call') return 'Naked Call'; if (strategy === 'Naked Put') return 'Naked Put'; if (strategy === 'Credit Spread') return 'Credit Spread'; return 'Iron Condor' }
 // Strike placement convention: Call strike = ATM + offset (positive offset → further OTM), Put strike = ATM − offset (positive offset → further OTM).
 // Higher delta = deeper ITM, lower delta = further OTM, so positive offset must map to the LOW delta tier and negative offset to the HIGH delta tier.
@@ -202,6 +202,7 @@ type LegDef = { key: string; label: string; side: 'Buy' | 'Sell'; wing: number }
 // `side` (Call/Put) is the single source of truth for Debit/Credit Spread leg construction — driven by the
 // user-facing toggle, not a hidden bias check, so the toggle is what actually controls which side gets built.
 function legsForStrategy(strategy: StrategyChoice, bias: string, side: Side): LegDef[] {
+  if (strategy === 'No Trade') return []
   if (strategy === 'Naked Call') return [{ key: 'p', label: 'Buy Call', side: 'Buy', wing: bias === 'Bearish' ? -1 : 1 }]
   if (strategy === 'Naked Put') return [{ key: 'p', label: 'Buy Put', side: 'Buy', wing: bias === 'Bullish' ? 1 : -1 }]
   if (strategy === 'Debit Spread') {
@@ -303,8 +304,9 @@ function computeStrategyRecommendation(biasLabel: BiasLabel, ivCondition: IvCond
   return { recommendation, reason }
 }
 // Maps a Stage 3 recommendation string to the existing strategy dropdown + Call/Put side toggle. "No Trade"
-// does not change the underlying strategy value — it falls back to Iron Condor as a neutral placeholder and
-// instead flags `noTrade` so the UI can show the banner without disabling the manual dropdown.
+// now maps to the dropdown's own 'No Trade' option (instead of silently falling back to Iron Condor as a
+// placeholder and pre-sizing legs that were never recommended). Any other unhandled recommendation string
+// still falls back to Iron Condor with `noTrade: true`, preserving prior behavior.
 function mapRecommendationToStrategy(recommendation: string): { strategy: StrategyChoice; side?: Side; noTrade: boolean } {
   if (recommendation === 'Naked Call') return { strategy: 'Naked Call', noTrade: false }
   if (recommendation === 'Naked Put') return { strategy: 'Naked Put', noTrade: false }
@@ -313,6 +315,7 @@ function mapRecommendationToStrategy(recommendation: string): { strategy: Strate
   if (recommendation === 'Put Credit Spread') return { strategy: 'Credit Spread', side: 'Put', noTrade: false }
   if (recommendation === 'Call Credit Spread') return { strategy: 'Credit Spread', side: 'Call', noTrade: false }
   if (recommendation === 'Iron Condor') return { strategy: 'Iron Condor', noTrade: false }
+  if (recommendation === 'No Trade') return { strategy: 'No Trade', noTrade: true }
   return { strategy: 'Iron Condor', noTrade: true }
 }
 function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrument }) {
@@ -425,6 +428,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
       </div>
       <div className="day-summary"><span className="eyebrow">Day summary</span><p>{summary}</p><div className="bias-reasoning"><p className="reasoning-line"><strong>Market Bias:</strong> {marketBias.label} (score {marketBias.score.toFixed(2)})</p><p className="reasoning-line"><strong>Option Readiness:</strong> {optionReadiness.label} (score {optionReadiness.score})</p><p className="reasoning-line"><strong>Strategy Recommendation:</strong> {strategyRec.recommendation}, because {strategyRec.reason}.</p></div></div>
     </div>
+    {strategy === 'No Trade' ? <div className="verdict-card no-trade-leg-builder"><p className="structure-line">No Trade is selected — there&apos;s no position to size. Switch the dropdown above to a real strategy if you want to build a trade manually.</p></div> : <>
     <div className="verdict-card verdict-editable">
       <div className="verdict-controls verdict-controls-triple">
         <label>ATM spot<input type="number" step={strikeStep} value={atmSpot} onChange={(e) => setAtmSpot(e.target.value === '' ? '' : String(roundedStrike(Number(e.target.value))))} aria-label={`${instrument} ATM spot`} /></label>
@@ -459,7 +463,8 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
         <small>{lotSize} per lot for {instrument}</small>
       </div>
     </div>
-    <div className="position-calculator">
+    </>}
+    {strategy !== 'No Trade' && <div className="position-calculator">
       <div className="position-head">
         <div><p className="eyebrow">Trade entry</p><strong>{strategy}</strong></div>
         <span>Live calculation</span>
@@ -500,7 +505,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
         </div>
       </div>}
       {!hasAnyPremium && <p className="structure-line">Enter fill premiums above to compute actual target / stop-loss and book levels.</p>}
-    </div>
+    </div>}
     <div className="verdict-rationale"><span>Rationale</span><p>{calc.bias} bias from gap direction, PCR positioning, max pain pull, and OI level action; {calc.ivRead} conditions favor {calc.strategy.toLowerCase()}.</p></div>
   </article>
 }
