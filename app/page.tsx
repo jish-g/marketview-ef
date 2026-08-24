@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Activity, ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, Layers3, Moon, Sun } from 'lucide-react'
+import { Activity, ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, Layers3, LogIn, LogOut, Moon, Sun } from 'lucide-react'
+import { useSession } from '@/hooks/use-session'
 
 const differentiators = [
   { icon: Gauge, title: 'Reads, not just reports', description: 'Weighted bias scoring from Gap, OI, PCR, and Max Pain — not a raw data dump.' },
@@ -22,6 +23,7 @@ const sessionMap = [
 
 export default function LandingPage() {
   const [dark, setDark] = useState(false)
+  const { session, loading, signOut } = useSession()
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
 
   return (
@@ -31,9 +33,16 @@ export default function LandingPage() {
           <div className="brand-symbol"><BarChart3 size={16} /></div>
           <div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div>
         </div>
-        <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">
-          {dark ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
+        <div className="topbar-meta">
+          {!loading && (session ? (
+            <button type="button" className="sign-in-link" onClick={() => signOut()}><LogOut size={13} /> Sign out</button>
+          ) : (
+            <Link href="/login" className="sign-in-link"><LogIn size={13} /> Sign in</Link>
+          ))}
+          <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">
+            {dark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+        </div>
       </header>
 
       <section className="landing-hero">
