@@ -29,7 +29,7 @@ export default function LandingPage() {
       <header className="landing-topbar">
         <div className="brand-mark">
           <div className="brand-symbol"><BarChart3 size={16} /></div>
-          <div><strong>MARKETCUE</strong><span>TRADE ANALYSIS PLATFORM</span></div>
+          <div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div>
         </div>
         <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">
           {dark ? <Sun size={16} /> : <Moon size={16} />}
@@ -37,25 +37,28 @@ export default function LandingPage() {
       </header>
 
       <section className="landing-hero">
-        <p className="eyebrow">Market Intelligence Platform</p>
-        <h1 className="landing-wordmark">MARKETCUE</h1>
-        <p className="landing-tagline">Market Intelligence, Not Just Market Data</p>
-        <p className="landing-lede">Everyone gives you data. We read it.</p>
-
-        <div className="landing-verdict-card" aria-label="Sample verdict card">
-          <div className="landing-verdict-head">
-            <span className="eyebrow">Sample verdict</span>
-            <h3>NIFTY</h3>
-          </div>
-          <div className="landing-verdict-badges">
-            <span className="landing-verdict-badge landing-verdict-badge-danger">Bearish</span>
-            <span className="landing-verdict-badge landing-verdict-badge-warning">Caution</span>
-          </div>
-          <strong className="landing-verdict-strategy">Put Credit Spread</strong>
-          <p className="landing-verdict-reasoning">Bearish bias with expensive IV, so selling premium instead of buying.</p>
+        <div className="landing-hero-copy">
+          <p className="eyebrow">Market Intelligence Platform</p>
+          <h1 className="landing-wordmark">MarketCue</h1>
+          <p className="landing-tagline">Market Intelligence, Not Just Market Data</p>
+          <p className="landing-lede">Everyone gives you data. We read it.</p>
+          <Link href="/dashboard" className="detailed-read-link landing-cta">Enter Dashboard <ArrowRight size={15} /></Link>
         </div>
 
-        <Link href="/dashboard" className="detailed-read-link landing-cta">Enter Dashboard <ArrowRight size={15} /></Link>
+        <div className="landing-hero-showcase">
+          <div className="landing-verdict-card" aria-label="Sample verdict card">
+            <div className="landing-verdict-head">
+              <span className="eyebrow">Sample verdict</span>
+              <h3>NIFTY</h3>
+            </div>
+            <div className="landing-verdict-badges">
+              <span className="landing-verdict-badge landing-verdict-badge-danger">Bearish</span>
+              <span className="landing-verdict-badge landing-verdict-badge-warning">Caution</span>
+            </div>
+            <strong className="landing-verdict-strategy">Put Credit Spread</strong>
+            <p className="landing-verdict-reasoning">Bearish bias with expensive IV, so selling premium instead of buying.</p>
+          </div>
+        </div>
       </section>
 
       <section className="landing-positioning">
