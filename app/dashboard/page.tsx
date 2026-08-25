@@ -589,27 +589,42 @@ function PhaseView({ phase, row, historyData }: { phase: Phase; row: Row | null;
   const renderGroup = (title: string, group: typeof fields) => { const isIndex = title === 'Nifty' || title === 'Sensex'; const bias = title === 'Nifty' ? marketOpenBias('gap_points_nifty') : marketOpenBias('gap_points_sensex'); return <section className={`metric-group ${title === 'Common market data' ? 'common-group' : ''}`}><div className="group-heading">{title !== 'Common market data' && <h3>{title}{phase === 'open' && isIndex && <em className={`market-open-bias ${bias.toLowerCase()}`}> ({bias})</em>} {isIndex && <button type="button" className="semantic-info" aria-label={`${title} market color and OI action guidance`}><Info size={14} aria-hidden="true" /><span className="semantic-tooltip" role="tooltip"><b className="key-positive">Green</b> bullish / positive · <b className="key-negative">Red</b> bearish / negative · OI Addition = building interest · OI Unwinding = reducing interest</span></button>}</h3>}</div><div className="field-grid">{group.map((f) => { const isVix = f.key === 'india_vix'; const isOiAction = f.key.startsWith('oi_change_'); const actionTone = isOiAction ? (String(row?.[f.key] ?? '').toLowerCase() === 'addition' ? 'positive' : String(row?.[f.key] ?? '').toLowerCase().includes('unwinding') ? 'negative' : '') : ''; const relatedAction = f.key === 'oi_support_nifty' ? row?.oi_change_support_nifty : f.key === 'oi_support_sensex' ? row?.oi_change_support_sensex : f.key === 'oi_resistance_nifty' ? row?.oi_change_resistance_nifty : f.key === 'oi_resistance_sensex' ? row?.oi_change_resistance_sensex : null; const breadth = f.key === 'advance_decline_ratio' ? breadthDirection(row?.[f.key]) : null; const isNiftyGap = f.key === 'gap_points_nifty'; const predictedGap = isNiftyGap ? (num(row ?? {}, 'gift_nifty_gap_pct') / 100) * num(row ?? {}, 'prev_close_nifty') : null; return <div className={`field-card ${row?.[f.key] == null ? 'is-empty' : ''}`} key={f.key}><span>{f.label}</span><strong className={tone(row, f.key)}>{value(row, f.key, f.pct)}{isVix && row?.india_vix_change_pct != null && <em className={`vix-change ${tone(row, 'india_vix_change_pct')}`}> ({value(row, 'india_vix_change_pct', true)})</em>}{relatedAction != null && <em className={`oi-action ${String(relatedAction).toLowerCase() === 'addition' ? 'positive' : String(relatedAction).toLowerCase().includes('unwinding') ? 'negative' : ''}`}> ({String(relatedAction)})</em>}{breadth && <em className={`breadth-flag ${breadth.tone}`}> {breadth.arrow} {breadth.label}</em>}{isNiftyGap && predictedGap != null && row?.[f.key] != null && <em className="predicted-gap"> (Predicted: {predictedGap.toFixed(1)}, Difference: {(predictedGap - Number(row[f.key])).toFixed(1)})</em>}</strong>{isOiAction && <small className={`oi-action ${actionTone}`}>{String(row?.[f.key] ?? '—')}</small>}</div> })}</div></section> }
   const [eyebrow, heading] = phaseHeadings[phase as 'premarket' | 'open']
   const scheduledTime = phaseSyncTimes[phase as 'premarket' | 'open']
-  // Prior-sessions recap for Pre-market only: the two most recent trading days strictly
-  // before today's row, each summarized as close %, bias, and the strategy that was called
-  // that morning — so Pre-market opens with context instead of a blank data grid.
-  const priorSessions = phase === 'premarket' && historyData
-    ? historyData.rows
-        .filter((r) => String(r.trade_date) !== String(row?.trade_date))
-        .slice(0, 2)
-        .reverse()
-        .map((r) => {
-          const post = historyData.post[String(r.trade_date)]
-          const closePct = post?.day_change_pct_nifty
-          const bias = r.market_bias_nifty
-          const strategy = r.suggested_strategy_nifty
-          const dayLabel = r.day_name ? String(r.day_name).slice(0, 3) : String(r.trade_date)
-          const closeText = closePct != null ? `closed ${Number(closePct) >= 0 ? '+' : ''}${Number(closePct).toFixed(2)}%` : 'close pending'
-          const biasText = bias ? String(bias) : null
-          const strategyText = strategy ? `${strategy} called` : null
-          return { key: String(r.trade_date), dayLabel, detail: [closeText, biasText, strategyText].filter(Boolean).join(', ') }
-        })
-    : []
-  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><span>Session snapshot</span></div>{phase === 'premarket' && priorSessions.length > 0 && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">Coming into today</p>{priorSessions.map((s) => <p key={s.key} className="prior-session-line"><strong>{s.dayLabel}</strong> — {s.detail}</p>)}</div>}<div className="metric-groups">{renderGroup('Common market data', common)}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div></section>
+  // D-1 recap for Pre-market only: the single most recent trading day strictly before
+  // today's row, summarized across all three of its sessions (open, mid, post) — so
+  // Pre-market opens with "what happened yesterday" instead of a blank data grid.
+  const priorDay = phase === 'premarket' && historyData
+    ? historyData.rows.find((r) => String(r.trade_date) !== String(row?.trade_date)) ?? null
+    : null
+  const priorDayLines = priorDay ? (() => {
+    const dateKey = String(priorDay.trade_date)
+    const dayLabel = priorDay.day_name ? String(priorDay.day_name) : dateKey
+    const mid = historyData?.mid[dateKey]
+    const post = historyData?.post[dateKey]
+
+    const gapPts = priorDay.gap_points_nifty
+    const prevClose = priorDay.prev_close_nifty
+    const gapPct = gapPts != null && prevClose ? (Number(gapPts) / Number(prevClose)) * 100 : null
+    const openBias = priorDay.market_bias_nifty
+    const openLine = gapPct != null
+      ? `Market open: gapped ${gapPct >= 0 ? '+' : ''}${gapPct.toFixed(2)}%${openBias ? `, ${openBias}` : ''}`
+      : null
+
+    const midStrategy = mid?.suggested_strategy_nifty_mid
+    const shiftNote = mid?.shift_note_nifty
+    const strategyShifted = mid?.strategy_shifted_nifty
+    const midLine = mid
+      ? `Mid-market: ${strategyShifted ? (shiftNote || 'shifted since morning') : 'unchanged since morning'}${midStrategy ? `, ${midStrategy}` : ''}`
+      : null
+
+    const closePct = post?.day_change_pct_nifty
+    const outcome = post?.target_hit_nifty ? 'target hit' : post?.sl_hit_nifty ? 'stop hit' : post ? 'neither hit' : null
+    const postLine = closePct != null
+      ? `Post-market: closed ${Number(closePct) >= 0 ? '+' : ''}${Number(closePct).toFixed(2)}%${outcome ? `, ${outcome}` : ''}`
+      : null
+
+    return { dayLabel, lines: [openLine, midLine, postLine].filter((l): l is string => l != null) }
+  })() : null
+  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><span>Session snapshot</span></div>{phase === 'premarket' && priorDayLines && priorDayLines.lines.length > 0 && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p>{priorDayLines.lines.map((line, i) => <p key={i} className="prior-session-line">{line}</p>)}</div>}<div className="metric-groups">{renderGroup('Common market data', common)}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div></section>
 }
 export default function Dashboard() {
   const [phase, setPhase] = useState<Phase>('premarket'); const [dark, setDark] = useState(false); const [navOpen, setNavOpen] = useState(true); const [liveDate, setLiveDate] = useState(''); const [liveDay, setLiveDay] = useState(''); const [liveTime, setLiveTime] = useState('')
