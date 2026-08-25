@@ -2,8 +2,17 @@
 
 import { useMemo, useState } from 'react'
 import useSWR from 'swr'
-import { CheckCircle2, RotateCcw } from 'lucide-react'
+import { CheckCircle2, RotateCcw, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+
+// Log entries are collapsed to a short preview by default so a journal spanning many days
+// stays scannable -- a "View" button next to Edit expands the full text for that one row.
+const PREVIEW_CHARS = 160
+
+function previewText(text: string) {
+  if (text.length <= PREVIEW_CHARS) return text
+  return `${text.slice(0, PREVIEW_CHARS).trimEnd()}…`
+}
 
 type Row = Record<string, string | number | boolean | null>
 type Instrument = 'NIFTY' | 'SENSEX'
@@ -91,6 +100,19 @@ export function JournalView() {
   const [noteDirty, setNoteDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // Which past log entries are currently expanded to full text -- everything starts
+  // collapsed to a short preview so a long-running journal doesn't turn into one huge
+  // scroll. Keyed by trade_date; toggled independently per row via the View button.
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set())
+
+  const toggleExpanded = (date: string) => {
+    setExpandedDates((prev) => {
+      const next = new Set(prev)
+      if (next.has(date)) next.delete(date)
+      else next.add(date)
+      return next
+    })
+  }
 
   const { data, error, mutate } = useSWR(['journal-page'], async () => {
     const [{ data: trades, error: tradeError }, { data: entries, error: entryError }] = await Promise.all([
@@ -188,18 +210,29 @@ export function JournalView() {
     <section className="trade-log journal-log">
       <div className="review-section-head"><div><p className="eyebrow">All saved notes</p><h2>Journal log</h2></div></div>
       {entries.length === 0 ? <p className="history-empty">No journal entries yet — write your first note above.</p> : <div className="history-list">
-        {entries.map((entry) => <article className={`journal-log-entry ${entry.trade_date === editingDate ? 'journal-log-entry-active' : ''}`} key={entry.id}>
-          <div className="journal-log-head">
-            <span className="journal-log-date">{formatDateLabel(entry.trade_date)}{entry.updated_at && entry.updated_at !== entry.created_at && <em className="journal-log-edited"> · edited</em>}</span>
-            <button type="button" className="action-button journal-edit-button" onClick={() => startEdit(entry.trade_date)}><RotateCcw size={12} /> Edit</button>
-          </div>
-          <div className="journal-trade-cards journal-trade-cards-compact">
-            {(tradesByDate[entry.trade_date] ?? []).length === 0
-              ? <span className="journal-trade-chip journal-chip-neutral">No trade</span>
-              : (tradesByDate[entry.trade_date] ?? []).map((trade) => <TradeChip key={String(trade.id)} trade={trade} />)}
-          </div>
-          <p className="journal-log-text">{entry.entry_text}</p>
-        </article>)}
+        {entries.map((entry) => {
+          const isExpanded = expandedDates.has(entry.trade_date)
+          const isLong = entry.entry_text.length > PREVIEW_CHARS
+          return <article className={`journal-log-entry ${entry.trade_date === editingDate ? 'journal-log-entry-active' : ''}`} key={entry.id}>
+            <div className="journal-log-head">
+              <span className="journal-log-date">{formatDateLabel(entry.trade_date)}{entry.updated_at && entry.updated_at !== entry.created_at && <em className="journal-log-edited"> · edited</em>}</span>
+              <span className="journal-log-actions">
+                {isLong && (
+                  <button type="button" className="action-button journal-view-button" onClick={() => toggleExpanded(entry.trade_date)}>
+                    {isExpanded ? <><EyeOff size={12} /> Hide</> : <><Eye size={12} /> View</>}
+                  </button>
+                )}
+                <button type="button" className="action-button journal-edit-button" onClick={() => startEdit(entry.trade_date)}><RotateCcw size={12} /> Edit</button>
+              </span>
+            </div>
+            <div className="journal-trade-cards journal-trade-cards-compact">
+              {(tradesByDate[entry.trade_date] ?? []).length === 0
+                ? <span className="journal-trade-chip journal-chip-neutral">No trade</span>
+                : (tradesByDate[entry.trade_date] ?? []).map((trade) => <TradeChip key={String(trade.id)} trade={trade} />)}
+            </div>
+            <p className="journal-log-text">{isExpanded || !isLong ? entry.entry_text : previewText(entry.entry_text)}</p>
+          </article>
+        })}
       </div>}
     </section>
   </section>
