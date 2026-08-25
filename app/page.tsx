@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Activity, ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, Layers3, LogIn, LogOut, Moon, Sun } from 'lucide-react'
+import { Activity, ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, Layers3, LogIn, LogOut, Moon, Newspaper, Sun } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
 
 const differentiators = [
@@ -52,6 +52,16 @@ export default function LandingPage() {
           <p className="landing-tagline">Market Intelligence, Not Just Market Data</p>
           <p className="landing-lede">Everyone gives you data. We read it.</p>
           <Link href="/dashboard" className="detailed-read-link landing-cta">Enter Dashboard <ArrowRight size={15} /></Link>
+          <div className="landing-today-ctas">
+            <Link href="/nifty-today" className="landing-today-cta">
+              <span className="landing-today-cta-label">Pre-market + post-market</span>
+              <span className="landing-today-cta-title"><Newspaper size={15} /> Nifty Today <ArrowRight size={14} /></span>
+            </Link>
+            <Link href="/sensex-today" className="landing-today-cta">
+              <span className="landing-today-cta-label">Pre-market + post-market</span>
+              <span className="landing-today-cta-title"><Newspaper size={15} /> Sensex Today <ArrowRight size={14} /></span>
+            </Link>
+          </div>
         </div>
 
         <div className="landing-hero-showcase">
