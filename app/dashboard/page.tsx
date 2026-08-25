@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { TradeView } from '@/components/trade-view'
 import { useSession } from '@/hooks/use-session'
 import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, RefreshCw, Sun } from 'lucide-react'
+import { Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 type Row = Record<string, string | number | boolean | null>
 type Phase = 'premarket' | 'open' | 'verdict' | 'mid' | 'post' | 'rules' | 'history' | 'trade'
 const phases = [
@@ -343,6 +344,67 @@ function mapRecommendationToStrategy(recommendation: string): { strategy: Strate
   if (recommendation === 'No Trade') return { strategy: 'No Trade', noTrade: true }
   return { strategy: 'Iron Condor', noTrade: true }
 }
+// Payoff diagram for the currently selected strategy: plots a stylized P&L curve across a strike
+// range around ATM, sized from each leg's strike/side/premium, with vertical reference lines for
+// Spot and every leg strike so it's immediately clear which strikes to short vs buy. For buyer
+// strategies (Naked Call/Put, Debit Spread) target/stop are point-based, so they're drawn as
+// vertical price-level lines too. For seller strategies (Credit Spread, Iron Condor), target/stop
+// are net-premium-based (already computed as actualConservativeTarget/Stop, in rupees), so they're
+// drawn as horizontal P&L threshold lines on the y-axis instead — no invented price level.
+function PayoffChart({ legRows, atmNumber, strikeStep, isSpreadSeller, isNetSeller, netPremium, spotEstTarget, spotEstStop, actualConservativeTarget, actualConservativeStop, qty }: {
+  legRows: { key: string; label: string; side: 'Buy' | 'Sell'; strike: number }[]
+  atmNumber: number
+  strikeStep: number
+  isSpreadSeller: boolean
+  isNetSeller: boolean
+  netPremium: number
+  spotEstTarget: number | null
+  spotEstStop: number | null
+  actualConservativeTarget: number | null
+  actualConservativeStop: number | null
+  qty: number
+}) {
+  if (legRows.length === 0 || !atmNumber) return null
+  const strikes = legRows.map((l) => l.strike)
+  const lo = Math.min(atmNumber, ...strikes) - 6 * strikeStep
+  const hi = Math.max(atmNumber, ...strikes) + 6 * strikeStep
+  const points: { x: number; pnl: number }[] = []
+  for (let x = lo; x <= hi; x += strikeStep / 2) {
+    let pnl = 0
+    for (const leg of legRows) {
+      const isPut = leg.label.toLowerCase().includes('put')
+      const intrinsic = isPut ? Math.max(0, leg.strike - x) : Math.max(0, x - leg.strike)
+      pnl += leg.side === 'Buy' ? -intrinsic : intrinsic
+    }
+    points.push({ x, pnl })
+  }
+  // Normalize so the flat (capped) side sits at a readable scale regardless of premium inputs.
+  const maxAbs = Math.max(1, ...points.map((p) => Math.abs(p.pnl)))
+  const scaled = points.map((p) => ({ x: p.x, pnl: +((p.pnl / maxAbs) * 60).toFixed(1) }))
+  const legColors: Record<string, string> = { Buy: '#008300', Sell: '#e34948' }
+  return <div className="verdict-card payoff-chart-card">
+    <span className="eyebrow">Strategy view</span>
+    <div style={{ width: '100%', height: 200 }}>
+      <ResponsiveContainer>
+        <LineChart data={scaled} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+          <XAxis dataKey="x" type="number" domain={[lo, hi]} tick={{ fontSize: 11, fill: '#898781' }} tickFormatter={(v) => String(Math.round(v))} />
+          <YAxis tick={{ fontSize: 11, fill: '#898781' }} width={36} />
+          <Tooltip formatter={(v) => [Number(v), 'Relative P&L']} labelFormatter={(l) => `Underlying ${l}`} />
+          <ReferenceLine y={0} stroke="#c3c2b7" />
+          <ReferenceLine x={atmNumber} stroke="#898781" label={{ value: 'Spot', position: 'insideTopLeft', fontSize: 10, fill: '#898781' }} />
+          {legRows.map((leg) => <ReferenceLine key={leg.key} x={leg.strike} stroke={legColors[leg.side]} strokeDasharray={leg.side === 'Sell' ? undefined : '4 3'} label={{ value: `${leg.side} ${leg.strike}`, position: 'insideBottomLeft', fontSize: 10, fill: legColors[leg.side] }} />)}
+          {!isNetSeller && spotEstTarget != null && <ReferenceLine x={atmNumber + spotEstTarget} stroke="#1baf7a" strokeDasharray="4 3" label={{ value: 'Target', position: 'insideTopRight', fontSize: 10, fill: '#1baf7a' }} />}
+          {!isNetSeller && spotEstStop != null && <ReferenceLine x={atmNumber - spotEstStop} stroke="#eda100" strokeDasharray="4 3" label={{ value: 'Stop', position: 'insideBottomRight', fontSize: 10, fill: '#eda100' }} />}
+          <Line type="monotone" dataKey="pnl" stroke="#2a78d6" strokeWidth={2.5} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+    {isNetSeller && actualConservativeTarget != null && actualConservativeStop != null && <div className="payoff-seller-exit">
+      <span>Exit on net premium — Target <b className="target-value">₹{(actualConservativeTarget * qty).toFixed(0)}</b> · Stop <b className="stop-value">₹{(actualConservativeStop * qty).toFixed(0)}</b></span>
+    </div>}
+  </div>
+}
+
 function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrument }) {
   const calc = useMemo(() => calculateVerdict(row, instrument), [row, instrument])
   const legSupabase = useMemo(() => createClient(), [])
@@ -481,6 +543,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
       <div className="day-summary"><span className="eyebrow">Day summary</span><p>{summary}</p><div className="bias-reasoning"><p className="reasoning-line"><strong>Market Bias:</strong> {marketBias.label} (score {marketBias.score.toFixed(2)})</p><p className="reasoning-line"><strong>Option Readiness:</strong> {optionReadiness.label} (score {optionReadiness.score})</p><p className="reasoning-line"><strong>Strategy Recommendation:</strong> {strategyRec.recommendation}, because {strategyRec.reason}.</p></div></div>
     </div>
     {strategy === 'No Trade' ? <div className="verdict-card no-trade-leg-builder"><p className="structure-line">No Trade is selected — there&apos;s no position to size. Switch the dropdown above to a real strategy if you want to build a trade manually.</p></div> : <>
+    <PayoffChart legRows={legRows} atmNumber={atmNumber} strikeStep={strikeStep} isSpreadSeller={isSpreadSeller} isNetSeller={isNetSeller} netPremium={netPremium} spotEstTarget={calc.target} spotEstStop={calc.stop} actualConservativeTarget={actualConservativeTarget} actualConservativeStop={actualConservativeStop} qty={qty} />
     <div className="verdict-card verdict-editable">
       <div className="verdict-controls verdict-controls-triple">
         <label>ATM spot<input type="number" step={strikeStep} value={atmSpot} onChange={(e) => setAtmSpot(e.target.value === '' ? '' : String(roundedStrike(Number(e.target.value))))} aria-label={`${instrument} ATM spot`} /></label>
