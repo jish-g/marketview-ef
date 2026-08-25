@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import useSWR from 'swr'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, RotateCcw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Row = Record<string, string | number | boolean | null>
@@ -22,7 +22,7 @@ type Trade = Row & {
   entry_premium: number | null
   qty: number | null
 }
-type JournalEntry = { id: string; trade_date: string; entry_text: string; created_at: string }
+type JournalEntry = { id: string; trade_date: string; entry_text: string; created_at: string; updated_at: string | null }
 
 function todayIST() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -82,14 +82,20 @@ function TradeDayCards({ trades }: { trades: Trade[] }) {
 export function JournalView() {
   const supabase = useMemo(() => createClient(), [])
   const tradeDate = todayIST()
+  // editingDate tracks which day's entry the textarea currently represents -- defaults to
+  // today. Clicking "Edit" on any past log row loads that day's text into the same form and
+  // switches editingDate to it, so Save always upserts onto journal_entries_trade_date_unique
+  // rather than ever creating a second row for the same day.
+  const [editingDate, setEditingDate] = useState(tradeDate)
   const [noteText, setNoteText] = useState('')
+  const [noteDirty, setNoteDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
   const { data, error, mutate } = useSWR(['journal-page'], async () => {
     const [{ data: trades, error: tradeError }, { data: entries, error: entryError }] = await Promise.all([
       supabase.from('auto_trades').select('*').order('trade_date', { ascending: false }),
-      supabase.from('journal_entries').select('*').order('trade_date', { ascending: false }).order('created_at', { ascending: false }),
+      supabase.from('journal_entries').select('*').order('trade_date', { ascending: false }),
     ])
     if (tradeError) throw tradeError
     if (entryError) throw entryError
@@ -99,6 +105,15 @@ export function JournalView() {
   const trades = data?.trades ?? []
   const entries = data?.entries ?? []
   const todayTrades = trades.filter((trade) => trade.trade_date === tradeDate)
+  const existingEntryForEditingDate = entries.find((entry) => entry.trade_date === editingDate)
+
+  // Prefill the textarea from the entry on record for whichever date is being edited --
+  // one entry per day now (journal_entries_trade_date_unique), so this is either today's
+  // existing note (to continue/replace it) or a past day's note when "Edit" was clicked.
+  // Only runs when not mid-edit (noteDirty false) so it doesn't clobber unsaved typing.
+  useMemo(() => {
+    if (!noteDirty) setNoteText(existingEntryForEditingDate?.entry_text ?? '')
+  }, [existingEntryForEditingDate, editingDate, noteDirty])
 
   // Group past entries' trade context by date so the log shows each entry alongside that
   // day's trades, without re-fetching per row -- trades are read fresh from auto_trades at
@@ -118,11 +133,25 @@ export function JournalView() {
     if (!noteText.trim()) return
     setSaving(true)
     setSaveError(null)
-    const { error: insertError } = await supabase.from('journal_entries').insert({ trade_date: tradeDate, entry_text: noteText.trim() })
+    // Upsert on trade_date (journal_entries_trade_date_unique) -- one entry per day, so
+    // saving again for the same date replaces it in place instead of adding a new row.
+    const { error: upsertError } = await supabase
+      .from('journal_entries')
+      .upsert({ trade_date: editingDate, entry_text: noteText.trim(), updated_at: new Date().toISOString() }, { onConflict: 'trade_date' })
     setSaving(false)
-    if (insertError) { setSaveError(insertError.message); return }
-    setNoteText('')
+    if (upsertError) { setSaveError(upsertError.message); return }
+    setNoteDirty(false)
+    if (editingDate !== tradeDate) setEditingDate(tradeDate)
     void mutate()
+  }
+
+  const startEdit = (date: string) => {
+    setEditingDate(date)
+    setNoteDirty(false)
+  }
+  const cancelEdit = () => {
+    setEditingDate(tradeDate)
+    setNoteDirty(false)
   }
 
   return <section className="phase-view journal-view">
@@ -133,29 +162,36 @@ export function JournalView() {
     <TradeDayCards trades={todayTrades} />
 
     <div className="position-calculator journal-notes-card">
-      <div className="position-head"><div><p className="eyebrow">Your notes</p><strong>What happened today, and what to remember next time</strong></div></div>
+      <div className="position-head">
+        <div>
+          <p className="eyebrow">{editingDate === tradeDate ? 'Your notes' : `Editing ${formatDateLabel(editingDate)}`}</p>
+          <strong>{editingDate === tradeDate ? 'What happened today, and what to remember next time' : 'Update this day\'s note'}</strong>
+        </div>
+      </div>
       <textarea
         className="journal-textarea"
         rows={4}
         value={noteText}
-        onChange={(e) => setNoteText(e.target.value)}
+        onChange={(e) => { setNoteText(e.target.value); setNoteDirty(true) }}
         placeholder="e.g. Took the system's Iron Condor on NIFTY, held through midday chop, conservative target hit around 1pm. Should have trusted the lock instead of watching it fall back near close."
         aria-label="Journal entry text"
       />
       {saveError && <p className="history-empty">Could not save: {saveError}</p>}
       <div className="trade-confirmation">
         <button type="button" className="action-button action-button-success" onClick={submitEntry} disabled={saving || !noteText.trim()}>
-          <CheckCircle2 size={14} /> {saving ? 'Saving...' : 'Save entry'}
+          <CheckCircle2 size={14} /> {saving ? 'Saving...' : existingEntryForEditingDate ? 'Save changes' : 'Save entry'}
         </button>
+        {editingDate !== tradeDate && <button type="button" className="action-button" onClick={cancelEdit} disabled={saving}>Cancel</button>}
       </div>
     </div>
 
     <section className="trade-log journal-log">
       <div className="review-section-head"><div><p className="eyebrow">All saved notes</p><h2>Journal log</h2></div></div>
       {entries.length === 0 ? <p className="history-empty">No journal entries yet — write your first note above.</p> : <div className="history-list">
-        {entries.map((entry) => <article className="journal-log-entry" key={entry.id}>
+        {entries.map((entry) => <article className={`journal-log-entry ${entry.trade_date === editingDate ? 'journal-log-entry-active' : ''}`} key={entry.id}>
           <div className="journal-log-head">
-            <span className="journal-log-date">{formatDateLabel(entry.trade_date)}</span>
+            <span className="journal-log-date">{formatDateLabel(entry.trade_date)}{entry.updated_at && entry.updated_at !== entry.created_at && <em className="journal-log-edited"> · edited</em>}</span>
+            <button type="button" className="action-button journal-edit-button" onClick={() => startEdit(entry.trade_date)}><RotateCcw size={12} /> Edit</button>
           </div>
           <div className="journal-trade-cards journal-trade-cards-compact">
             {(tradesByDate[entry.trade_date] ?? []).length === 0
