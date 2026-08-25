@@ -382,8 +382,23 @@ function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarge
   const maxAbs = Math.max(1, ...points.map((p) => Math.abs(p.pnl)))
   const scaled = points.map((p) => ({ x: p.x, pnl: +((p.pnl / maxAbs) * 60).toFixed(1) }))
   const legColors: Record<string, string> = { Buy: '#008300', Sell: '#e34948' }
+  const targetPrice = spotEstTarget != null ? +(atmNumber + spotEstTarget).toFixed(0) : null
+  const stopPrice = spotEstStop != null ? +(atmNumber - spotEstStop).toFixed(0) : null
+  const aggTargetPrice = spotAggressiveTarget != null ? +(atmNumber + spotAggressiveTarget).toFixed(0) : null
+  const aggStopPrice = spotAggressiveStop != null ? +(atmNumber - spotAggressiveStop).toFixed(0) : null
+  // Reference-line text labels were removed: with multiple lines clustered close together
+  // (spot, legs, conservative + aggressive target/stop) recharts doesn't avoid collisions and
+  // the text overlapped into unreadable soup. Lines stay as color-coded visual markers only;
+  // the legend row + summary strip below the chart carry all the actual numbers.
   return <div className="verdict-card payoff-chart-card">
     <span className="eyebrow">Strategy view</span>
+    <div className="payoff-legend">
+      <span className="payoff-legend-item"><i className="payoff-swatch" style={{ background: '#898781' }} />Spot</span>
+      <span className="payoff-legend-item"><i className="payoff-swatch" style={{ background: legColors.Sell }} />Sell leg</span>
+      <span className="payoff-legend-item"><i className="payoff-swatch" style={{ background: legColors.Buy }} />Buy leg</span>
+      {!isNetSeller && <span className="payoff-legend-item"><i className="payoff-swatch" style={{ background: '#1baf7a' }} />Target</span>}
+      {!isNetSeller && <span className="payoff-legend-item"><i className="payoff-swatch" style={{ background: '#eda100' }} />Stop</span>}
+    </div>
     <div style={{ width: '100%', height: 200 }}>
       <ResponsiveContainer>
         <LineChart data={scaled} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
@@ -391,18 +406,22 @@ function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarge
           <YAxis tick={{ fontSize: 11, fill: '#898781' }} width={36} />
           <Tooltip formatter={(v) => [Number(v), 'Relative P&L']} labelFormatter={(l) => `Underlying ${l}`} />
           <ReferenceLine y={0} stroke="#c3c2b7" />
-          <ReferenceLine x={atmNumber} stroke="#898781" label={{ value: `Spot ${atmNumber}`, position: 'insideTopLeft', fontSize: 10, fill: '#898781' }} />
-          {legRows.map((leg) => <ReferenceLine key={leg.key} x={leg.strike} stroke={legColors[leg.side]} strokeDasharray={leg.side === 'Sell' ? undefined : '4 3'} label={{ value: `${leg.side} ${leg.strike}`, position: 'insideBottomLeft', fontSize: 10, fill: legColors[leg.side] }} />)}
-          {!isNetSeller && spotEstTarget != null && <ReferenceLine x={+(atmNumber + spotEstTarget).toFixed(0)} stroke="#1baf7a" strokeDasharray="4 3" label={{ value: `Target (cons.) ${(atmNumber + spotEstTarget).toFixed(0)}`, position: 'insideTopRight', fontSize: 10, fill: '#1baf7a' }} />}
-          {!isNetSeller && spotEstStop != null && <ReferenceLine x={+(atmNumber - spotEstStop).toFixed(0)} stroke="#eda100" strokeDasharray="4 3" label={{ value: `Stop (cons.) ${(atmNumber - spotEstStop).toFixed(0)}`, position: 'insideBottomRight', fontSize: 10, fill: '#eda100' }} />}
-          {!isNetSeller && spotAggressiveTarget != null && <ReferenceLine x={+(atmNumber + spotAggressiveTarget).toFixed(0)} stroke="#1baf7a" strokeDasharray="2 2" strokeOpacity={0.55} label={{ value: `Target (agg.) ${(atmNumber + spotAggressiveTarget).toFixed(0)}`, position: 'insideTopRight', fontSize: 9, fill: '#1baf7a' }} />}
-          {!isNetSeller && spotAggressiveStop != null && <ReferenceLine x={+(atmNumber - spotAggressiveStop).toFixed(0)} stroke="#eda100" strokeDasharray="2 2" strokeOpacity={0.55} label={{ value: `Stop (agg.) ${(atmNumber - spotAggressiveStop).toFixed(0)}`, position: 'insideBottomRight', fontSize: 9, fill: '#eda100' }} />}
+          <ReferenceLine x={atmNumber} stroke="#898781" strokeWidth={1.5} />
+          {legRows.map((leg) => <ReferenceLine key={leg.key} x={leg.strike} stroke={legColors[leg.side]} strokeDasharray={leg.side === 'Sell' ? undefined : '4 3'} />)}
+          {!isNetSeller && targetPrice != null && <ReferenceLine x={targetPrice} stroke="#1baf7a" strokeDasharray="4 3" />}
+          {!isNetSeller && stopPrice != null && <ReferenceLine x={stopPrice} stroke="#eda100" strokeDasharray="4 3" />}
+          {!isNetSeller && aggTargetPrice != null && <ReferenceLine x={aggTargetPrice} stroke="#1baf7a" strokeDasharray="2 2" strokeOpacity={0.5} />}
+          {!isNetSeller && aggStopPrice != null && <ReferenceLine x={aggStopPrice} stroke="#eda100" strokeDasharray="2 2" strokeOpacity={0.5} />}
           <Line type="monotone" dataKey="pnl" stroke="#2a78d6" strokeWidth={2.5} dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
-    {!isNetSeller && spotEstTarget != null && spotEstStop != null && <div className="payoff-seller-exit">
-      <span>Target (cons.) <b className="target-value">{(atmNumber + spotEstTarget).toFixed(0)}</b> · Stop (cons.) <b className="stop-value">{(atmNumber - spotEstStop).toFixed(0)}</b>{spotAggressiveTarget != null && spotAggressiveStop != null && <> · Target (agg.) <b className="target-value">{(atmNumber + spotAggressiveTarget).toFixed(0)}</b> · Stop (agg.) <b className="stop-value">{(atmNumber - spotAggressiveStop).toFixed(0)}</b></>}</span>
+    <div className="payoff-strike-list">
+      <span>Spot <b>{atmNumber}</b></span>
+      {legRows.map((leg) => <span key={leg.key}><b className={leg.side === 'Sell' ? 'stop-value' : 'target-value'}>{leg.side}</b> {leg.strike}</span>)}
+    </div>
+    {!isNetSeller && targetPrice != null && stopPrice != null && <div className="payoff-seller-exit">
+      <span>Target (cons.) <b className="target-value">{targetPrice}</b> · Stop (cons.) <b className="stop-value">{stopPrice}</b>{aggTargetPrice != null && aggStopPrice != null && <> · Target (agg.) <b className="target-value">{aggTargetPrice}</b> · Stop (agg.) <b className="stop-value">{aggStopPrice}</b></>}</span>
     </div>}
     {isNetSeller && actualConservativeTarget != null && actualConservativeStop != null && <div className="payoff-seller-exit">
       <span>Exit on net premium — Target <b className="target-value">₹{(actualConservativeTarget * qty).toFixed(0)}</b> · Stop <b className="stop-value">₹{(actualConservativeStop * qty).toFixed(0)}</b></span>
