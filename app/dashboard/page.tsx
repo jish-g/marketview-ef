@@ -754,11 +754,51 @@ function MidVerdictInstrument({ row, mid, midSnapshot, instrument }: { row: Row;
   const shiftNote = String(midSnapshot[`shift_note_${suffix}`] ?? '')
   return <article className="verdict-instrument"><div className="verdict-instrument-head"><h3>{instrument}</h3><span>{marketBias.label} · {strategyRec.recommendation}</span></div><div className="sync-strip"><span>Spot <b>{value(mid, spotKey)}</b></span><span>Intraday change <b className={tone(mid, changeKey)}>{value(mid, changeKey, true)}</b></span></div><div className="verdict-banner"><div><p className="eyebrow">Midday strategy read</p><strong>{strategyRec.recommendation}</strong><p>{strategyRec.reason}.</p></div></div><div className="verdict-card since-morning-card"><span className="eyebrow">Since morning</span><div className="since-morning-row"><span className="since-morning-label">Bias</span><span className={`since-morning-value ${biasShifted ? 'is-shifted' : 'is-unchanged'}`}>{morningBias} → {marketBias.label}</span></div><div className="since-morning-row"><span className="since-morning-label">Strategy</span><span className={`since-morning-value ${strategyShifted ? 'is-shifted' : 'is-unchanged'}`}>{morningStrategy} → {strategyRec.recommendation}</span></div><p className="since-morning-note">{hasShifted ? (shiftNote || 'Shifted since this morning.') : 'Unchanged since this morning.'}</p></div><div className="verdict-grid"><div className="verdict-card verdict-tracks"><div className="track-columns"><div className="track-column"><div className="track-header"><i></i><span>Conservative</span></div><strong className="track-move">{calc.conservative.toFixed(1)} pts</strong><div className="track-row"><span>↑ Target</span><b className="target-value">{calc.target.toFixed(1)} pts</b><em>₹{(calc.target * effectiveDelta).toFixed(1)}</em></div><div className="track-row"><span>↓ Stop-loss</span><b className="stop-value">{calc.stop.toFixed(1)} pts</b><em>₹{(calc.stop * effectiveDelta).toFixed(1)}</em></div></div><div className="track-column"><div className="track-header"><i></i><span>Aggressive</span></div><strong className="track-move">{calc.aggressive.toFixed(1)} pts</strong><div className="track-row"><span>↑ Target</span><b className="target-value">{calc.aggressiveTarget.toFixed(1)} pts</b><em>₹{(calc.aggressiveTarget * effectiveDelta).toFixed(1)}</em></div><div className="track-row"><span>↓ Stop-loss</span><b className="stop-value">{calc.aggressiveStop.toFixed(1)} pts</b><em>₹{(calc.aggressiveStop * effectiveDelta).toFixed(1)}</em></div></div></div></div></div></article>
 }
-function MidMarketView({ row, midSnapshot }: { row: Row; midSnapshot: Row | null | undefined }) {
-  if (midSnapshot === undefined) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Open → Mid snapshot · {syncLabel(null, '12:45')}</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div><p className="history-empty">Loading mid-market data…</p></section>
-  if (!midSnapshot) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Open → Mid snapshot · {syncLabel(null, '12:45')}</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div><p className="history-empty">Mid-market data not available yet — updates at 12:45 PM IST.</p></section>
-  const mid = buildMidRow(row, midSnapshot)
-  return <section className="phase-view special-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">Open → Mid snapshot · {syncLabel(midSnapshot, '12:45')}</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div><div className="verdict-instruments"><MidVerdictInstrument row={row} mid={mid} midSnapshot={midSnapshot} instrument="NIFTY" /><MidVerdictInstrument row={row} mid={mid} midSnapshot={midSnapshot} instrument="SENSEX" /></div></section>
+// Checkpoint time labels for display -- '1245' is the legacy single-checkpoint label kept for
+// historical days recorded before the 5-checkpoint (10:30/11:30/12:30/1:30/2:30) schedule.
+const checkpointLabels: Record<string, string> = { '1030': '10:30', '1130': '11:30', '1230': '12:30', '1330': '1:30', '1430': '2:30', '1245': '12:45' }
+
+// One dot per checkpoint on the timeline strip -- filled/accent when selected, otherwise a plain
+// outline. A checkpoint is flagged "shifted" (small dot accent) if either instrument's bias or
+// strategy moved since the morning call, so a glance at the strip shows roughly where in the day
+// the read changed without opening every card.
+function MidCheckpointStrip({ checkpoints, selectedId, onSelect }: { checkpoints: Row[]; selectedId: string; onSelect: (id: string) => void }) {
+  return <div className="mid-checkpoint-strip">
+    {checkpoints.map((cp) => {
+      const id = String(cp.checkpoint)
+      const shifted = Boolean(cp.bias_shifted_nifty) || Boolean(cp.bias_shifted_sensex) || Boolean(cp.strategy_shifted_nifty) || Boolean(cp.strategy_shifted_sensex)
+      return <button
+        type="button"
+        key={id}
+        className={`mid-checkpoint-dot ${id === selectedId ? 'is-selected' : ''} ${shifted ? 'is-shifted' : ''}`}
+        onClick={() => onSelect(id)}
+      >
+        <span className="mid-checkpoint-dot-marker" />
+        <span className="mid-checkpoint-dot-label">{checkpointLabels[id] ?? id}</span>
+      </button>
+    })}
+  </div>
+}
+
+function MidMarketView({ row, midCheckpoints }: { row: Row; midCheckpoints: Row[] | null | undefined }) {
+  // Default to the most recent checkpoint that's actually landed today, so the page opens on
+  // the freshest read rather than always the first (10:30) slot.
+  const latest = midCheckpoints && midCheckpoints.length > 0 ? midCheckpoints[midCheckpoints.length - 1] : null
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const effectiveId = selectedId ?? (latest ? String(latest.checkpoint) : null)
+  const selected = midCheckpoints?.find((cp) => String(cp.checkpoint) === effectiveId) ?? null
+
+  if (midCheckpoints === undefined) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div><p className="history-empty">Loading mid-market data…</p></section>
+  if (!midCheckpoints || midCheckpoints.length === 0) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div><p className="history-empty">Mid-market data not available yet — first checkpoint updates at 10:30 AM IST.</p></section>
+  if (!selected) return null
+
+  const mid = buildMidRow(row, selected)
+  return <section className="phase-view special-view verdict-view">
+    <div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div>
+    <MidCheckpointStrip checkpoints={midCheckpoints} selectedId={effectiveId ?? ''} onSelect={setSelectedId} />
+    <p className="mid-checkpoint-synclabel">{checkpointLabels[effectiveId ?? ''] ?? effectiveId} IST · {syncLabel(selected, checkpointLabels[effectiveId ?? ''] ?? '')}</p>
+    <div className="verdict-instruments"><MidVerdictInstrument row={row} mid={mid} midSnapshot={selected} instrument="NIFTY" /><MidVerdictInstrument row={row} mid={mid} midSnapshot={selected} instrument="SENSEX" /></div>
+  </section>
 }
 function PostInstrumentCard({ row, postSummary, instrument }: { row: Row; postSummary: Row; instrument: Instrument }) {
   const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
@@ -879,9 +919,18 @@ export default function Dashboard() {
     return { rows, mid, post, trade }
   }, { revalidateOnFocus: false })
   const row = liveRow ? Object.fromEntries(Object.keys(visualRow).map((key) => [key, liveRow[key] ?? visualRow[key]])) as Row : visualRow
-  const { data: midSnapshot } = useSWR<Row | null>(row.trade_date ? ['midmarket-snapshot', row.trade_date] : null, async () => { const { data, error } = await supabase.from('midmarket_snapshot').select('*').eq('trade_date', row.trade_date).order('trade_date', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data as Row | null }, { revalidateOnFocus: false })
+  // All of today's mid-market checkpoints (10:30/11:30/12:30/1:30/2:30 IST, or the legacy
+  // single '1245' row for historical days before the 5-checkpoint schedule started), ordered
+  // earliest-first so the timeline UI can just .map() them left-to-right / top-to-bottom.
+  const checkpointOrder = ['1030', '1130', '1230', '1330', '1430', '1245']
+  const { data: midCheckpoints } = useSWR<Row[] | null>(row.trade_date ? ['midmarket-checkpoints', row.trade_date] : null, async () => {
+    const { data, error } = await supabase.from('midmarket_snapshot').select('*').eq('trade_date', row.trade_date)
+    if (error) throw error
+    const rows = (data ?? []) as Row[]
+    return rows.sort((a, b) => checkpointOrder.indexOf(String(a.checkpoint)) - checkpointOrder.indexOf(String(b.checkpoint)))
+  }, { revalidateOnFocus: false })
   const { data: postSummary } = useSWR<Row | null>(row.trade_date ? ['postmarket-summary', row.trade_date] : null, async () => { const { data, error } = await supabase.from('postmarket_summary').select('*').eq('trade_date', row.trade_date).order('trade_date', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data as Row | null }, { revalidateOnFocus: false })
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   useEffect(() => { const updateClock = () => { const now = new Date(); const options = { timeZone: 'Asia/Kolkata' } as const; setLiveDate(new Intl.DateTimeFormat('en-IN', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)); setLiveDay(new Intl.DateTimeFormat('en-IN', { ...options, weekday: 'long' }).format(now)); setLiveTime(new Intl.DateTimeFormat('en-IN', { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(now)) }; updateClock(); const timer = window.setInterval(updateClock, 1000); return () => window.clearInterval(timer) }, [])
-  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation"><Menu size={18} /></button><div className="brand-mark"><div className="brand-symbol"><BarChart3 size={16} /></div><div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div></div><span className="topbar-date">{liveDate || row?.trade_date || 'No current row'} · {liveDay || row?.day_name || 'Session date'} · {liveTime || '—'} IST</span><div className="topbar-meta">{!sessionLoading && (session ? <button type="button" className="sign-in-link" onClick={() => signOut()}><LogOut size={13} /> Sign out</button> : <Link href="/login" className="sign-in-link"><LogIn size={13} /> Sign in</Link>)}<button className="icon-button" onClick={() => location.reload()} aria-label="Refresh dashboard"><RefreshCw size={16} /></button><button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button></div></header><div className="workspace"><aside className={`sidebar ${navOpen ? '' : 'closed'}`}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle, icon: Icon }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => setPhase(id)}><Icon size={17} /><span><strong>{label}</strong><small>{subtitle}</small></span><ChevronRight size={14} /></button>)}<div className="side-rule" /></aside><div className="content">{phase === 'rules' ? <RulesView /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midSnapshot={midSnapshot} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
+  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation"><Menu size={18} /></button><div className="brand-mark"><div className="brand-symbol"><BarChart3 size={16} /></div><div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div></div><span className="topbar-date">{liveDate || row?.trade_date || 'No current row'} · {liveDay || row?.day_name || 'Session date'} · {liveTime || '—'} IST</span><div className="topbar-meta">{!sessionLoading && (session ? <button type="button" className="sign-in-link" onClick={() => signOut()}><LogOut size={13} /> Sign out</button> : <Link href="/login" className="sign-in-link"><LogIn size={13} /> Sign in</Link>)}<button className="icon-button" onClick={() => location.reload()} aria-label="Refresh dashboard"><RefreshCw size={16} /></button><button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button></div></header><div className="workspace"><aside className={`sidebar ${navOpen ? '' : 'closed'}`}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle, icon: Icon }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => setPhase(id)}><Icon size={17} /><span><strong>{label}</strong><small>{subtitle}</small></span><ChevronRight size={14} /></button>)}<div className="side-rule" /></aside><div className="content">{phase === 'rules' ? <RulesView /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
 }
