@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import { createClient } from '@/lib/supabase/client'
 import { TradeView } from '@/components/trade-view'
 import { useSession } from '@/hooks/use-session'
-import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, RefreshCw, Sun } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, RefreshCw, RotateCcw, Sun } from 'lucide-react'
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 type Row = Record<string, string | number | boolean | null>
 type Phase = 'premarket' | 'open' | 'verdict' | 'mid' | 'post' | 'rules' | 'history' | 'trade'
@@ -445,11 +445,24 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   // Live call/put premiums for a +/-20-strike band around ATM, refreshed by the Edge Function's
   // open and mid phases — used to auto-fill each leg's premium below instead of requiring a
   // manual "Enter fill" for every strategy change.
-  const { data: legPremiumRows } = useSWR<Row[] | null>(
+  const { data: legPremiumRows, mutate: mutateLegPremiums } = useSWR<Row[] | null>(
     row.trade_date ? ['leg-premiums', row.trade_date, instrument] : null,
     async () => { const { data, error } = await legSupabase.from('leg_premiums').select('*').eq('trade_date', row.trade_date).eq('instrument', instrument); if (error) throw error; return data as Row[] | null },
     { revalidateOnFocus: false },
   )
+  // Manual-trade submit flow: "Update premium" re-fetches the leg_premiums table (which the
+  // open/mid Edge Function phases keep refreshed with live LTPs for a +/-20-strike band), so
+  // the premium fields below pick up whatever's live right now instead of the last poll cycle.
+  // "Trade" then logs whatever strategy/legs/premium are currently on screen as a manual trade,
+  // tagged source: 'manual' so it's tracked on the Trade page independently of (and alongside)
+  // the system's own 09:30 pick for the same instrument/day.
+  const [updatingPremium, setUpdatingPremium] = useState(false)
+  const [submittingTrade, setSubmittingTrade] = useState(false)
+  const [manualTradeStatus, setManualTradeStatus] = useState<string | null>(null)
+  const handleUpdatePremium = async () => {
+    setUpdatingPremium(true)
+    try { await mutateLegPremiums() } finally { setUpdatingPremium(false) }
+  }
   // 3-stage Bias / Option Readiness / Strategy Recommendation framework now drives autoStrategy (replacing the
   // old normalizeStrategy(calc.strategy) vote-based pick). calc.bias/calc.strategy themselves are left intact
   // since calc.bias still drives leg wing/side placement (strike/hedge placement logic, out of scope here).
@@ -551,6 +564,55 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const bookStopConservative = actualConservativeStop === null ? null : isSpreadSeller ? actualConservativeStop * qty : actualConservativeStop * qty * 0.4
   const bookProfitAggressive = actualAggressiveTarget === null ? null : isSpreadSeller ? actualAggressiveTarget * qty : actualAggressiveTarget * qty * 0.6
   const bookStopAggressive = actualAggressiveStop === null ? null : isSpreadSeller ? actualAggressiveStop * qty : actualAggressiveStop * qty * 0.4
+  // Same conservative/aggressive target-stop formulas used everywhere else on this page
+  // (net-seller vs net-buyer split above) feed the manual trade's stored target/stop levels,
+  // so a manual trade is judged by the exact same math as a system trade -- equal treatment,
+  // per the plan: only the strategy choice and entry timing differ.
+  const submitManualTrade = async () => {
+    if (!hasAnyPremium || strategy === 'No Trade') return
+    setSubmittingTrade(true)
+    setManualTradeStatus(null)
+    try {
+      const { data: inserted, error: insertError } = await legSupabase
+        .from('auto_trades')
+        .insert({
+          trade_date: row.trade_date,
+          instrument,
+          strategy,
+          source: 'manual',
+          filled_at: new Date().toISOString(),
+          qty,
+          net_premium: +netPremium.toFixed(2),
+          is_credit: isNetSeller,
+          outcome: 'open',
+          state: 'running',
+          entry_premium: +netPremium.toFixed(2),
+          target_price_cons: actualConservativeTarget != null ? +actualConservativeTarget.toFixed(2) : null,
+          stop_price_cons: actualConservativeStop != null ? +actualConservativeStop.toFixed(2) : null,
+          target_price_aggr: actualAggressiveTarget != null ? +actualAggressiveTarget.toFixed(2) : null,
+          stop_price_aggr: actualAggressiveStop != null ? +actualAggressiveStop.toFixed(2) : null,
+          dte: calc.dte,
+          last_checked_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+      if (insertError) throw insertError
+      const legInsertRows = legRows.map((leg) => ({
+        auto_trade_id: inserted.id,
+        leg_key: leg.key,
+        side: leg.side,
+        strike: leg.strike,
+        premium: Number(legPremiums[leg.key]) || 0,
+      }))
+      const { error: legInsertError } = await legSupabase.from('auto_trade_legs').insert(legInsertRows)
+      if (legInsertError) throw legInsertError
+      setManualTradeStatus('Logged as a manual trade — now tracked on the Trade page.')
+    } catch (e) {
+      setManualTradeStatus(`Could not log this trade: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setSubmittingTrade(false)
+    }
+  }
   const sync = Math.abs(calc.difference) <= 5 ? ['In Sync', 'success', 'Prediction is tracking the actual open.'] : Math.abs(calc.difference) <= 15 ? ['Minor Divergence', 'warning', 'Prediction is slightly away from the actual open.'] : ['Diverging', 'danger', 'Prediction is materially away from the actual open.']
   const realGapPct = calc.prev ? (calc.open / calc.prev) * 100 : calc.gapPct
   const summary = `${row.trade_date} · ${row.day_name}: ${instrument} opened ${realGapPct >= 0 ? '+' : ''}${realGapPct.toFixed(2)}% gap (${calc.open.toFixed(1)}). ${marketBias.label} bias with India VIX ${calc.vix.toFixed(1)} (${calc.vix < 11 ? 'low volatility — momentum only' : calc.vix <= 14 ? 'normal volatility — ATM / ITM by setup' : 'elevated volatility — prefer defined risk'}), ${calc.dte <= 7 ? 'Weekly' : 'Monthly'} expiry in ${calc.dte} days, ${calc.iv} versus VIX, PCR ${calc.pcr.toFixed(2)}, OI support ${calc.support.toFixed(0)} (${calc.oiSupport}) / resistance ${calc.resistance.toFixed(0)} (${calc.oiResistance}), chart ${calc.chartSupport.toFixed(0)}–${calc.chartResistance.toFixed(0)}, max pain ${calc.maxPain.toFixed(0)}.`
@@ -629,6 +691,12 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
       <div className="position-outputs">
         <span>Net Premium ({isNetSeller ? 'received' : 'paid'}) <b>{hasAnyPremium ? `₹${netPremium.toFixed(1)}` : 'Not entered yet'}</b></span>
       </div>
+      <div className="manual-trade-actions">
+        <button type="button" className="action-button" onClick={handleUpdatePremium} disabled={updatingPremium}><RotateCcw size={13} /> {updatingPremium ? 'Updating...' : 'Update premium'}</button>
+        <button type="button" className="action-button action-button-success" onClick={submitManualTrade} disabled={submittingTrade || !hasAnyPremium}><CheckCircle2 size={13} /> {submittingTrade ? 'Logging...' : 'Trade'}</button>
+      </div>
+      {manualTradeStatus && <p className="structure-line">{manualTradeStatus}</p>}
+      {!hasAnyPremium && <p className="structure-line">Enter or update premiums above, then Trade to log this as a manual trade on today's Trade page -- tracked the same way as the system's pick, alongside it.</p>}
       {hasAnyPremium && <div className="verdict-card verdict-tracks actual-tracks">
         <div className="track-columns">
           <div className="track-column">
