@@ -19,8 +19,26 @@ type Trade = Row & {
   exit_reason: ExitReason | null
   exit_time: string | null
   exit_premium: number | null
+  entry_premium: number | null
+  qty: number | null
+  strategy: string | null
   ambiguous_resolution: boolean | null
   entry_delayed: boolean | null
+  last_checked_at: string | null
+}
+
+// Real signed P&L for a closed trade, in rupees, using the actual entry/exit premium
+// and lot size rather than assuming a fixed capture ratio. Credit-spread and Iron
+// Condor trades are net sellers — for them premium falling is the profit direction,
+// so the sign flips relative to a net buyer (Naked Call/Put, Debit Spread), where
+// premium rising is profit. This mirrors the exact touch-direction logic the poll
+// phase already uses server-side (market-data-sync, phase "poll").
+function tradePnl(trade: Trade): number | null {
+  if (trade.entry_premium == null || trade.exit_premium == null) return null
+  const qty = Number(trade.qty) || 0
+  const isNetSeller = trade.strategy === 'Credit Spread' || trade.strategy === 'Iron Condor'
+  const directionSign = isNetSeller ? -1 : 1
+  return (Number(trade.exit_premium) - Number(trade.entry_premium)) * directionSign * qty
 }
 type Leg = Row & { auto_trade_id: string; leg_key: string; side: 'Buy' | 'Sell'; strike: number | null; premium: number | null }
 
@@ -158,15 +176,29 @@ export function TradeView() {
     const isLoss = (trade: Trade) => trade.exit_reason === 'stop_conservative' || (trade.exit_reason == null && trade.outcome === 'stop')
     const targets = closed.filter(isWin).length
     const stops = closed.filter(isLoss).length
-    const pnl = closed.reduce((sum, trade) => {
-      const netPremium = Number(trade.net_premium) || 0
-      const qty = Number(trade.qty) || 0
-      if (isWin(trade)) return sum + netPremium * qty * 0.6
-      if (isLoss(trade)) return sum - netPremium * qty * 0.4
-      return sum
-    }, 0)
-    return { total: closed.length, targets, stops, winRate: closed.length ? (targets / closed.length) * 100 : 0, pnl }
+
+    // Real P&L per trade (entry vs exit premium, sign-adjusted for net sellers, times
+    // lot size) rather than a fixed 0.6/0.4-of-premium guess keyed on target/stop hit.
+    // This also correctly captures eod_unresolved trades, which never hit a target or
+    // stop line but still close with a real gain or loss on the day.
+    const pnlByTrade = closed.map((trade) => tradePnl(trade)).filter((v): v is number => v != null)
+    const pnl = pnlByTrade.reduce((sum, v) => sum + v, 0)
+
+    // Bucket by actual sign of realized P&L, not by which line was hit — an
+    // eod_unresolved trade that happens to close up counts as a profit here, and one
+    // that closes down counts as a loss, exactly per your instruction that EOD trades
+    // aren't necessarily clean target/stop hits but still have a real result.
+    const profits = pnlByTrade.filter((v) => v > 0)
+    const losses = pnlByTrade.filter((v) => v < 0)
+    const avgProfit = profits.length ? profits.reduce((s, v) => s + v, 0) / profits.length : 0
+    const avgLoss = losses.length ? losses.reduce((s, v) => s + v, 0) / losses.length : 0
+    const riskReward = avgLoss !== 0 ? avgProfit / Math.abs(avgLoss) : null
+
+    const eodUnresolvedCount = closed.filter((trade) => trade.exit_reason === 'eod_unresolved').length
+
+    return { total: closed.length, targets, stops, winRate: closed.length ? (targets / closed.length) * 100 : 0, pnl, avgProfit, avgLoss, riskReward, eodUnresolvedCount }
   }, [trades])
+  const openPositions = todayTrades.filter((trade) => trade.outcome === 'open')
   const getTrade = (instrument: Instrument) => todayTrades.find((trade) => trade.instrument === instrument)
   const rationale = (instrument: Instrument) => data?.snapshot ? calculateVerdict(data.snapshot, instrument) as Row : undefined
   const rows = [...trades].sort((a, b) => `${b.trade_date}-${b.instrument}`.localeCompare(`${a.trade_date}-${a.instrument}`))
@@ -185,7 +217,45 @@ export function TradeView() {
         <div className="field-card"><span>Stop-loss hit count</span><strong>{summary.stops}</strong></div>
         <div className="field-card"><span>Win rate %</span><strong>{summary.winRate.toFixed(0)}%</strong></div>
         <div className="field-card"><span>Total P&amp;L</span><strong><em className={`breadth-flag ${summary.pnl >= 0 ? 'positive' : 'negative'}`}>{summary.pnl >= 0 ? '+' : '−'}₹{Math.abs(summary.pnl).toFixed(0)}</em></strong></div>
+        <div className="field-card field-card-accent"><span>Open positions</span><strong>{openPositions.length}</strong></div>
       </div>
+      <div className="trade-summary-tiles">
+        <div className="field-card"><span>Average profit</span><strong><em className="breadth-flag positive">{summary.avgProfit > 0 ? `+₹${summary.avgProfit.toFixed(0)}` : '—'}</em></strong></div>
+        <div className="field-card"><span>Average loss</span><strong><em className="breadth-flag negative">{summary.avgLoss < 0 ? `−₹${Math.abs(summary.avgLoss).toFixed(0)}` : '—'}</em></strong></div>
+        <div className="field-card"><span>Avg risk-reward</span><strong>{summary.riskReward != null ? `1 : ${summary.riskReward.toFixed(1)}` : '—'}</strong></div>
+      </div>
+      {summary.eodUnresolvedCount > 0 && <p className="history-empty">{summary.eodUnresolvedCount} trade{summary.eodUnresolvedCount === 1 ? '' : 's'} closed at market close without hitting a target or stop — counted above by actual profit or loss, not as a clean hit.</p>}
+      {openPositions.length > 0 && <div className="trade-open-positions">
+        <p className="eyebrow">Open positions</p>
+        <div className="trade-open-grid">
+          {openPositions.map((trade) => {
+            const entry = trade.entry_premium != null ? Number(trade.entry_premium) : null
+            const current = Number(trade.net_premium) || 0
+            const isNetSeller = trade.strategy === 'Credit Spread' || trade.strategy === 'Iron Condor'
+            const targetCons = trade.target_price_cons != null ? Number(trade.target_price_cons) : null
+            const stopCons = trade.stop_price_cons != null ? Number(trade.stop_price_cons) : null
+            const distance = targetCons != null ? Math.abs(current - targetCons) : null
+            let progressPct = 50
+            if (targetCons != null && stopCons != null && targetCons !== stopCons) {
+              progressPct = Math.max(0, Math.min(100, ((current - stopCons) / (targetCons - stopCons)) * 100))
+            }
+            return <div className="trade-open-card" key={String(trade.id)}>
+              <div className="trade-open-head">
+                <div><b>{trade.instrument}</b><span>{String(trade.strategy)}</span></div>
+                <span className={`trade-status sync-${trade.state === 'locked_conservative' ? 'warning' : 'accent'}`}>{stateLabel(trade.state)}</span>
+              </div>
+              <div className="trade-open-figures">
+                <div><span>Entry premium</span><b>{entry != null ? `₹${entry.toFixed(2)}` : '—'}</b></div>
+                <div><span>Current premium</span><b>{`₹${current.toFixed(2)}`}</b></div>
+                {distance != null && <div><span>Distance to target</span><b>{`₹${distance.toFixed(2)} away`}</b></div>}
+              </div>
+              <div className="trade-open-bar"><div className="trade-open-bar-fill" style={{ width: `${progressPct}%` }} /></div>
+              <div className="trade-open-levels"><span>Stop {stopCons != null ? stopCons.toFixed(2) : '—'}</span><span>Target (cons.) {targetCons != null ? targetCons.toFixed(2) : '—'}</span></div>
+              <p className="trade-open-checked">Last checked {trade.last_checked_at ? formatTime(trade.last_checked_at) : '—'} — rechecks every 5 min</p>
+            </div>
+          })}
+        </div>
+      </div>}
       {rows.length === 0 ? <p className="history-empty">No past trades recorded yet.</p> : <div className="history-list">
         <div className="history-row history-head trade-log-row" aria-hidden="true"><span>Date</span><span>Instrument</span><span>Strategy</span><span>Net Premium</span><span>Outcome</span></div>
         {rows.map((trade) => <article className="history-row trade-log-row" key={String(trade.id)}>
