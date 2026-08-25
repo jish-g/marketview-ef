@@ -77,6 +77,31 @@ function statusTone(trade: Pick<Trade, 'outcome' | 'exit_reason'>) {
   return trade.outcome === 'target' ? 'success' : trade.outcome === 'stop' ? 'danger' : 'warning'
 }
 
+// Leg keys are internal shorthand written by the Edge Function (market-data-sync,
+// legsForStrategyV): "p" for a naked buy, "s"/"lg" for the primary/hedge leg of a
+// debit or credit spread, and "lc"/"sc"/"sp"/"lp" for the four Iron Condor legs
+// (long call, short call, short put, long put). Never show these raw codes — map
+// them to the same plain-English labels the Verdict page uses.
+function legKeyLabel(legKey: string, side: 'Buy' | 'Sell', strategy: string | null | undefined) {
+  // Naked Call/Put, Debit Spread, and Credit Spread don't record call-vs-put on the
+  // trade row itself (that's only resolved server-side at entry time), so those keys
+  // stay generic here rather than guessing wrong — the strike shown alongside each
+  // row disambiguates. Iron Condor's four keys are unambiguous (lc/sc/sp/lq always
+  // mean the same leg), so those get the specific Call/Put label.
+  if (strategy === 'Naked Call') return 'Call (naked)'
+  if (strategy === 'Naked Put') return 'Put (naked)'
+  const map: Record<string, string> = {
+    p: 'Option (naked)',
+    s: side === 'Sell' ? 'Primary (sold)' : 'Primary (bought)',
+    lg: side === 'Buy' ? 'Hedge (bought)' : 'Hedge (sold)',
+    lc: 'Call (hedge)',
+    sc: 'Call (sold)',
+    sp: 'Put (sold)',
+    lp: 'Put (hedge)',
+  }
+  return map[legKey] ?? `${side === 'Buy' ? 'Bought' : 'Sold'} leg`
+}
+
 // Live-state label for a trade that's still open in the automated poller, shown instead of
 // a bare "Open" so it's clear the system is actively tracking it, not waiting on a manual click.
 function stateLabel(state: TradeState | null | undefined) {
@@ -122,7 +147,7 @@ function TradeCard({ instrument, trade, legs, rationale, mutate }: { instrument:
       <div className="leg-list">
         {legs.length === 0 ? <p className="history-empty">No leg fills recorded.</p> : legs.map((leg) => <div className="leg-row" key={String(leg.id ?? leg.leg_key)}>
           <span className={`leg-badge leg-${leg.side.toLowerCase()}`}>{leg.side}</span>
-          <span className="leg-label">{String(leg.leg_key)}</span>
+          <span className="leg-label">{legKeyLabel(String(leg.leg_key), leg.side, trade.strategy)}</span>
           <b className="trade-strike">{leg.strike ?? '—'}</b>
           <span className="trade-premium">₹{leg.premium != null ? Number(leg.premium).toFixed(1) : '—'}</span>
         </div>)}
