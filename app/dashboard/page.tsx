@@ -376,7 +376,7 @@ function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarge
     for (const leg of legRows) {
       const isPut = leg.label.toLowerCase().includes('put')
       const intrinsic = isPut ? Math.max(0, leg.strike - x) : Math.max(0, x - leg.strike)
-      pnl += leg.side === 'Buy' ? -intrinsic : intrinsic
+      pnl += leg.side === 'Buy' ? intrinsic : -intrinsic
     }
     points.push({ x, pnl })
   }
