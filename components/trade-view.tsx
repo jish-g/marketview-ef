@@ -288,7 +288,7 @@ export function TradeView() {
           <span>{trade.instrument}</span>
           <span>{String(trade.strategy)}</span>
           <span>₹{Math.abs(Number(trade.net_premium) || 0).toFixed(1)} {trade.is_credit ? 'received' : 'paid'}</span>
-          <span className={`trade-status sync-${statusTone(trade)}`}>{trade.outcome === 'open' ? 'Open' : statusLabel(trade)}</span>
+          <span className={`trade-status sync-${statusTone(trade)}`}>{trade.outcome === 'open' ? stateLabel(trade.state) : statusLabel(trade)}</span>
         </article>)}
       </div>}
     </section>
