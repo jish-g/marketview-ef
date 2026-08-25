@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { TradeView } from '@/components/trade-view'
 import { useSession } from '@/hooks/use-session'
 import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, RefreshCw, Sun } from 'lucide-react'
-import { Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 type Row = Record<string, string | number | boolean | null>
 type Phase = 'premarket' | 'open' | 'verdict' | 'mid' | 'post' | 'rules' | 'history' | 'trade'
 const phases = [
@@ -351,7 +351,7 @@ function mapRecommendationToStrategy(recommendation: string): { strategy: Strate
 // vertical price-level lines too. For seller strategies (Credit Spread, Iron Condor), target/stop
 // are net-premium-based (already computed as actualConservativeTarget/Stop, in rupees), so they're
 // drawn as horizontal P&L threshold lines on the y-axis instead — no invented price level.
-function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarget, spotEstStop, spotAggressiveTarget, spotAggressiveStop, actualConservativeTarget, actualConservativeStop, qty }: {
+function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarget, spotEstStop, spotAggressiveTarget, spotAggressiveStop, actualConservativeTarget, actualConservativeStop, actualAggressiveTarget, actualAggressiveStop, qty }: {
   legRows: { key: string; label: string; side: 'Buy' | 'Sell'; strike: number }[]
   atmNumber: number
   strikeStep: number
@@ -362,6 +362,8 @@ function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarge
   spotAggressiveStop: number | null
   actualConservativeTarget: number | null
   actualConservativeStop: number | null
+  actualAggressiveTarget: number | null
+  actualAggressiveStop: number | null
   qty: number
 }) {
   if (legRows.length === 0 || !atmNumber) return null
@@ -378,33 +380,45 @@ function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarge
     }
     points.push({ x, pnl })
   }
-  // Normalize so the flat (capped) side sits at a readable scale regardless of premium inputs.
-  const maxAbs = Math.max(1, ...points.map((p) => Math.abs(p.pnl)))
-  const scaled = points.map((p) => ({ x: p.x, pnl: +((p.pnl / maxAbs) * 60).toFixed(1) }))
-  const legColors: Record<string, string> = { Buy: '#008300', Sell: '#e34948' }
   const targetPrice = spotEstTarget != null ? +(atmNumber + spotEstTarget).toFixed(0) : null
   const stopPrice = spotEstStop != null ? +(atmNumber - spotEstStop).toFixed(0) : null
   const aggTargetPrice = spotAggressiveTarget != null ? +(atmNumber + spotAggressiveTarget).toFixed(0) : null
   const aggStopPrice = spotAggressiveStop != null ? +(atmNumber - spotAggressiveStop).toFixed(0) : null
-  // Reference-line text labels were removed: with multiple lines clustered close together
-  // (spot, legs, conservative + aggressive target/stop) recharts doesn't avoid collisions and
-  // the text overlapped into unreadable soup. Lines stay as color-coded visual markers only;
-  // the legend row + summary strip below the chart carry all the actual numbers.
+  const legColors: Record<string, string> = { Buy: '#008300', Sell: '#e34948' }
+  // Approved design (confirmed against prototypes covering all 4 strategy types): plain P&L
+  // curve colored by profit/loss segment, thin color-coded vertical guide lines with NO on-chart
+  // text (recharts doesn't avoid label collisions — text overlapped when levels cluster near
+  // spot), no y-axis gridlines/ticks (the shape + legend carry the meaning, not an absolute
+  // scale), and a legend row of dot + stacked label/value chips carrying every actual number.
+  const legendItems: { label: string; value: string; color: string }[] = [
+    { label: 'Spot', value: atmNumber.toLocaleString('en-IN'), color: '#898781' },
+  ]
+  for (const leg of legRows) {
+    legendItems.push({ label: leg.side, value: `${leg.strike.toLocaleString('en-IN')} ${leg.label.toLowerCase().includes('put') ? 'PE' : 'CE'}`, color: legColors[leg.side] })
+  }
+  if (!isNetSeller && targetPrice != null && stopPrice != null) {
+    const targetValue = aggTargetPrice != null ? `${targetPrice.toLocaleString('en-IN')} / ${aggTargetPrice.toLocaleString('en-IN')}` : targetPrice.toLocaleString('en-IN')
+    const stopValue = aggStopPrice != null ? `${stopPrice.toLocaleString('en-IN')} / ${aggStopPrice.toLocaleString('en-IN')}` : stopPrice.toLocaleString('en-IN')
+    legendItems.push({ label: aggTargetPrice != null ? 'Target (cons. / agg.)' : 'Target', value: targetValue, color: '#1baf7a' })
+    legendItems.push({ label: aggStopPrice != null ? 'Stop (cons. / agg.)' : 'Stop', value: stopValue, color: '#eda100' })
+  }
+  if (isNetSeller && actualConservativeTarget != null && actualConservativeStop != null) {
+    const consTarget = Math.round(actualConservativeTarget * qty)
+    const consStop = Math.round(actualConservativeStop * qty)
+    const aggTarget = actualAggressiveTarget != null ? Math.round(actualAggressiveTarget * qty) : null
+    const aggStop = actualAggressiveStop != null ? Math.round(actualAggressiveStop * qty) : null
+    const targetValue = aggTarget != null ? `₹${consTarget.toLocaleString('en-IN')} / ₹${aggTarget.toLocaleString('en-IN')}` : `₹${consTarget.toLocaleString('en-IN')}`
+    const stopValue = aggStop != null ? `₹${consStop.toLocaleString('en-IN')} / ₹${aggStop.toLocaleString('en-IN')}` : `₹${consStop.toLocaleString('en-IN')}`
+    legendItems.push({ label: aggTarget != null ? 'Target (net premium, cons. / agg.)' : 'Target (net premium)', value: targetValue, color: '#1baf7a' })
+    legendItems.push({ label: aggStop != null ? 'Stop (net premium, cons. / agg.)' : 'Stop (net premium)', value: stopValue, color: '#eda100' })
+  }
   return <div className="verdict-card payoff-chart-card">
     <span className="eyebrow">Strategy view</span>
-    <div className="payoff-legend">
-      <span className="payoff-legend-item"><i className="payoff-swatch" style={{ background: '#898781' }} />Spot</span>
-      <span className="payoff-legend-item"><i className="payoff-swatch" style={{ background: legColors.Sell }} />Sell leg</span>
-      <span className="payoff-legend-item"><i className="payoff-swatch" style={{ background: legColors.Buy }} />Buy leg</span>
-      {!isNetSeller && <span className="payoff-legend-item"><i className="payoff-swatch" style={{ background: '#1baf7a' }} />Target</span>}
-      {!isNetSeller && <span className="payoff-legend-item"><i className="payoff-swatch" style={{ background: '#eda100' }} />Stop</span>}
-    </div>
-    <div style={{ width: '100%', height: 200 }}>
-      <ResponsiveContainer>
-        <LineChart data={scaled} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-          <XAxis dataKey="x" type="number" domain={[lo, hi]} tick={{ fontSize: 11, fill: '#898781' }} tickFormatter={(v) => String(Math.round(v))} />
-          <YAxis tick={{ fontSize: 11, fill: '#898781' }} width={36} />
-          <Tooltip formatter={(v) => [Number(v), 'Relative P&L']} labelFormatter={(l) => `Underlying ${l}`} />
+    <div className="payoff-chart-canvas">
+      <ResponsiveContainer width="100%" height={180}>
+        <LineChart data={points} margin={{ top: 8, right: 10, bottom: 4, left: 6 }}>
+          <XAxis dataKey="x" type="number" domain={[lo, hi]} tick={{ fontSize: 11, fill: '#898781' }} tickFormatter={(v) => String(Math.round(v))} axisLine={{ stroke: '#c3c2b7' }} tickLine={false} />
+          <YAxis hide domain={['dataMin', 'dataMax']} />
           <ReferenceLine y={0} stroke="#c3c2b7" />
           <ReferenceLine x={atmNumber} stroke="#898781" strokeWidth={1.5} />
           {legRows.map((leg) => <ReferenceLine key={leg.key} x={leg.strike} stroke={legColors[leg.side]} strokeDasharray={leg.side === 'Sell' ? undefined : '4 3'} />)}
@@ -412,20 +426,16 @@ function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarge
           {!isNetSeller && stopPrice != null && <ReferenceLine x={stopPrice} stroke="#eda100" strokeDasharray="4 3" />}
           {!isNetSeller && aggTargetPrice != null && <ReferenceLine x={aggTargetPrice} stroke="#1baf7a" strokeDasharray="2 2" strokeOpacity={0.5} />}
           {!isNetSeller && aggStopPrice != null && <ReferenceLine x={aggStopPrice} stroke="#eda100" strokeDasharray="2 2" strokeOpacity={0.5} />}
-          <Line type="monotone" dataKey="pnl" stroke="#2a78d6" strokeWidth={2.5} dot={false} />
+          <Line type="monotone" dataKey="pnl" stroke="#2a78d6" strokeWidth={2.5} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
-    <div className="payoff-strike-list">
-      <span>Spot <b>{atmNumber}</b></span>
-      {legRows.map((leg) => <span key={leg.key}><b className={leg.side === 'Sell' ? 'stop-value' : 'target-value'}>{leg.side}</b> {leg.strike}</span>)}
+    <div className="payoff-legend-row">
+      {legendItems.map((it, i) => <div key={i} className="payoff-legend-chip">
+        <i className="payoff-swatch" style={{ background: it.color }} />
+        <span><small>{it.label}</small><b>{it.value}</b></span>
+      </div>)}
     </div>
-    {!isNetSeller && targetPrice != null && stopPrice != null && <div className="payoff-seller-exit">
-      <span>Target (cons.) <b className="target-value">{targetPrice}</b> · Stop (cons.) <b className="stop-value">{stopPrice}</b>{aggTargetPrice != null && aggStopPrice != null && <> · Target (agg.) <b className="target-value">{aggTargetPrice}</b> · Stop (agg.) <b className="stop-value">{aggStopPrice}</b></>}</span>
-    </div>}
-    {isNetSeller && actualConservativeTarget != null && actualConservativeStop != null && <div className="payoff-seller-exit">
-      <span>Exit on net premium — Target <b className="target-value">₹{(actualConservativeTarget * qty).toFixed(0)}</b> · Stop <b className="stop-value">₹{(actualConservativeStop * qty).toFixed(0)}</b></span>
-    </div>}
   </div>
 }
 
@@ -567,7 +577,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
       <div className="day-summary"><span className="eyebrow">Day summary</span><p>{summary}</p><div className="bias-reasoning"><p className="reasoning-line"><strong>Market Bias:</strong> {marketBias.label} (score {marketBias.score.toFixed(2)})</p><p className="reasoning-line"><strong>Option Readiness:</strong> {optionReadiness.label} (score {optionReadiness.score})</p><p className="reasoning-line"><strong>Strategy Recommendation:</strong> {strategyRec.recommendation}, because {strategyRec.reason}.</p></div></div>
     </div>
     {strategy === 'No Trade' ? <div className="verdict-card no-trade-leg-builder"><p className="structure-line">No Trade is selected — there&apos;s no position to size. Switch the dropdown above to a real strategy if you want to build a trade manually.</p></div> : <>
-    <PayoffChart legRows={legRows} atmNumber={atmNumber} strikeStep={strikeStep} isNetSeller={isNetSeller} spotEstTarget={calc.target} spotEstStop={calc.stop} spotAggressiveTarget={calc.aggressiveTarget} spotAggressiveStop={calc.aggressiveStop} actualConservativeTarget={actualConservativeTarget} actualConservativeStop={actualConservativeStop} qty={qty} />
+    <PayoffChart legRows={legRows} atmNumber={atmNumber} strikeStep={strikeStep} isNetSeller={isNetSeller} spotEstTarget={calc.target} spotEstStop={calc.stop} spotAggressiveTarget={calc.aggressiveTarget} spotAggressiveStop={calc.aggressiveStop} actualConservativeTarget={actualConservativeTarget} actualConservativeStop={actualConservativeStop} actualAggressiveTarget={actualAggressiveTarget} actualAggressiveStop={actualAggressiveStop} qty={qty} />
     <div className="verdict-card verdict-editable">
       <div className="verdict-controls verdict-controls-triple">
         <label>ATM spot<input type="number" step={strikeStep} value={atmSpot} onChange={(e) => setAtmSpot(e.target.value === '' ? '' : String(roundedStrike(Number(e.target.value))))} aria-label={`${instrument} ATM spot`} /></label>
