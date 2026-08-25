@@ -345,6 +345,15 @@ function mapRecommendationToStrategy(recommendation: string): { strategy: Strate
 }
 function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrument }) {
   const calc = useMemo(() => calculateVerdict(row, instrument), [row, instrument])
+  const legSupabase = useMemo(() => createClient(), [])
+  // Live call/put premiums for a +/-20-strike band around ATM, refreshed by the Edge Function's
+  // open and mid phases — used to auto-fill each leg's premium below instead of requiring a
+  // manual "Enter fill" for every strategy change.
+  const { data: legPremiumRows } = useSWR<Row[] | null>(
+    row.trade_date ? ['leg-premiums', row.trade_date, instrument] : null,
+    async () => { const { data, error } = await legSupabase.from('leg_premiums').select('*').eq('trade_date', row.trade_date).eq('instrument', instrument); if (error) throw error; return data as Row[] | null },
+    { revalidateOnFocus: false },
+  )
   // 3-stage Bias / Option Readiness / Strategy Recommendation framework now drives autoStrategy (replacing the
   // old normalizeStrategy(calc.strategy) vote-based pick). calc.bias/calc.strategy themselves are left intact
   // since calc.bias still drives leg wing/side placement (strike/hedge placement logic, out of scope here).
@@ -407,6 +416,24 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
     return callStrike
   }
   const legRows = legs.map((leg) => { const computed = roundedStrike(computedStrike(leg)); const override = strategy === 'Custom' ? strikeOverrides[leg.key] : undefined; return { ...leg, strike: override !== undefined && override !== '' ? Number(override) : computed, displayStrike: override !== undefined && override !== '' ? override : String(computed) } })
+  // Auto-fill each leg's premium from the fetched +/-20-strike band whenever the strategy,
+  // strikes, or fetched data change — only fills blank fields, never overwrites a value the
+  // user already typed or already auto-filled-and-edited.
+  useEffect(() => {
+    if (!legPremiumRows || legPremiumRows.length === 0) return
+    setLegPremiums((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const leg of legRows) {
+        if (next[leg.key] !== undefined && next[leg.key] !== '') continue
+        const isPut = leg.label.toLowerCase().includes('put')
+        const match = legPremiumRows.find((r) => Number(r.strike) === leg.strike)
+        const ltp = match ? (isPut ? match.put_ltp : match.call_ltp) : null
+        if (ltp != null) { next[leg.key] = String(ltp); changed = true }
+      }
+      return changed ? next : prev
+    })
+  }, [legPremiumRows, legRows])
   const netPremium = legRows.reduce((sum, leg) => { const p = Number(legPremiums[leg.key]) || 0; return sum + (leg.side === 'Sell' ? p : -p) }, 0)
   const hasAnyPremium = legRows.some((leg) => Number(legPremiums[leg.key]) !== 0)
   const effectiveDelta = Number(delta) || 0
@@ -499,7 +526,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
           <span className={`leg-badge leg-${leg.side.toLowerCase()}`}>{leg.side}</span>
           <span className="leg-label">{leg.label}</span>
           <label>Strike<input type="number" step={strikeStep} value={leg.displayStrike} onChange={(e) => setStrikeOverrides((p) => ({ ...p, [leg.key]: e.target.value === '' ? '' : String(roundedStrike(Number(e.target.value))) }))} aria-label={`${instrument} ${leg.label} strike`} /></label>
-          <label>Premium<input type="number" min="0" value={legPremiums[leg.key] ?? ''} onChange={(e) => setLegPremiums((p) => ({ ...p, [leg.key]: e.target.value }))} placeholder="Enter fill" aria-label={`${instrument} ${leg.label} premium`} /></label>
+          <label>Premium<input type="number" min="0" value={legPremiums[leg.key] ?? ''} onChange={(e) => setLegPremiums((p) => ({ ...p, [leg.key]: e.target.value }))} placeholder="Auto-filled from live quote" aria-label={`${instrument} ${leg.label} premium`} /></label>
         </div>)}
       </div>
       <div className="position-outputs">
