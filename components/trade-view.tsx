@@ -10,12 +10,14 @@ type Row = Record<string, string | number | boolean | null>
 type Instrument = 'NIFTY' | 'SENSEX'
 type TradeState = 'running' | 'locked_conservative' | 'closed'
 type ExitReason = 'stop_conservative' | 'target_conservative' | 'target_aggressive' | 'eod_unresolved' | 'eod_at_or_above_conservative'
+type TradeSource = 'system' | 'manual'
 type Trade = Row & {
   id: string
   trade_date: string
   instrument: Instrument
   outcome: 'open' | 'target' | 'stop'
   state: TradeState | null
+  source: TradeSource | null
   exit_reason: ExitReason | null
   exit_time: string | null
   exit_premium: number | null
@@ -102,6 +104,13 @@ function legKeyLabel(legKey: string, side: 'Buy' | 'Sell', strategy: string | nu
   return map[legKey] ?? `${side === 'Buy' ? 'Bought' : 'Sold'} leg`
 }
 
+// Small badge distinguishing a system-picked trade (the 09:30 automatic entry) from a
+// manually-logged one (via the Verdict page's Update Premium / Trade buttons). Defaults to
+// 'system' for older rows written before the source column existed.
+function sourceLabel(source: TradeSource | null | undefined) {
+  return source === 'manual' ? 'Manual' : 'System'
+}
+
 // Live-state label for a trade that's still open in the automated poller, shown instead of
 // a bare "Open" so it's clear the system is actively tracking it, not waiting on a manual click.
 function stateLabel(state: TradeState | null | undefined) {
@@ -131,7 +140,7 @@ function TradeCard({ instrument, trade, legs, rationale, mutate }: { instrument:
 
   return <article className="verdict-instrument">
     <div className="verdict-instrument-head">
-      <h3>{instrument}</h3>
+      <h3>{instrument} <span className={`source-badge source-${trade.source ?? 'system'}`}>{sourceLabel(trade.source)}</span></h3>
       <span className={`trade-status sync-${statusTone(trade)}`}>{isOpen ? stateLabel(trade.state) : statusLabel(trade)}</span>
     </div>
     {(trade.ambiguous_resolution || trade.entry_delayed) && <p className="history-empty">
@@ -223,16 +232,30 @@ export function TradeView() {
 
     return { total: closed.length, targets, stops, winRate: closed.length ? (targets / closed.length) * 100 : 0, pnl, avgProfit, avgLoss, riskReward, eodUnresolvedCount }
   }, [trades])
-  const openPositions = todayTrades.filter((trade) => trade.outcome === 'open')
-  const getTrade = (instrument: Instrument) => todayTrades.find((trade) => trade.instrument === instrument)
+  // System and manual trades can both exist for the same instrument/day now (a manual trade
+  // is always logged alongside the system's own pick, never in place of it), so this filters
+  // the whole page's view rather than picking a single trade per instrument.
+  const [sourceFilter, setSourceFilter] = useState<'all' | TradeSource>('all')
+  const matchesFilter = (trade: Trade) => sourceFilter === 'all' || (trade.source ?? 'system') === sourceFilter
+  const openPositions = todayTrades.filter((trade) => trade.outcome === 'open' && matchesFilter(trade))
+  const getTradesForInstrument = (instrument: Instrument) => todayTrades.filter((trade) => trade.instrument === instrument && matchesFilter(trade))
   const rationale = (instrument: Instrument) => data?.snapshot ? calculateVerdict(data.snapshot, instrument) as Row : undefined
-  const rows = [...trades].sort((a, b) => `${b.trade_date}-${b.instrument}`.localeCompare(`${a.trade_date}-${a.instrument}`))
+  const rows = [...trades].filter(matchesFilter).sort((a, b) => `${b.trade_date}-${b.instrument}`.localeCompare(`${a.trade_date}-${a.instrument}`))
 
   return <section className="phase-view trade-page">
     <div className="review-section-head"><div><p className="eyebrow">Execution desk</p><h2>Trade</h2></div><span>{tradeDate}</span></div>
     {error && <p className="history-empty">Unable to load trade data right now.</p>}
+    <div className="source-toggle" role="group" aria-label="Filter by trade source">
+      <button type="button" className={sourceFilter === 'all' ? 'is-active' : ''} aria-pressed={sourceFilter === 'all'} onClick={() => setSourceFilter('all')}>All trades</button>
+      <button type="button" className={sourceFilter === 'system' ? 'is-active' : ''} aria-pressed={sourceFilter === 'system'} onClick={() => setSourceFilter('system')}>System</button>
+      <button type="button" className={sourceFilter === 'manual' ? 'is-active' : ''} aria-pressed={sourceFilter === 'manual'} onClick={() => setSourceFilter('manual')}>Manual</button>
+    </div>
     <div className="trade-grid">
-      {(['NIFTY', 'SENSEX'] as Instrument[]).map((instrument) => { const trade = getTrade(instrument); return <TradeCard key={instrument} instrument={instrument} trade={trade} legs={data?.legs.filter((leg) => leg.auto_trade_id === trade?.id) ?? []} rationale={rationale(instrument)} mutate={() => { void mutate() }} /> })}
+      {(['NIFTY', 'SENSEX'] as Instrument[]).flatMap((instrument) => {
+        const instrumentTrades = getTradesForInstrument(instrument)
+        if (instrumentTrades.length === 0) return [<TradeCard key={instrument} instrument={instrument} legs={[]} rationale={rationale(instrument)} mutate={() => { void mutate() }} />]
+        return instrumentTrades.map((trade) => <TradeCard key={String(trade.id)} instrument={instrument} trade={trade} legs={data?.legs.filter((leg) => leg.auto_trade_id === trade.id) ?? []} rationale={rationale(instrument)} mutate={() => { void mutate() }} />)
+      })}
     </div>
     <section className="trade-log">
       <div className="review-section-head"><div><p className="eyebrow">All recorded outcomes</p><h2>Trade Log</h2></div></div>
@@ -266,7 +289,7 @@ export function TradeView() {
             }
             return <div className="trade-open-card" key={String(trade.id)}>
               <div className="trade-open-head">
-                <div><b>{trade.instrument}</b><span>{String(trade.strategy)}</span></div>
+                <div><b>{trade.instrument}</b> <span className={`source-badge source-${trade.source ?? 'system'}`}>{sourceLabel(trade.source)}</span><span>{String(trade.strategy)}</span></div>
                 <span className={`trade-status sync-${trade.state === 'locked_conservative' ? 'warning' : 'accent'}`}>{stateLabel(trade.state)}</span>
               </div>
               <div className="trade-open-figures">
@@ -285,7 +308,7 @@ export function TradeView() {
         <div className="history-row history-head trade-log-row" aria-hidden="true"><span>Date</span><span>Instrument</span><span>Strategy</span><span>Net Premium</span><span>Outcome</span></div>
         {rows.map((trade) => <article className="history-row trade-log-row" key={String(trade.id)}>
           <span>{trade.trade_date}</span>
-          <span>{trade.instrument}</span>
+          <span>{trade.instrument} <span className={`source-badge source-${trade.source ?? 'system'}`}>{sourceLabel(trade.source)}</span></span>
           <span>{String(trade.strategy)}</span>
           <span>₹{Math.abs(Number(trade.net_premium) || 0).toFixed(1)} {trade.is_credit ? 'received' : 'paid'}</span>
           <span className={`trade-status sync-${statusTone(trade)}`}>{trade.outcome === 'open' ? stateLabel(trade.state) : statusLabel(trade)}</span>
