@@ -7,20 +7,20 @@ import useSWR from 'swr'
 import { BarChart3, Moon, Sun, ArrowLeft, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-type Post = { id: string; trade_date: string; instrument: 'NIFTY' | 'SENSEX'; phase: 'premarket' | 'postmarket'; slug: string; title: string; body: string; badges: string[]; published_at: string }
+type Post = { id: string; trade_date: string; instrument: 'NIFTY' | 'SENSEX' | 'BOTH'; phase: 'premarket' | 'postmarket'; slug: string; title: string; body: string; badges: string[]; published_at: string }
 
 function formatDateLabel(dateStr: string) {
   return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(`${dateStr}T00:00:00`))
 }
 
-export default function NiftyTodayPostPage() {
+export default function NiftySensexTodayPostPage() {
   const params = useParams<{ slug: string }>()
   const [dark, setDark] = useState(false)
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   const supabase = createClient()
 
-  const { data, error } = useSWR(['blog-post', 'NIFTY', params.slug], async () => {
-    const { data, error } = await supabase.from('blog_posts').select('*').eq('instrument', 'NIFTY').eq('slug', params.slug).maybeSingle()
+  const { data, error } = useSWR(['blog-post', params.slug], async () => {
+    const { data, error } = await supabase.from('blog_posts').select('*').eq('slug', params.slug).maybeSingle()
     if (error) throw error
     return data as Post | null
   })
@@ -38,7 +38,7 @@ export default function NiftyTodayPostPage() {
       </header>
 
       <div className="blog-post-main">
-        <Link href="/nifty-today" className="blog-post-back"><ArrowLeft size={13} /> All Nifty Today posts</Link>
+        <Link href="/nifty-sensex-today" className="blog-post-back"><ArrowLeft size={13} /> All Nifty & Sensex Today posts</Link>
 
         {error && <p className="history-empty">Unable to load this post right now.</p>}
         {!error && data === undefined && <p className="history-empty">Loading...</p>}
