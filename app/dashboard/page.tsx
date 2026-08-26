@@ -128,11 +128,17 @@ function historyOutcomeRead(trade: Row | undefined) {
 }
 
 // One trading day told as a 4-beat story: Opening (real gap), Expected (fresh morning-call recompute),
-// Through the day (fresh midday recompute vs. the morning call), Close (actual outcome). Beats 2 and 3 are
-// recomputed here with the same computeMarketBias/computeOptionReadiness/computeStrategyRecommendation
-// functions the Verdict and Mid-market pages use — never read from the stale stored bias/strategy columns.
+// Through the day (midday bias read from midmarket_snapshot's own stored value), Close (actual outcome).
+// Beat 2 is recomputed here with the same computeMarketBias/computeOptionReadiness/computeStrategyRecommendation
+// functions the Verdict page uses -- pre-market has all 4 inputs those functions need, so recomputing is fine.
+// Beat 3 reads midSnapshot's market_bias_{suffix}_mid / suggested_strategy_{suffix}_mid directly instead,
+// since midmarket_snapshot has no open-interest columns and no gap field -- recomputing here was silently
+// missing 2 of computeMarketBias's 4 inputs and pinning almost every midday reading to "Neutral" regardless
+// of the real intraday move (verified against real PCR/spot/max-pain swings on 2026-08-26, where the stored
+// value correctly moved Neutral -> Bearish -> Strong Bearish through the day).
 function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid: Row | undefined; post: Row | undefined; trade: Row | undefined }) {
   const instrument: Instrument = 'NIFTY'
+  const suffix = 'nifty'
 
   // Beat 1 — Opening: NIFTY's own real opening gap (gap_points_nifty / prev_close_nifty), not GIFT Nifty's
   // predicted overnight gap.
@@ -147,16 +153,11 @@ function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid:
   const morningReadiness = useMemo(() => computeOptionReadiness(morningCalc), [morningCalc])
   const morningStrategy = useMemo(() => computeStrategyRecommendation(morningBias.label, morningReadiness.ivCondition, morningCalc.vix, morningCalc.dte), [morningBias, morningReadiness, morningCalc])
 
-  // Beat 3 — Through the day: midday read, recomputed fresh the same way from midmarket_snapshot's raw
-  // inputs merged over the morning row (buildMidRow), then compared against the Beat 2 result to decide
-  // whether it actually shifted.
-  const mid = useMemo(() => (midSnapshot ? buildMidRow(row, midSnapshot) : null), [row, midSnapshot])
-  const midCalc = useMemo(() => (mid ? calculateVerdict(mid, instrument) : null), [mid])
-  const midBias = useMemo(() => (mid && midCalc ? computeMarketBias(mid, midCalc, instrument) : null), [mid, midCalc])
-  const midReadiness = useMemo(() => (midCalc ? computeOptionReadiness(midCalc) : null), [midCalc])
-  const midStrategy = useMemo(() => (midBias && midReadiness && midCalc ? computeStrategyRecommendation(midBias.label, midReadiness.ivCondition, midCalc.vix, midCalc.dte) : null), [midBias, midReadiness, midCalc])
-  const hasMidday = Boolean(mid && midBias && midStrategy)
-  const shifted = midBias && midStrategy ? (midBias.label !== morningBias.label || midStrategy.recommendation !== morningStrategy.recommendation) : false
+  // Beat 3 — Through the day: midday bias/strategy read directly from midSnapshot's own stored columns.
+  const hasMidday = Boolean(midSnapshot && midSnapshot[`market_bias_${suffix}_mid`] != null)
+  const middayBiasLabel = midSnapshot ? String(midSnapshot[`market_bias_${suffix}_mid`] ?? '—') : '—'
+  const middayStrategy = midSnapshot ? String(midSnapshot[`suggested_strategy_${suffix}_mid`] ?? '—') : '—'
+  const shifted = midSnapshot ? Boolean(midSnapshot[`bias_shifted_${suffix}`]) || Boolean(midSnapshot[`strategy_shifted_${suffix}`]) : false
 
   // Beat 4 — Close: postmarket_summary as-is (day_change_pct_nifty already reflects the corrected net_change
   // calculation), plus the actual logged auto_trades outcome for the day — not a range-based estimate.
@@ -178,7 +179,7 @@ function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid:
       </div>
       <div className="history-beat">
         <span className="history-beat-label">Through the day</span>
-        {hasMidday && midBias && midStrategy ? <p><b className={shifted ? 'is-shifted' : ''}>{midBias.label}</b> bias · {midStrategy.recommendation}<br /><span className="history-beat-note">{shifted ? 'Shifted since the morning call' : 'Unchanged since the morning call'}</span></p> : <p className="history-beat-empty">No midday snapshot recorded</p>}
+        {hasMidday ? <p><b className={shifted ? 'is-shifted' : ''}>{middayBiasLabel}</b> bias · {middayStrategy}<br /><span className="history-beat-note">{shifted ? 'Shifted since the morning call' : 'Unchanged since the morning call'}</span></p> : <p className="history-beat-empty">No midday snapshot recorded</p>}
       </div>
       <div className="history-beat">
         <span className="history-beat-label">Close</span>
@@ -744,16 +745,21 @@ function MidVerdictInstrument({ row, mid, midSnapshot, instrument }: { row: Row;
   const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
   const spotKey = `spot_${suffix}`
   const changeKey = `intraday_change_pct_${suffix}`
-  // Same 3-stage Bias / Option Readiness / Strategy Recommendation framework the Verdict page's
-  // VerdictInstrument uses (replacing the old vote-based calc.bias, Trend/Range calc.strategy, and "IV
-  // rich"/"IV fair" reading here), fed the merged mid-row (buildMidRow output) so it reflects midday data.
-  // calc.bias/calc.strategy themselves are left untouched since calculateVerdict still drives other logic.
-  const marketBias = useMemo(() => computeMarketBias(mid, calc, instrument), [mid, calc, instrument])
-  const optionReadiness = useMemo(() => computeOptionReadiness(calc), [calc])
-  const strategyRec = useMemo(() => computeStrategyRecommendation(marketBias.label, optionReadiness.ivCondition, calc.vix, calc.dte), [marketBias, optionReadiness, calc])
+  // Mid-market bias/strategy are read directly from midSnapshot's already-computed
+  // market_bias_{suffix}_mid / suggested_strategy_{suffix}_mid columns (written by the backend's
+  // own mid-market scoring job) rather than recalculated here via computeMarketBias. That shared
+  // function was built for the pre-market/post-market shape of data -- it needs a gap percentage
+  // and open-interest support/resistance reading, neither of which exists in midmarket_snapshot
+  // (no OI columns at all, and the gap field it falls back to is a premarket-only field) -- so
+  // recalculating here was silently missing 2 of its 4 inputs and pinning almost every reading to
+  // "Neutral" regardless of the real intraday move. The stored value is already correct (verified
+  // against real PCR/spot/max-pain swings), so we trust it instead of re-deriving it.
+  const biasLabel = String(midSnapshot[`market_bias_${suffix}_mid`] ?? 'Neutral')
+  const strategyRecommendation = String(midSnapshot[`suggested_strategy_${suffix}_mid`] ?? 'No Trade')
+  const strategyReason = String(midSnapshot[`pcr_reading_${suffix}_mid`] ?? '')
   const effectiveDelta = strikeDefaults[calc.strike]
   // "Since morning" comparison: morning bias/strategy read from the original premarket_dashboard row (not the
-  // mid-merged row), and the shift flags/note read from the raw midmarket_snapshot row — neither is currently
+  // mid-merged row), and the shift flags/note read from the raw midmarket_snapshot row -- neither is currently
   // overlaid into `mid` by buildMidRow.
   const morningBias = String(row[`market_bias_${suffix}`] ?? '—')
   const morningStrategy = String(row[`suggested_strategy_${suffix}`] ?? '—')
@@ -761,8 +767,9 @@ function MidVerdictInstrument({ row, mid, midSnapshot, instrument }: { row: Row;
   const strategyShifted = Boolean(midSnapshot[`strategy_shifted_${suffix}`])
   const hasShifted = biasShifted || strategyShifted
   const shiftNote = String(midSnapshot[`shift_note_${suffix}`] ?? '')
-  return <article className="verdict-instrument"><div className="verdict-instrument-head"><h3>{instrument}</h3><span>{marketBias.label} · {strategyRec.recommendation}</span></div><div className="sync-strip"><span>Spot <b>{value(mid, spotKey)}</b></span><span>Intraday change <b className={tone(mid, changeKey)}>{value(mid, changeKey, true)}</b></span></div><div className="verdict-banner"><div><p className="eyebrow">Midday strategy read</p><strong>{strategyRec.recommendation}</strong><p>{strategyRec.reason}.</p></div></div><div className="verdict-card since-morning-card"><span className="eyebrow">Since morning</span><div className="since-morning-row"><span className="since-morning-label">Bias</span><span className={`since-morning-value ${biasShifted ? 'is-shifted' : 'is-unchanged'}`}>{morningBias} → {marketBias.label}</span></div><div className="since-morning-row"><span className="since-morning-label">Strategy</span><span className={`since-morning-value ${strategyShifted ? 'is-shifted' : 'is-unchanged'}`}>{morningStrategy} → {strategyRec.recommendation}</span></div><p className="since-morning-note">{hasShifted ? (shiftNote || 'Shifted since this morning.') : 'Unchanged since this morning.'}</p></div></article>
+  return <article className="verdict-instrument"><div className="verdict-instrument-head"><h3>{instrument}</h3><span>{biasLabel} · {strategyRecommendation}</span></div><div className="sync-strip"><span>Spot <b>{value(mid, spotKey)}</b></span><span>Intraday change <b className={tone(mid, changeKey)}>{value(mid, changeKey, true)}</b></span></div><div className="verdict-banner"><div><p className="eyebrow">Midday strategy read</p><strong>{strategyRecommendation}</strong>{strategyReason && <p>{strategyReason}.</p>}</div></div><div className="verdict-card since-morning-card"><span className="eyebrow">Since morning</span><div className="since-morning-row"><span className="since-morning-label">Bias</span><span className={`since-morning-value ${biasShifted ? 'is-shifted' : 'is-unchanged'}`}>{morningBias} → {biasLabel}</span></div><div className="since-morning-row"><span className="since-morning-label">Strategy</span><span className={`since-morning-value ${strategyShifted ? 'is-shifted' : 'is-unchanged'}`}>{morningStrategy} → {strategyRecommendation}</span></div><p className="since-morning-note">{hasShifted ? (shiftNote || 'Shifted since this morning.') : 'Unchanged since this morning.'}</p></div></article>
 }
+
 // Fixed daily checkpoint slots in order, with display label and 24h IST minute-of-day (used to
 // decide whether a not-yet-landed checkpoint is merely "later today" vs. actually overdue).
 const CHECKPOINT_SLOTS: { id: string; label: string; minuteOfDay: number }[] = [
