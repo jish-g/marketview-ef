@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Activity, ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, Layers3, LogIn, LogOut, Moon, Newspaper, Sun } from 'lucide-react'
+import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Moon, Newspaper, Sun } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
 
 const differentiators = [
@@ -10,15 +10,6 @@ const differentiators = [
   { icon: Clock3, title: 'Built for the full session', description: 'Pre-market call, Mid-market check, Post-close review — same logic every time.' },
   { icon: BookOpen, title: 'Rules you can audit', description: 'Every recommendation traces to a documented scoring rule, not a black box.' },
   { icon: CheckCircle2, title: 'One verdict, not six charts', description: 'Collapses the decision into a single strategy recommendation with reasoning.' },
-]
-
-const sessionMap = [
-  { label: 'Pre-market', icon: Clock3 },
-  { label: 'Market open', icon: Activity },
-  { label: 'Verdict', icon: CheckCircle2 },
-  { label: 'Mid-market', icon: Gauge },
-  { label: 'Post-market', icon: Layers3 },
-  { label: 'History', icon: BarChart3 },
 ]
 
 export default function LandingPage() {
@@ -45,66 +36,34 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section className="landing-hero">
-        <div className="landing-hero-copy">
-          <p className="eyebrow">Market Intelligence Platform</p>
-          <h1 className="landing-wordmark">MarketCue</h1>
-          <p className="landing-tagline">Market Intelligence, Not Just Market Data</p>
-          <p className="landing-lede">Everyone gives you data. We read it.</p>
-          <Link href="/dashboard" className="detailed-read-link landing-cta">Enter Dashboard <ArrowRight size={15} /></Link>
-          <div className="landing-today-ctas">
-            <Link href="/nifty-sensex-today" className="landing-today-cta">
-              <span className="landing-today-cta-label">Pre-market + post-market</span>
-              <span className="landing-today-cta-title"><Newspaper size={15} /> Nifty & Sensex Today <ArrowRight size={14} /></span>
-            </Link>
+      <section className="landing-card landing-hero-card">
+        <div className="landing-hero">
+          <p className="eyebrow">Market intelligence platform</p>
+          <h1 className="landing-headline">Everyone gives you data. We read it.</h1>
+          <p className="landing-lede">A daily read on Nifty and Sensex, built from a rules engine you can audit — not a black box.</p>
+          <div className="landing-hero-ctas">
+            <Link href="/dashboard" className="landing-cta-primary">Enter dashboard <ArrowRight size={15} /></Link>
+            <Link href="/nifty-sensex-today" className="landing-cta-secondary"><Newspaper size={15} /> Nifty and Sensex today</Link>
           </div>
         </div>
-
-        <div className="landing-hero-showcase">
-          <div className="landing-verdict-card" aria-label="Sample market read">
-            <div className="landing-verdict-head">
-              <span className="eyebrow">Sample read</span>
-              <h3>NIFTY</h3>
-            </div>
-            <div className="landing-verdict-badges">
-              <span className="landing-verdict-badge landing-verdict-badge-danger">Bearish</span>
-              <span className="landing-verdict-badge landing-verdict-badge-warning">Caution</span>
-            </div>
-            <strong className="landing-verdict-strategy">24,318 &minus;0.42%</strong>
-            <p className="landing-verdict-reasoning">Bearish bias with expensive IV — option writers hold the edge today.</p>
+        <div className="landing-stat-strip">
+          <span className="landing-stat-meta">Sample read · as on 26 Aug 2026, 12:16 pm</span>
+          <div className="landing-stat-grid">
+            <div><span>Nifty</span><strong>24,610 <em className="positive">+0.31%</em></strong></div>
+            <div><span>Sensex</span><strong>80,210 <em className="negative">-0.18%</em></strong></div>
+            <div><span>India VIX</span><strong>13.2</strong></div>
+            <div><span>Expiry</span><strong>3d</strong></div>
           </div>
         </div>
       </section>
 
-      <section className="landing-positioning">
+      <section className="landing-card">
         <p className="eyebrow">Why MarketCue</p>
-        <p>Raw options data — gap, OI, PCR, max pain, IV, VIX — is available everywhere and looks the same on every terminal. The edge isn&apos;t access to data, it&apos;s reading it the same disciplined way every session.</p>
-        <p>MarketCue runs that data through a 3-stage framework — Bias, Option Readiness, Strategy Recommendation — to produce one verdict instead of six charts to interpret yourself.</p>
+        <p className="landing-body-text">Raw options data — gap, OI, PCR, max pain, IV, VIX — is available everywhere and looks the same on every terminal. The edge isn&apos;t access to data, it&apos;s reading it the same disciplined way every session.</p>
+        <p className="landing-body-text">MarketCue runs that data through a documented, rules-based framework to produce one read instead of six charts to interpret yourself.</p>
       </section>
 
-      <section className="landing-comparison">
-        <p className="eyebrow">Raw data vs. our read</p>
-        <div className="landing-comparison-grid">
-          <div className="landing-comparison-col landing-comparison-raw">
-            <span className="side-label">What every terminal shows you</span>
-            <ul className="landing-raw-list">
-              <li><span>Gap</span><b>-0.42%</b></li>
-              <li><span>PCR</span><b>0.91</b></li>
-              <li><span>Max pain</span><b>24300</b></li>
-              <li><span>ATM IV</span><b>14.2</b></li>
-              <li><span>India VIX</span><b>12.6</b></li>
-              <li><span>OI resistance</span><b>Addition</b></li>
-            </ul>
-          </div>
-          <div className="landing-comparison-col landing-comparison-read">
-            <span className="side-label">What we tell you</span>
-            <strong className="landing-comparison-headline">Bearish · Caution</strong>
-            <p>One weighted read of the session, not six numbers to reconcile yourself.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="landing-differentiators">
+      <section className="landing-card">
         <p className="eyebrow">What makes it different</p>
         <div className="landing-diff-grid">
           {differentiators.map(({ icon: Icon, title, description }) => (
@@ -118,15 +77,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="landing-footer">
-        <Link href="/dashboard" className="detailed-read-link landing-cta">Enter Dashboard <ArrowRight size={15} /></Link>
-        <div className="landing-session-map">
-          <span className="side-label">Session map</span>
-          <div className="landing-session-list">
-            {sessionMap.map(({ label, icon: Icon }) => (
-              <span className="landing-session-item" key={label}><Icon size={14} /> {label}</span>
-            ))}
-          </div>
-        </div>
+        <Link href="/dashboard" className="landing-cta-primary">Enter dashboard <ArrowRight size={15} /></Link>
       </footer>
     </main>
   )
