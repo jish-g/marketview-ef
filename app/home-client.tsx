@@ -22,6 +22,12 @@ const howItWorks = [
 
 type Row = Record<string, any>
 
+type HomeClientProps = {
+  tradeDate: string
+  initialPre: Row | null
+  initialPost: Row | null
+}
+
 function fmtPct(v: any) {
   if (v === null || v === undefined || v === '') return null
   const n = Number(v)
@@ -41,26 +47,36 @@ function istHour() {
   return Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: false }).format(new Date()))
 }
 
-export default function HomeClient() {
+export default function HomeClient({ tradeDate: initialTradeDate, initialPre, initialPost }: HomeClientProps) {
   const [dark, setDark] = useState(false)
   const { session, loading, signOut } = useSession()
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   const supabase = createClient()
 
+  // Recomputed client-side too (not just trusting the server prop) so a tab left
+  // open across midnight IST still re-keys onto the new trade date.
   const tradeDate = todayIST()
   const preferPost = istHour() >= 20
 
-  const { data: pre } = useSWR(['home-premarket', tradeDate], async () => {
-    const { data, error } = await supabase.from('premarket_dashboard').select('gap_points_nifty, gap_points_sensex, prev_close_nifty, prev_close_sensex, india_vix, days_to_expiry_nifty, days_to_expiry_sensex, market_bias_nifty, market_bias_sensex').eq('trade_date', tradeDate).maybeSingle()
-    if (error) throw error
-    return data as Row | null
-  })
+  const { data: pre } = useSWR(
+    ['home-premarket', tradeDate],
+    async () => {
+      const { data, error } = await supabase.from('premarket_dashboard').select('gap_points_nifty, gap_points_sensex, prev_close_nifty, prev_close_sensex, india_vix, days_to_expiry_nifty, days_to_expiry_sensex, market_bias_nifty, market_bias_sensex').eq('trade_date', tradeDate).maybeSingle()
+      if (error) throw error
+      return data as Row | null
+    },
+    { fallbackData: tradeDate === initialTradeDate ? initialPre : undefined }
+  )
 
-  const { data: post } = useSWR(['home-postmarket', tradeDate], async () => {
-    const { data, error } = await supabase.from('postmarket_summary').select('day_change_pct_nifty, day_change_pct_sensex, day_high_nifty, day_low_nifty, day_high_sensex, day_low_sensex, recap_story_nifty, recap_story_sensex').eq('trade_date', tradeDate).maybeSingle()
-    if (error) throw error
-    return data as Row | null
-  })
+  const { data: post } = useSWR(
+    ['home-postmarket', tradeDate],
+    async () => {
+      const { data, error } = await supabase.from('postmarket_summary').select('day_change_pct_nifty, day_change_pct_sensex, day_high_nifty, day_low_nifty, day_high_sensex, day_low_sensex, recap_story_nifty, recap_story_sensex').eq('trade_date', tradeDate).maybeSingle()
+      if (error) throw error
+      return data as Row | null
+    },
+    { fallbackData: tradeDate === initialTradeDate ? initialPost : undefined }
+  )
 
   const showPost = preferPost && !!post
   const gapPctNifty = pre?.gap_points_nifty != null && pre?.prev_close_nifty ? +((Number(pre.gap_points_nifty) / Number(pre.prev_close_nifty)) * 100).toFixed(2) : null

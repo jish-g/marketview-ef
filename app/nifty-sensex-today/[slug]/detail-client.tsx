@@ -10,6 +10,11 @@ import { createClient } from '@/lib/supabase/client'
 type Post = { id: string; trade_date: string; instrument: 'NIFTY' | 'SENSEX' | 'BOTH'; phase: 'premarket' | 'postmarket'; slug: string; title: string; body: string; badges: string[]; published_at: string }
 type Row = Record<string, any>
 
+type DetailClientProps = {
+  initialPost: Post | null
+  initialMarketRow: Row | null
+}
+
 function formatDateLabel(dateStr: string) {
   return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(`${dateStr}T00:00:00`))
 }
@@ -33,24 +38,32 @@ function ptsSuffix(v: any) {
   return `${n > 0 ? '+' : ''}${v} pts`
 }
 
-export default function NiftySensexTodayPostClient() {
+export default function NiftySensexTodayPostClient({ initialPost, initialMarketRow }: DetailClientProps) {
   const params = useParams<{ slug: string }>()
   const [dark, setDark] = useState(false)
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   const supabase = createClient()
 
-  const { data, error } = useSWR(['blog-post', params.slug], async () => {
-    const { data, error } = await supabase.from('blog_posts').select('*').eq('slug', params.slug).maybeSingle()
-    if (error) throw error
-    return data as Post | null
-  })
+  const { data, error } = useSWR(
+    ['blog-post', params.slug],
+    async () => {
+      const { data, error } = await supabase.from('blog_posts').select('*').eq('slug', params.slug).maybeSingle()
+      if (error) throw error
+      return data as Post | null
+    },
+    { fallbackData: initialPost }
+  )
 
-  const { data: marketRow } = useSWR(data ? ['blog-post-market', data.trade_date, data.phase] : null, async () => {
-    const table = data!.phase === 'premarket' ? 'premarket_dashboard' : 'postmarket_summary'
-    const { data: row, error } = await supabase.from(table).select('*').eq('trade_date', data!.trade_date).maybeSingle()
-    if (error) throw error
-    return row as Row | null
-  })
+  const { data: marketRow } = useSWR(
+    data ? ['blog-post-market', data.trade_date, data.phase] : null,
+    async () => {
+      const table = data!.phase === 'premarket' ? 'premarket_dashboard' : 'postmarket_summary'
+      const { data: row, error } = await supabase.from(table).select('*').eq('trade_date', data!.trade_date).maybeSingle()
+      if (error) throw error
+      return row as Row | null
+    },
+    { fallbackData: data?.slug === initialPost?.slug ? initialMarketRow : undefined }
+  )
 
   const isPre = data?.phase === 'premarket'
 

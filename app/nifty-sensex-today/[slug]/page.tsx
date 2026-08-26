@@ -3,7 +3,9 @@ import { cache } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import NiftySensexTodayPostClient from './detail-client'
 
-// Server-side metadata fetch for this dynamic route. Uses the same publishable
+export const revalidate = 60
+
+// Server-side data fetch for this dynamic route. Uses the same publishable
 // (anon, read-only) Supabase credentials already used client-side and in
 // sitemap.ts -- safe to read here since RLS restricts this key to SELECT only.
 const SUPABASE_URL =
@@ -13,7 +15,8 @@ const SUPABASE_KEY =
 
 const SITE_URL = 'https://marketcue.in'
 
-type PostRow = { slug: string; title: string; body: string; phase: 'premarket' | 'postmarket'; trade_date: string }
+type PostRow = { id: string; slug: string; title: string; body: string; phase: 'premarket' | 'postmarket'; trade_date: string; instrument: 'NIFTY' | 'SENSEX' | 'BOTH'; badges: string[]; published_at: string }
+type Row = Record<string, any>
 
 // Wrapped in React's cache() so generateMetadata and the page body both calling
 // getPost() for the same slug within one request collapse into a single
@@ -23,7 +26,7 @@ const getPost = cache(async (slug: string): Promise<PostRow | null> => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
     const { data } = await supabase
       .from('blog_posts')
-      .select('slug, title, body, phase, trade_date')
+      .select('*')
       .eq('slug', slug)
       .maybeSingle()
     return (data as PostRow | null) ?? null
@@ -31,6 +34,17 @@ const getPost = cache(async (slug: string): Promise<PostRow | null> => {
     return null
   }
 })
+
+async function getMarketRow(post: PostRow): Promise<Row | null> {
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+    const table = post.phase === 'premarket' ? 'premarket_dashboard' : 'postmarket_summary'
+    const { data } = await supabase.from(table).select('*').eq('trade_date', post.trade_date).maybeSingle()
+    return (data as Row | null) ?? null
+  } catch {
+    return null
+  }
+}
 
 function firstSentence(body: string, max = 155): string {
   const text = body.replace(/\s+/g, ' ').trim()
@@ -76,6 +90,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const post = await getPost(slug)
+  const marketRow = post ? await getMarketRow(post) : null
 
   const jsonLd = post
     ? {
@@ -101,7 +116,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <NiftySensexTodayPostClient />
+      <NiftySensexTodayPostClient initialPost={post} initialMarketRow={marketRow} />
     </>
   )
 }

@@ -10,6 +10,11 @@ type Post = { id: string; trade_date: string; instrument: 'NIFTY' | 'SENSEX' | '
 type Row = Record<string, any>
 type DayGroup = { tradeDate: string; pre: Post | null; post: Post | null }
 
+type IndexClientProps = {
+  initialPosts: Post[]
+  initialMarketRows: Record<string, Row>
+}
+
 function formatDateLabel(dateStr: string) {
   return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${dateStr}T00:00:00`))
 }
@@ -32,16 +37,20 @@ function biasFrom(pctNifty: any, pctSensex: any, openBiasNifty: any) {
   return '—'
 }
 
-export default function NiftySensexTodayIndexClient() {
+export default function NiftySensexTodayIndexClient({ initialPosts, initialMarketRows }: IndexClientProps) {
   const [dark, setDark] = useState(false)
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   const supabase = createClient()
 
-  const { data, error } = useSWR(['blog-posts', 'BOTH'], async () => {
-    const { data, error } = await supabase.from('blog_posts').select('*').order('published_at', { ascending: false }).limit(60)
-    if (error) throw error
-    return (data ?? []) as Post[]
-  })
+  const { data, error } = useSWR(
+    ['blog-posts', 'BOTH'],
+    async () => {
+      const { data, error } = await supabase.from('blog_posts').select('*').order('published_at', { ascending: false }).limit(60)
+      if (error) throw error
+      return (data ?? []) as Post[]
+    },
+    { fallbackData: initialPosts }
+  )
 
   const posts = data ?? []
   const dayGroups: DayGroup[] = []
@@ -57,18 +66,22 @@ export default function NiftySensexTodayIndexClient() {
   const olderGroups = dayGroups.slice(1)
   const dates = dayGroups.map((g) => g.tradeDate)
 
-  const { data: marketRows } = useSWR(dates.length ? ['blog-index-market', dates.join(',')] : null, async () => {
-    const [pre, post] = await Promise.all([
-      supabase.from('premarket_dashboard').select('trade_date, gap_points_nifty, gap_points_sensex, prev_close_nifty, prev_close_sensex, market_bias_nifty, market_bias_sensex').in('trade_date', dates),
-      supabase.from('postmarket_summary').select('trade_date, day_change_pct_nifty, day_change_pct_sensex').in('trade_date', dates),
-    ])
-    if (pre.error) throw pre.error
-    if (post.error) throw post.error
-    const map: Record<string, Row> = {}
-    for (const r of pre.data ?? []) map[r.trade_date] = { ...map[r.trade_date], ...r }
-    for (const r of post.data ?? []) map[r.trade_date] = { ...map[r.trade_date], ...r }
-    return map
-  })
+  const { data: marketRows } = useSWR(
+    dates.length ? ['blog-index-market', dates.join(',')] : null,
+    async () => {
+      const [pre, post] = await Promise.all([
+        supabase.from('premarket_dashboard').select('trade_date, gap_points_nifty, gap_points_sensex, prev_close_nifty, prev_close_sensex, market_bias_nifty, market_bias_sensex').in('trade_date', dates),
+        supabase.from('postmarket_summary').select('trade_date, day_change_pct_nifty, day_change_pct_sensex').in('trade_date', dates),
+      ])
+      if (pre.error) throw pre.error
+      if (post.error) throw post.error
+      const map: Record<string, Row> = {}
+      for (const r of pre.data ?? []) map[r.trade_date] = { ...map[r.trade_date], ...r }
+      for (const r of post.data ?? []) map[r.trade_date] = { ...map[r.trade_date], ...r }
+      return map
+    },
+    { fallbackData: Object.keys(initialMarketRows).length ? initialMarketRows : undefined }
+  )
 
   function rowFor(tradeDate: string) {
     return marketRows?.[tradeDate] ?? null
