@@ -772,6 +772,11 @@ const CHECKPOINT_SLOTS: { id: string; label: string; minuteOfDay: number }[] = [
   { id: '1330', label: '1:30', minuteOfDay: 13 * 60 + 30 },
   { id: '1430', label: '2:30', minuteOfDay: 14 * 60 + 30 },
 ]
+// Ordering used to pick "the latest landed checkpoint" for a given day (History recap, etc.) --
+// derived from CHECKPOINT_SLOTS so there's one source of truth for the daily schedule, plus the
+// legacy '1245' single-checkpoint label (pre-dates the 5-checkpoint schedule) sorted last since
+// it's always the only checkpoint on whatever day it appears.
+const CHECKPOINT_ORDER = [...CHECKPOINT_SLOTS.map((s) => s.id), '1245']
 
 function checkpointShifted(cp: Row) {
   return Boolean(cp.bias_shifted_nifty) || Boolean(cp.bias_shifted_sensex) || Boolean(cp.strategy_shifted_nifty) || Boolean(cp.strategy_shifted_sensex)
@@ -955,8 +960,21 @@ export default function Dashboard() {
     if (midError) throw midError
     if (postError) throw postError
     if (tradeError) throw tradeError
+    // Since the mid-market schedule became 5 checkpoints/day, midmarket_snapshot now has up to
+    // 5 rows per trade_date (one per checkpoint) instead of 1. For history/recap purposes we
+    // want exactly one representative mid-market read per day -- the LATEST checkpoint that
+    // actually landed, not whichever row the query happens to return last (which was
+    // non-deterministic and could silently show an early-session read instead of the final
+    // one). CHECKPOINT_ORDER mirrors the daily schedule (CHECKPOINT_SLOTS); legacy '1245' rows
+    // sort after all 5 hourly slots since they predate this schedule and are the only
+    // checkpoint on their day.
     const mid: Record<string, Row> = {}
-    for (const m of (midRows ?? []) as Row[]) { const d = String(m.trade_date ?? ''); if (d) mid[d] = m }
+    for (const m of (midRows ?? []) as Row[]) {
+      const d = String(m.trade_date ?? '')
+      if (!d) continue
+      const existing = mid[d]
+      if (!existing || CHECKPOINT_ORDER.indexOf(String(m.checkpoint)) > CHECKPOINT_ORDER.indexOf(String(existing.checkpoint))) mid[d] = m
+    }
     const post: Record<string, Row> = {}
     for (const p of (postRows ?? []) as Row[]) { const d = String(p.trade_date ?? ''); if (d) post[d] = p }
     const trade: Record<string, Row> = {}
@@ -972,7 +990,7 @@ export default function Dashboard() {
   // All of today's mid-market checkpoints (10:30/11:30/12:30/1:30/2:30 IST, or the legacy
   // single '1245' row for historical days before the 5-checkpoint schedule started), ordered
   // earliest-first so the timeline UI can just .map() them left-to-right / top-to-bottom.
-  const checkpointOrder = ['1030', '1130', '1230', '1330', '1430', '1245']
+  const checkpointOrder = CHECKPOINT_ORDER
   const { data: midCheckpoints } = useSWR<Row[] | null>(row.trade_date ? ['midmarket-checkpoints', row.trade_date] : null, async () => {
     const { data, error } = await supabase.from('midmarket_snapshot').select('*').eq('trade_date', row.trade_date)
     if (error) throw error
