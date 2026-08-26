@@ -117,7 +117,7 @@ function RulesView() {
 }
 
 // Per-day extras History needs beyond the premarket_dashboard row itself, keyed by trade_date.
-type HistoryExtras = { rows: Row[]; mid: Record<string, Row>; post: Record<string, Row>; trade: Record<string, Row> }
+type HistoryExtras = { rows: Row[]; mid: Record<string, Row>; midAll: Record<string, Row[]>; post: Record<string, Row>; trade: Record<string, Row> }
 
 function historyOutcomeRead(trade: Row | undefined) {
   const outcome = trade?.outcome
@@ -905,38 +905,60 @@ function PhaseView({ phase, row, historyData }: { phase: Phase; row: Row | null;
   const priorDayLines = priorDay ? (() => {
     const dateKey = String(priorDay.trade_date)
     const dayLabel = priorDay.day_name ? String(priorDay.day_name) : dateKey
-    const mid = historyData?.mid[dateKey]
+    const checkpoints = historyData?.midAll[dateKey] ?? []
     const post = historyData?.post[dateKey]
 
     const gapPts = priorDay.gap_points_nifty
     const prevClose = priorDay.prev_close_nifty
     const gapPct = gapPts != null && prevClose ? (Number(gapPts) / Number(prevClose)) * 100 : null
-    const openBias = priorDay.market_bias_nifty
-    const openLine = gapPct != null
-      ? `Market open: gapped ${gapPct >= 0 ? '+' : ''}${gapPct.toFixed(2)}%${openBias ? `, ${openBias}` : ''}`
+    const openBias = priorDay.market_bias_nifty ? String(priorDay.market_bias_nifty) : null
+    const openSentence = gapPct != null
+      ? `Market opened ${Math.abs(gapPct) < 0.05 ? 'flat' : `gapping ${gapPct >= 0 ? '+' : ''}${gapPct.toFixed(2)}%`}${openBias ? ` with a ${openBias} bias` : ''}.`
       : null
 
-    const midStrategy = mid?.suggested_strategy_nifty_mid
-    const shiftNote = mid?.shift_note_nifty
-    const strategyShifted = mid?.strategy_shifted_nifty
-    const midLine = mid
-      ? `Mid-market: ${strategyShifted ? (shiftNote || 'shifted since morning') : 'unchanged since morning'}${midStrategy ? `, ${midStrategy}` : ''}`
-      : null
+    // Walk the day's checkpoint sequence (bias per 10:30/11:30/12:30/1:30/2:30 slot) and detect
+    // the shape of the day: steady (bias never changed), a single flip (one clean turn, the
+    // most common "story" case), or choppy (flipped back and forth more than once). Each shape
+    // gets its own sentence pattern so the recap reads like a description of what happened
+    // rather than a fixed fill-in-the-blanks template repeated verbatim every day.
+    const sequence = checkpoints
+      .map((cp) => ({ label: CHECKPOINT_SLOTS.find((s) => s.id === String(cp.checkpoint))?.label ?? 'midday', bias: cp.market_bias_nifty_mid ? String(cp.market_bias_nifty_mid) : null, strategy: cp.suggested_strategy_nifty_mid ? String(cp.suggested_strategy_nifty_mid) : null }))
+      .filter((s) => s.bias != null)
+
+    let midSentence: string | null = null
+    if (sequence.length > 0) {
+      const flips: { at: string; from: string; to: string; strategy: string | null }[] = []
+      let running = openBias ?? sequence[0].bias
+      for (const step of sequence) {
+        if (step.bias !== running) { flips.push({ at: step.label, from: running as string, to: step.bias as string, strategy: step.strategy }); running = step.bias }
+      }
+      const last = sequence[sequence.length - 1]
+      if (flips.length === 0) {
+        midSentence = `Through the day's checkpoints the tone held steady at ${running}${last.strategy ? `, with ${last.strategy} the standing call` : ''}.`
+      } else if (flips.length === 1) {
+        const f = flips[0]
+        midSentence = `The tone held ${f.from} through the morning, then flipped ${f.to} by the ${f.at} checkpoint${f.strategy ? ` as the call shifted to ${f.strategy}` : ''}, and stayed that way into the close.`
+      } else {
+        const path = [openBias ?? sequence[0].bias, ...flips.map((f) => f.to)].join(' → ')
+        midSentence = `Mid-market was choppy, swinging ${path} across the day's checkpoints before settling ${last.bias} by ${last.label}.`
+      }
+    }
 
     const closePct = post?.day_change_pct_nifty
-    const outcome = post?.target_hit_nifty ? 'target hit' : post?.sl_hit_nifty ? 'stop hit' : post ? 'neither hit' : null
-    const postLine = closePct != null
-      ? `Post-market: closed ${Number(closePct) >= 0 ? '+' : ''}${Number(closePct).toFixed(2)}%${outcome ? `, ${outcome}` : ''}`
+    const outcome = post?.target_hit_nifty ? 'the target was hit intraday' : post?.sl_hit_nifty ? 'the stop-loss was hit intraday' : post ? 'neither target nor stop was hit' : null
+    const closeSentence = closePct != null
+      ? `The session closed ${Number(closePct) >= 0 ? '+' : ''}${Number(closePct).toFixed(2)}%${outcome ? `, and ${outcome}` : ''}.`
       : null
 
-    return { dayLabel, lines: [openLine, midLine, postLine].filter((l): l is string => l != null) }
+    const story = [openSentence, midSentence, closeSentence].filter((s): s is string => s != null).join(' ')
+    return { dayLabel, story }
   })() : null
   // 'open' phase's real data (spot/gap/IV/PCR) only lands once the 9:30 cron actually runs --
   // before that, gap_points_nifty/sensex are null on today's row and there's nothing genuine
   // to show, so this shows an explicit not-yet message instead of a mostly-empty field grid.
   const openDataMissing = phase === 'open' && row?.gap_points_nifty == null && row?.gap_points_sensex == null
   if (openDataMissing) return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><span>Session snapshot</span></div><p className="history-empty">Market Open data not available yet — updates at 9:30 AM IST once the market opens.</p></section>
-  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><span>Session snapshot</span></div>{phase === 'premarket' && priorDayLines && priorDayLines.lines.length > 0 && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p>{priorDayLines.lines.map((line, i) => <p key={i} className="prior-session-line">{line}</p>)}</div>}<div className="metric-groups">{renderGroup('Common market data', common)}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div></section>
+  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><span>Session snapshot</span></div>{phase === 'premarket' && priorDayLines && priorDayLines.story && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p><p className="prior-session-line prior-session-story">{priorDayLines.story}</p></div>}<div className="metric-groups">{renderGroup('Common market data', common)}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div></section>
 }
 export default function Dashboard() {
   const [phase, setPhase] = useState<Phase>('premarket'); const [dark, setDark] = useState(false); const [navOpen, setNavOpen] = useState(true); const [liveDate, setLiveDate] = useState(''); const [liveDay, setLiveDay] = useState(''); const [liveTime, setLiveTime] = useState('')
@@ -969,17 +991,23 @@ export default function Dashboard() {
     // sort after all 5 hourly slots since they predate this schedule and are the only
     // checkpoint on their day.
     const mid: Record<string, Row> = {}
+    // midAll keeps every checkpoint for a day (sorted earliest-first) so the Pre-market recap
+    // can tell the full intraday arc ("opened Neutral, flipped Bullish by 12:30, held into
+    // close") instead of collapsing straight to the single latest reading.
+    const midAll: Record<string, Row[]> = {}
     for (const m of (midRows ?? []) as Row[]) {
       const d = String(m.trade_date ?? '')
       if (!d) continue
       const existing = mid[d]
       if (!existing || CHECKPOINT_ORDER.indexOf(String(m.checkpoint)) > CHECKPOINT_ORDER.indexOf(String(existing.checkpoint))) mid[d] = m
+      ;(midAll[d] ??= []).push(m)
     }
+    for (const d of Object.keys(midAll)) midAll[d].sort((a, b) => CHECKPOINT_ORDER.indexOf(String(a.checkpoint)) - CHECKPOINT_ORDER.indexOf(String(b.checkpoint)))
     const post: Record<string, Row> = {}
     for (const p of (postRows ?? []) as Row[]) { const d = String(p.trade_date ?? ''); if (d) post[d] = p }
     const trade: Record<string, Row> = {}
     for (const t of (tradeRows ?? []) as Row[]) { const d = String(t.trade_date ?? ''); if (d && t.instrument === 'NIFTY') trade[d] = t }
-    return { rows, mid, post, trade }
+    return { rows, mid, midAll, post, trade }
   }, { revalidateOnFocus: false })
   // Use the real row's own values as-is when we have one -- a null field means that phase
   // genuinely hasn't run yet today, and must stay null/empty rather than being silently
