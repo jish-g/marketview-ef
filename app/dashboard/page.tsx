@@ -728,7 +728,16 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
     <div className="verdict-rationale"><span>Rationale</span><p>{calc.bias} bias from gap direction, PCR positioning, max pain pull, and OI level action; {calc.ivRead} conditions favor {calc.strategy.toLowerCase()}.</p></div>
   </article>
 }
-function VerdictView({ row }: { row: Row }) { const eventFlag = useMemo(() => highImpactEvent(row.event_today as string | null), [row.event_today]); return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open · {syncLabel(row, '09:30')}</p><h2>Verdict</h2></div><span>Calculated strategy</span></div>{eventFlag && <div className="event-caution"><AlertTriangle size={16} /><span><strong>{eventFlag.name}</strong> — high impact event at {eventFlag.time}. Trade with caution.</span></div>}<div className="verdict-instruments"><VerdictInstrument row={row} instrument="NIFTY" /><VerdictInstrument row={row} instrument="SENSEX" /></div></section> }
+function VerdictView({ row }: { row: Row }) {
+  const eventFlag = useMemo(() => highImpactEvent(row.event_today as string | null), [row.event_today])
+  // Verdict is computed from Open-phase fields (bias/strategy are derived from gap, PCR, IV
+  // captured at 9:30). If those are still null, the 9:30 cron hasn't run yet today -- show a
+  // clear not-yet-available message instead of the instrument cards (which would otherwise
+  // render off of leftover/undefined values).
+  const hasOpenData = row.market_bias_nifty != null && row.market_bias_sensex != null
+  if (!hasOpenData) return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open · {syncLabel(row, '09:30')}</p><h2>Verdict</h2></div><span>Calculated strategy</span></div><p className="history-empty">Verdict data not available yet — updates at 9:30 AM IST once the market opens.</p></section>
+  return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open · {syncLabel(row, '09:30')}</p><h2>Verdict</h2></div><span>Calculated strategy</span></div>{eventFlag && <div className="event-caution"><AlertTriangle size={16} /><span><strong>{eventFlag.name}</strong> — high impact event at {eventFlag.time}. Trade with caution.</span></div>}<div className="verdict-instruments"><VerdictInstrument row={row} instrument="NIFTY" /><VerdictInstrument row={row} instrument="SENSEX" /></div></section>
+}
 function OutcomeBadge({ label, target, sl }: { label: string; target?: boolean; sl?: boolean }) { const text = target === true ? 'Target hit' : sl === true ? 'SL hit' : target === false && sl === false ? 'Neither' : 'Not yet available'; const cls = target === true ? 'outcome-hit' : sl === true ? 'outcome-stop' : 'outcome-neutral'; return <div className={`outcome-badge ${cls}`}><span>{label}</span><strong>{text}</strong></div> }
 function MidVerdictInstrument({ row, mid, midSnapshot, instrument }: { row: Row; mid: Row; midSnapshot: Row; instrument: Instrument }) {
   const calc = useMemo(() => calculateVerdict(mid, instrument), [mid, instrument])
@@ -917,6 +926,11 @@ function PhaseView({ phase, row, historyData }: { phase: Phase; row: Row | null;
 
     return { dayLabel, lines: [openLine, midLine, postLine].filter((l): l is string => l != null) }
   })() : null
+  // 'open' phase's real data (spot/gap/IV/PCR) only lands once the 9:30 cron actually runs --
+  // before that, gap_points_nifty/sensex are null on today's row and there's nothing genuine
+  // to show, so this shows an explicit not-yet message instead of a mostly-empty field grid.
+  const openDataMissing = phase === 'open' && row?.gap_points_nifty == null && row?.gap_points_sensex == null
+  if (openDataMissing) return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><span>Session snapshot</span></div><p className="history-empty">Market Open data not available yet — updates at 9:30 AM IST once the market opens.</p></section>
   return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><span>Session snapshot</span></div>{phase === 'premarket' && priorDayLines && priorDayLines.lines.length > 0 && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p>{priorDayLines.lines.map((line, i) => <p key={i} className="prior-session-line">{line}</p>)}</div>}<div className="metric-groups">{renderGroup('Common market data', common)}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div></section>
 }
 export default function Dashboard() {
@@ -949,7 +963,12 @@ export default function Dashboard() {
     for (const t of (tradeRows ?? []) as Row[]) { const d = String(t.trade_date ?? ''); if (d && t.instrument === 'NIFTY') trade[d] = t }
     return { rows, mid, post, trade }
   }, { revalidateOnFocus: false })
-  const row = liveRow ? Object.fromEntries(Object.keys(visualRow).map((key) => [key, liveRow[key] ?? visualRow[key]])) as Row : visualRow
+  // Use the real row's own values as-is when we have one -- a null field means that phase
+  // genuinely hasn't run yet today, and must stay null/empty rather than being silently
+  // backfilled with the hardcoded demo row's fake numbers (that was masking "not run yet" as
+  // if it were real data). The demo row is only used as a whole when there's no live row at
+  // all (e.g. very first load before Supabase has ever written anything).
+  const row = liveRow ?? visualRow
   // All of today's mid-market checkpoints (10:30/11:30/12:30/1:30/2:30 IST, or the legacy
   // single '1245' row for historical days before the 5-checkpoint schedule started), ordered
   // earliest-first so the timeline UI can just .map() them left-to-right / top-to-bottom.
