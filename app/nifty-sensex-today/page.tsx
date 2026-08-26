@@ -77,7 +77,7 @@ export default function NiftySensexTodayIndexPage() {
   return (
     <main className="blog-index-shell">
       <header className="blog-index-topbar">
-        <Link href="/" className="brand-mark" style={{ textDecoration: 'none' }}>
+        <Link href="/" className="brand-mark blog-brand-mark">
           <div className="brand-symbol"><BarChart3 size={16} /></div>
           <div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div>
         </Link>
@@ -88,8 +88,8 @@ export default function NiftySensexTodayIndexPage() {
 
       <div className="blog-index-main">
         <div className="blog-index-head">
-          <p className="eyebrow">Nifty & Sensex Today</p>
-          <h1 style={{ fontSize: 'clamp(26px,3vw,34px)', letterSpacing: '-.02em', marginTop: 8 }}>Daily Nifty and Sensex pre-market and post-market reads</h1>
+          <p className="eyebrow">Nifty &amp; Sensex Today</p>
+          <h1 className="blog-index-title">Daily Nifty and Sensex pre-market and post-market reads</h1>
           <p>Daily gap, PCR, Max Pain, and option-readiness reads for both Nifty and Sensex in one place — published before the open and after the close, straight from the MarketCue rules engine.</p>
         </div>
 
@@ -99,12 +99,16 @@ export default function NiftySensexTodayIndexPage() {
 
         {todayGroup && (
           <div className="archive-hero">
-            <span className="archive-hero-date">Today · {formatDateLabel(todayGroup.tradeDate)}</span>
+            <div className="archive-hero-top">
+              <span className="archive-hero-live-dot" aria-hidden="true" />
+              <span className="archive-hero-date">Today · {formatDateLabel(todayGroup.tradeDate)}</span>
+            </div>
             <div className="archive-hero-tiles">
               {todayGroup.pre ? (
                 <Link href={`/nifty-sensex-today/${todayGroup.pre.slug}`} className="archive-hero-tile">
                   <span className="archive-hero-tag archive-hero-tag-pre">Pre-market</span>
                   <p>{todayGroup.pre.title}</p>
+                  <span className="archive-hero-tile-link">Read the call <ArrowRight size={12} /></span>
                 </Link>
               ) : (
                 <div className="archive-hero-tile archive-hero-tile-empty">
@@ -116,6 +120,7 @@ export default function NiftySensexTodayIndexPage() {
                 <Link href={`/nifty-sensex-today/${todayGroup.post.slug}`} className="archive-hero-tile">
                   <span className="archive-hero-tag archive-hero-tag-post">Post-market</span>
                   <p>{todayGroup.post.title}</p>
+                  <span className="archive-hero-tile-link">Read the call <ArrowRight size={12} /></span>
                 </Link>
               ) : (
                 <div className="archive-hero-tile archive-hero-tile-empty">
@@ -128,27 +133,30 @@ export default function NiftySensexTodayIndexPage() {
         )}
 
         {olderGroups.length > 0 && (
-          <div className="archive-table">
-            <div className="archive-table-head">
-              <span>Date</span><span>Nifty</span><span>Sensex</span><span>Bias</span><span>Read</span>
+          <div className="archive-table-block">
+            <p className="archive-table-eyebrow">Archive</p>
+            <div className="archive-table">
+              <div className="archive-table-head">
+                <span>Date</span><span>Nifty</span><span>Sensex</span><span>Bias</span><span>Read</span>
+              </div>
+              {olderGroups.map((g) => {
+                const row = rowFor(g.tradeDate)
+                const bias = biasFrom(row?.day_change_pct_nifty, row?.day_change_pct_sensex, row?.market_bias_nifty)
+                return (
+                  <div className="archive-table-row" key={g.tradeDate}>
+                    <span className="archive-table-cell-date">{formatDateLabel(g.tradeDate)}</span>
+                    <span className={`archive-table-cell-num ${tone(row?.day_change_pct_nifty)}`}>{fmtPct(row?.day_change_pct_nifty)}</span>
+                    <span className={`archive-table-cell-num ${tone(row?.day_change_pct_sensex)}`}>{fmtPct(row?.day_change_pct_sensex)}</span>
+                    <span className="archive-table-cell-bias">{bias}</span>
+                    <span className="archive-table-links">
+                      {g.pre && <Link href={`/nifty-sensex-today/${g.pre.slug}`}>Pre</Link>}
+                      {g.pre && g.post && <em> · </em>}
+                      {g.post && <Link href={`/nifty-sensex-today/${g.post.slug}`}>Post</Link>}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
-            {olderGroups.map((g) => {
-              const row = rowFor(g.tradeDate)
-              const bias = biasFrom(row?.day_change_pct_nifty, row?.day_change_pct_sensex, row?.market_bias_nifty)
-              return (
-                <div className="archive-table-row" key={g.tradeDate}>
-                  <span>{formatDateLabel(g.tradeDate)}</span>
-                  <span className={tone(row?.day_change_pct_nifty)}>{fmtPct(row?.day_change_pct_nifty)}</span>
-                  <span className={tone(row?.day_change_pct_sensex)}>{fmtPct(row?.day_change_pct_sensex)}</span>
-                  <span>{bias}</span>
-                  <span className="archive-table-links">
-                    {g.pre && <Link href={`/nifty-sensex-today/${g.pre.slug}`}>Pre</Link>}
-                    {g.pre && g.post && <em> · </em>}
-                    {g.post && <Link href={`/nifty-sensex-today/${g.post.slug}`}>Post</Link>}
-                  </span>
-                </div>
-              )
-            })}
           </div>
         )}
       </div>
