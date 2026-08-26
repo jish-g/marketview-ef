@@ -36,15 +36,13 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section className="landing-card landing-hero-card">
-        <div className="landing-hero">
-          <p className="eyebrow">Market intelligence platform</p>
-          <h1 className="landing-headline">Everyone gives you data. We read it.</h1>
-          <p className="landing-lede">A daily read on Nifty and Sensex, built from a rules engine you can audit — not a black box.</p>
-          <div className="landing-hero-ctas">
-            <Link href="/dashboard" className="landing-cta-primary">Enter dashboard <ArrowRight size={15} /></Link>
-            <Link href="/nifty-sensex-today" className="landing-cta-secondary"><Newspaper size={15} /> Nifty and Sensex today</Link>
-          </div>
+      <section className="landing-hero">
+        <p className="eyebrow">Market intelligence platform</p>
+        <h1 className="landing-headline">Everyone gives you data. <span className="landing-headline-accent">We read it.</span></h1>
+        <p className="landing-lede">A daily read on Nifty and Sensex, built from a rules engine you can audit — not a black box.</p>
+        <div className="landing-hero-ctas">
+          <Link href="/dashboard" className="landing-cta-primary">Enter dashboard <ArrowRight size={15} /></Link>
+          <Link href="/nifty-sensex-today" className="landing-cta-secondary"><Newspaper size={15} /> Nifty and Sensex today</Link>
         </div>
         <div className="landing-stat-strip">
           <span className="landing-stat-meta">Sample read · as on 26 Aug 2026, 12:16 pm</span>
@@ -57,13 +55,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="landing-card">
+      <section className="landing-positioning">
         <p className="eyebrow">Why MarketCue</p>
         <p className="landing-body-text">Raw options data — gap, OI, PCR, max pain, IV, VIX — is available everywhere and looks the same on every terminal. The edge isn&apos;t access to data, it&apos;s reading it the same disciplined way every session.</p>
         <p className="landing-body-text">MarketCue runs that data through a documented, rules-based framework to produce one read instead of six charts to interpret yourself.</p>
       </section>
 
-      <section className="landing-card">
+      <section className="landing-differentiators">
         <p className="eyebrow">What makes it different</p>
         <div className="landing-diff-grid">
           {differentiators.map(({ icon: Icon, title, description }) => (
