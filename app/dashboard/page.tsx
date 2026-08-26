@@ -740,85 +740,57 @@ function VerdictView({ row }: { row: Row }) {
   return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open · {syncLabel(row, '09:30')}</p><h2>Verdict</h2></div><span>Calculated strategy</span></div>{eventFlag && <div className="event-caution"><AlertTriangle size={16} /><span><strong>{eventFlag.name}</strong> — high impact event at {eventFlag.time}. Trade with caution.</span></div>}<div className="verdict-instruments"><VerdictInstrument row={row} instrument="NIFTY" /><VerdictInstrument row={row} instrument="SENSEX" /></div></section>
 }
 function OutcomeBadge({ label, target, sl }: { label: string; target?: boolean; sl?: boolean }) { const text = target === true ? 'Target hit' : sl === true ? 'SL hit' : target === false && sl === false ? 'Neither' : 'Not yet available'; const cls = target === true ? 'outcome-hit' : sl === true ? 'outcome-stop' : 'outcome-neutral'; return <div className={`outcome-badge ${cls}`}><span>{label}</span><strong>{text}</strong></div> }
-function MidVerdictInstrument({ row, mid, midSnapshot, instrument }: { row: Row; mid: Row; midSnapshot: Row; instrument: Instrument }) {
-  const calc = useMemo(() => calculateVerdict(mid, instrument), [mid, instrument])
-  const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
-  const spotKey = `spot_${suffix}`
-  const changeKey = `intraday_change_pct_${suffix}`
-  // Mid-market bias/strategy are read directly from midSnapshot's already-computed
-  // market_bias_{suffix}_mid / suggested_strategy_{suffix}_mid columns (written by the backend's
-  // own mid-market scoring job) rather than recalculated here via computeMarketBias. That shared
-  // function was built for the pre-market/post-market shape of data -- it needs a gap percentage
-  // and open-interest support/resistance reading, neither of which exists in midmarket_snapshot
-  // (no OI columns at all, and the gap field it falls back to is a premarket-only field) -- so
-  // recalculating here was silently missing 2 of its 4 inputs and pinning almost every reading to
-  // "Neutral" regardless of the real intraday move. The stored value is already correct (verified
-  // against real PCR/spot/max-pain swings), so we trust it instead of re-deriving it.
-  const biasLabel = String(midSnapshot[`market_bias_${suffix}_mid`] ?? 'Neutral')
-  const strategyRecommendation = String(midSnapshot[`suggested_strategy_${suffix}_mid`] ?? 'No Trade')
-  const strategyReason = String(midSnapshot[`pcr_reading_${suffix}_mid`] ?? '')
-  const effectiveDelta = strikeDefaults[calc.strike]
-  // "Since morning" comparison: morning bias/strategy read from the original premarket_dashboard row (not the
-  // mid-merged row), and the shift flags/note read from the raw midmarket_snapshot row -- neither is currently
-  // overlaid into `mid` by buildMidRow.
-  const morningBias = String(row[`market_bias_${suffix}`] ?? '—')
-  const morningStrategy = String(row[`suggested_strategy_${suffix}`] ?? '—')
-  const biasShifted = Boolean(midSnapshot[`bias_shifted_${suffix}`])
-  const strategyShifted = Boolean(midSnapshot[`strategy_shifted_${suffix}`])
-  const hasShifted = biasShifted || strategyShifted
-  const shiftNote = String(midSnapshot[`shift_note_${suffix}`] ?? '')
-  return <article className="verdict-instrument"><div className="verdict-instrument-head"><h3>{instrument}</h3><span>{biasLabel} · {strategyRecommendation}</span></div><div className="sync-strip"><span>Spot <b>{value(mid, spotKey)}</b></span><span>Intraday change <b className={tone(mid, changeKey)}>{value(mid, changeKey, true)}</b></span></div><div className="verdict-banner"><div><p className="eyebrow">Midday strategy read</p><strong>{strategyRecommendation}</strong>{strategyReason && <p>{strategyReason}.</p>}</div></div><div className="verdict-card since-morning-card"><span className="eyebrow">Since morning</span><div className="since-morning-row"><span className="since-morning-label">Bias</span><span className={`since-morning-value ${biasShifted ? 'is-shifted' : 'is-unchanged'}`}>{morningBias} → {biasLabel}</span></div><div className="since-morning-row"><span className="since-morning-label">Strategy</span><span className={`since-morning-value ${strategyShifted ? 'is-shifted' : 'is-unchanged'}`}>{morningStrategy} → {strategyRecommendation}</span></div><p className="since-morning-note">{hasShifted ? (shiftNote || 'Shifted since this morning.') : 'Unchanged since this morning.'}</p></div></article>
-}
+// One checkpoint's compact read for a single instrument -- time, bias (with the live intraday
+// % change alongside it), suggested strategy (with the IV-vs-VIX read that drove the pick), and
+// a one-line shift note when the bias/strategy actually moved since the morning call. All values
+// read directly from the stored midmarket_snapshot row (see the bias-source fix above) rather than
+// recalculated. intraday_change_pct_{suffix} is a genuine derived value -- (spot - prev_close) /
+// prev_close * 100 off two real captured prices, verified against today's actual spot/prev_close --
+// not a placeholder or estimate.
+function MidCheckpointRow({ cp, suffix, label }: { cp: Row; suffix: 'nifty' | 'sensex'; label: string }) {
+  const biasLabel = String(cp[`market_bias_${suffix}_mid`] ?? '—')
+  const strategy = String(cp[`suggested_strategy_${suffix}_mid`] ?? '—')
+  const ivRead = cp[`iv_vs_vix_${suffix}_mid`] != null ? String(cp[`iv_vs_vix_${suffix}_mid`]).toLowerCase() : null
+  const changePct = cp[`intraday_change_pct_${suffix}`]
+  const changeLabel = changePct != null ? `${Number(changePct) > 0 ? '+' : ''}${Number(changePct).toFixed(2)}%` : null
+  const shifted = Boolean(cp[`bias_shifted_${suffix}`]) || Boolean(cp[`strategy_shifted_${suffix}`])
+  const shiftNote = String(cp[`shift_note_${suffix}`] ?? '')
+  const tone = /bearish/i.test(biasLabel) ? 'negative' : /bullish/i.test(biasLabel) ? 'positive' : ''
 
-// Fixed daily checkpoint slots in order, with display label and 24h IST minute-of-day (used to
-// decide whether a not-yet-landed checkpoint is merely "later today" vs. actually overdue).
-const CHECKPOINT_SLOTS: { id: string; label: string; minuteOfDay: number }[] = [
-  { id: '1030', label: '10:30', minuteOfDay: 10 * 60 + 30 },
-  { id: '1130', label: '11:30', minuteOfDay: 11 * 60 + 30 },
-  { id: '1230', label: '12:30', minuteOfDay: 12 * 60 + 30 },
-  { id: '1330', label: '1:30', minuteOfDay: 13 * 60 + 30 },
-  { id: '1430', label: '2:30', minuteOfDay: 14 * 60 + 30 },
-]
-// Ordering used to pick "the latest landed checkpoint" for a given day (History recap, etc.) --
-// derived from CHECKPOINT_SLOTS so there's one source of truth for the daily schedule, plus the
-// legacy '1245' single-checkpoint label (pre-dates the 5-checkpoint schedule) sorted last since
-// it's always the only checkpoint on whatever day it appears.
-const CHECKPOINT_ORDER = [...CHECKPOINT_SLOTS.map((s) => s.id), '1245']
-
-function checkpointShifted(cp: Row) {
-  return Boolean(cp.bias_shifted_nifty) || Boolean(cp.bias_shifted_sensex) || Boolean(cp.strategy_shifted_nifty) || Boolean(cp.strategy_shifted_sensex)
-}
-
-function nowMinuteOfDayIST(): number {
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date())
-  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0)
-  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? 0)
-  return hour * 60 + minute
-}
-
-// A landed checkpoint's full detail -- both instruments always rendered in full (no collapse),
-// per the approved prototype: every checkpoint visible in one scroll, no tap-to-expand.
-function MidCheckpointCard({ cp, row, label }: { cp: Row; row: Row; label: string }) {
-  const mid = buildMidRow(row, cp)
-  const shifted = checkpointShifted(cp)
-  return <div className="mid-checkpoint-card">
-    <div className="mid-checkpoint-card-top">
-      <span className="mid-checkpoint-card-label">{shifted ? 'Bias shifted since morning' : 'Nifty & Sensex'}</span>
-      <span className="mid-checkpoint-updated-tag">{syncLabel(cp, label)}</span>
+  return <div className={`mid-row-card ${shifted ? 'mid-row-card-shifted' : ''}`}>
+    <div className="mid-row-top">
+      <span className="mid-row-time">{label}</span>
+      <span className={`mid-row-bias ${tone}`}>{biasLabel}{changeLabel && <em className="mid-row-change">{changeLabel}</em>}</span>
     </div>
-    <div className="verdict-instruments"><MidVerdictInstrument row={row} mid={mid} midSnapshot={cp} instrument="NIFTY" /><MidVerdictInstrument row={row} mid={mid} midSnapshot={cp} instrument="SENSEX" /></div>
+    <p className="mid-row-strategy">{strategy}{ivRead && <span className="mid-row-iv"> · IV {ivRead}</span>}</p>
+    {shifted && shiftNote && <p className="mid-row-shift-note">{shiftNote}</p>}
   </div>
 }
 
-// A checkpoint slot whose cron hasn't run yet today -- rendered as a dashed placeholder instead
-// of being omitted, so the full 5-slot shape of the day is always visible on the spine.
-function MidCheckpointPending({ label }: { label: string }) {
-  return <div className="mid-checkpoint-card mid-checkpoint-card-pending">
-    <div className="mid-checkpoint-card-top">
-      <span className="mid-checkpoint-card-label">Nifty &amp; Sensex</span>
-      <span className="mid-checkpoint-updated-tag mid-checkpoint-updated-tag-pending">Not yet run</span>
+// A checkpoint slot whose cron hasn't run yet today, for one instrument column.
+function MidCheckpointRowPending({ label }: { label: string }) {
+  return <div className="mid-row-card mid-row-card-pending">
+    <span className="mid-row-time">{label}</span>
+    <span className="mid-row-pending-tag">Pending</span>
+  </div>
+}
+
+// One instrument's full day at a glance: all 5 checkpoints stacked, expanded by default (no
+// tap-to-expand) so the whole session is visible in one compact column.
+function MidInstrumentColumn({ instrument, byId, nowMin }: { instrument: Instrument; byId: Map<string, Row>; nowMin: number }) {
+  const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
+  return <div className="mid-instrument-col">
+    <p className="mid-instrument-col-label">{instrument === 'NIFTY' ? 'Nifty' : 'Sensex'}</p>
+    <div className="mid-instrument-col-rows">
+      {CHECKPOINT_SLOTS.map((slot) => {
+        const cp = byId.get(slot.id)
+        const isDue = nowMin >= slot.minuteOfDay
+        return <div key={slot.id}>
+          {cp ? <MidCheckpointRow cp={cp} suffix={suffix} label={slot.label} /> : <MidCheckpointRowPending label={slot.label} />}
+          {!cp && isDue && <p className="mid-row-overdue-note">Running a little late</p>}
+        </div>
+      })}
     </div>
-    <p className="mid-checkpoint-pending-body">Updates automatically at {label} IST</p>
   </div>
 }
 
@@ -835,23 +807,13 @@ function MidMarketView({ row, midCheckpoints }: { row: Row; midCheckpoints: Row[
 
   return <section className="phase-view special-view mid-checkpoint-view">
     <div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div>
-    <div className="mid-checkpoint-spine">
-      {CHECKPOINT_SLOTS.map((slot) => {
-        const cp = byId.get(slot.id)
-        const shifted = cp ? checkpointShifted(cp) : false
-        const isDue = nowMin >= slot.minuteOfDay
-        return <div className="mid-checkpoint-row" key={slot.id}>
-          <div className="mid-checkpoint-time">{slot.label}<small>IST</small></div>
-          <div className={`mid-checkpoint-dot-marker ${shifted ? 'is-shifted' : ''} ${!cp ? 'is-pending' : ''}`} />
-          <div className="mid-checkpoint-card-col">
-            {cp ? <MidCheckpointCard cp={cp} row={row} label={slot.label} /> : <MidCheckpointPending label={slot.label} />}
-            {!cp && isDue && <p className="mid-checkpoint-overdue-note">Running a little late — this usually lands within a few minutes of {slot.label} IST.</p>}
-          </div>
-        </div>
-      })}
+    <div className="mid-instrument-grid">
+      <MidInstrumentColumn instrument="NIFTY" byId={byId} nowMin={nowMin} />
+      <MidInstrumentColumn instrument="SENSEX" byId={byId} nowMin={nowMin} />
     </div>
   </section>
 }
+
 function PostInstrumentCard({ row, postSummary, instrument }: { row: Row; postSummary: Row; instrument: Instrument }) {
   const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
   const calc = useMemo(() => calculateVerdict(row, instrument), [row, instrument])
