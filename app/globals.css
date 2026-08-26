@@ -157,5 +157,5 @@ button, input { font: inherit; }
 .blog-post-back:hover { color: var(--foreground); }
 .blog-post-header time { display: block; color: var(--muted-foreground); font-size: 11px; margin-top: 10px; }
 .blog-post-title { margin: 12px 0 0; font-size: clamp(22px, 3vw, 30px); letter-spacing: -.02em; }
-.blog-post-body { margin-top: 26px; color: var(--foreground); font-size: 14px; line-height: 1.85; white-space: pre-wrap; }
+.blog-post-body { margin-top: 26px; color: var(--foreground); font-size: 15px; line-height: 1.75; max-width: 640px; } .blog-post-body p { margin: 0 0 20px; } .blog-post-body p:last-child { margin-bottom: 0; }
 .blog-post-cta { margin-top: 36px; padding-top: 22px; border-top: 1px solid var(--border); }

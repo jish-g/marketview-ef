@@ -53,7 +53,7 @@ export default function NiftySensexTodayPostPage() {
               <h1 className="blog-post-title">{data.title}</h1>
               <time>{formatDateLabel(data.trade_date)}</time>
             </div>
-            <div className="blog-post-body">{data.body}</div>
+            <div className="blog-post-body">{data.body.split(/\n\s*\n/).map((para, i) => <p key={i}>{para.trim()}</p>)}</div>
             <div className="blog-post-cta">
               <Link href="/dashboard" className="detailed-read-link">Open live Verdict on the dashboard <ArrowRight size={15} /></Link>
             </div>
