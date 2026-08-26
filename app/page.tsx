@@ -61,17 +61,17 @@ export default function LandingPage() {
         </div>
 
         <div className="landing-hero-showcase">
-          <div className="landing-verdict-card" aria-label="Sample verdict card">
+          <div className="landing-verdict-card" aria-label="Sample market read">
             <div className="landing-verdict-head">
-              <span className="eyebrow">Sample verdict</span>
+              <span className="eyebrow">Sample read</span>
               <h3>NIFTY</h3>
             </div>
             <div className="landing-verdict-badges">
               <span className="landing-verdict-badge landing-verdict-badge-danger">Bearish</span>
               <span className="landing-verdict-badge landing-verdict-badge-warning">Caution</span>
             </div>
-            <strong className="landing-verdict-strategy">Put Credit Spread</strong>
-            <p className="landing-verdict-reasoning">Bearish bias with expensive IV, so selling premium instead of buying.</p>
+            <strong className="landing-verdict-strategy">24,318 &minus;0.42%</strong>
+            <p className="landing-verdict-reasoning">Bearish bias with expensive IV — option writers hold the edge today.</p>
           </div>
         </div>
       </section>
@@ -99,7 +99,7 @@ export default function LandingPage() {
           <div className="landing-comparison-col landing-comparison-read">
             <span className="side-label">What we tell you</span>
             <strong className="landing-comparison-headline">Bearish · Caution</strong>
-            <p>Put Credit Spread. One read, one decision.</p>
+            <p>One weighted read of the session, not six numbers to reconcile yourself.</p>
           </div>
         </div>
       </section>
