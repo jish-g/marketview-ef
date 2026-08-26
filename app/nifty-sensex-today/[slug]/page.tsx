@@ -57,7 +57,7 @@ export default function NiftySensexTodayPostPage() {
   return (
     <main className="blog-post-shell">
       <header className="blog-index-topbar">
-        <Link href="/" className="brand-mark" style={{ textDecoration: 'none' }}>
+        <Link href="/" className="brand-mark blog-brand-mark">
           <div className="brand-symbol"><BarChart3 size={16} /></div>
           <div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div>
         </Link>
@@ -80,49 +80,50 @@ export default function NiftySensexTodayPostPage() {
                 <span className={`blog-post-badge blog-post-badge-${data.phase}`}>{data.phase === 'premarket' ? 'Pre-market' : 'Post-market'}</span>
               </div>
               <h1 className="blog-post-title">{data.title}</h1>
-              <time>{formatDateLabel(data.trade_date)}</time>
+              <time className="blog-post-time">{formatDateLabel(data.trade_date)}</time>
             </div>
 
             {marketRow && (
-              <section className="scorecard-section">
-                <div className="field-grid scorecard-tiles">
+              <section className="blog-scorecard">
+                <p className="blog-scorecard-eyebrow">{isPre ? 'Pre-market readout' : 'Post-market readout'}</p>
+                <div className="blog-scorecard-grid">
                   {isPre ? (
                     <>
-                      <div className="field-card">
+                      <div className="blog-scorecard-tile">
                         <span>India VIX</span>
                         <strong>{fmtNum(marketRow.india_vix)}</strong>
                       </div>
-                      <div className="field-card">
+                      <div className="blog-scorecard-tile">
                         <span>GIFT Nifty Gap</span>
                         <strong className={tone(marketRow.gift_nifty_gap_pct)}>
                           {fmtPct(marketRow.gift_nifty_gap_pct)}
-                          {ptsSuffix(marketRow.gift_nifty_gap_pts) && <em className="prior-day-pts"> ({ptsSuffix(marketRow.gift_nifty_gap_pts)})</em>}
+                          {ptsSuffix(marketRow.gift_nifty_gap_pts) && <em className="blog-scorecard-sub"> ({ptsSuffix(marketRow.gift_nifty_gap_pts)})</em>}
                         </strong>
                       </div>
-                      <div className="field-card">
+                      <div className="blog-scorecard-tile">
                         <span>Nifty Expiry</span>
                         <strong>{fmtNum(marketRow.days_to_expiry_nifty, marketRow.days_to_expiry_nifty === 1 ? ' day' : ' days')}</strong>
                       </div>
-                      <div className="field-card">
+                      <div className="blog-scorecard-tile">
                         <span>Sensex Expiry</span>
                         <strong>{fmtNum(marketRow.days_to_expiry_sensex, marketRow.days_to_expiry_sensex === 1 ? ' day' : ' days')}</strong>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div className="field-card">
+                      <div className="blog-scorecard-tile">
                         <span>Nifty Closed</span>
                         <strong className={tone(marketRow.day_change_pct_nifty)}>{fmtPct(marketRow.day_change_pct_nifty)}</strong>
                       </div>
-                      <div className="field-card">
+                      <div className="blog-scorecard-tile">
                         <span>Sensex Closed</span>
                         <strong className={tone(marketRow.day_change_pct_sensex)}>{fmtPct(marketRow.day_change_pct_sensex)}</strong>
                       </div>
-                      <div className="field-card">
+                      <div className="blog-scorecard-tile">
                         <span>Nifty Range</span>
                         <strong>{fmtNum(marketRow.day_low_nifty)} – {fmtNum(marketRow.day_high_nifty)}</strong>
                       </div>
-                      <div className="field-card">
+                      <div className="blog-scorecard-tile">
                         <span>Sensex Range</span>
                         <strong>{fmtNum(marketRow.day_low_sensex)} – {fmtNum(marketRow.day_high_sensex)}</strong>
                       </div>
@@ -130,8 +131,8 @@ export default function NiftySensexTodayPostPage() {
                   )}
                 </div>
 
-                <div className="comparison-grid scorecard-comparison">
-                  <div className="comparison-card">
+                <div className="blog-scorecard-compare">
+                  <div className="blog-scorecard-compare-card">
                     <span>NIFTY</span>
                     {isPre ? (
                       <>
@@ -145,7 +146,7 @@ export default function NiftySensexTodayPostPage() {
                       </>
                     )}
                   </div>
-                  <div className="comparison-card">
+                  <div className="blog-scorecard-compare-card">
                     <span>SENSEX</span>
                     {isPre ? (
                       <>
@@ -165,7 +166,11 @@ export default function NiftySensexTodayPostPage() {
 
             <div className="blog-post-body">{data.body.split(/\n\s*\n/).map((para, i) => <p key={i}>{para.trim()}</p>)}</div>
             <div className="blog-post-cta">
-              <Link href="/dashboard" className="detailed-read-link">Open live Verdict on the dashboard <ArrowRight size={15} /></Link>
+              <div className="blog-post-cta-text">
+                <strong>Want the live, session-by-session read?</strong>
+                <span>The dashboard updates through the day — this post is a fixed snapshot.</span>
+              </div>
+              <Link href="/dashboard" className="blog-post-cta-link">Open live Verdict on the dashboard <ArrowRight size={15} /></Link>
             </div>
           </>
         )}
