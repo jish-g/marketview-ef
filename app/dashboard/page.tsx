@@ -908,6 +908,14 @@ function PhaseView({ phase, row, historyData }: { phase: Phase; row: Row | null;
     const checkpoints = historyData?.midAll[dateKey] ?? []
     const post = historyData?.post[dateKey]
 
+    // Prefer the AI-phrased recap written by the post-close Edge Function (v16) -- it's built
+    // from the exact same underlying structured data (open bias, checkpoint flips, close%,
+    // outcome) computed server-side, just phrased by Haiku instead of the sentence-template
+    // logic below. Only fall back to the rules-based builder if that column is null (e.g. the
+    // anthropic_api_key wasn't configured yet when that day's post-close ran, or the AI call
+    // failed) -- so the banner never goes blank just because phrasing didn't happen.
+    if (post?.recap_story_nifty) return { dayLabel, story: String(post.recap_story_nifty) }
+
     const gapPts = priorDay.gap_points_nifty
     const prevClose = priorDay.prev_close_nifty
     const gapPct = gapPts != null && prevClose ? (Number(gapPts) / Number(prevClose)) * 100 : null
