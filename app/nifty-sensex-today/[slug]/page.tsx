@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { cache } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import NiftySensexTodayPostClient from './detail-client'
 
@@ -14,7 +15,10 @@ const SITE_URL = 'https://marketcue.in'
 
 type PostRow = { slug: string; title: string; body: string; phase: 'premarket' | 'postmarket'; trade_date: string }
 
-async function getPost(slug: string): Promise<PostRow | null> {
+// Wrapped in React's cache() so generateMetadata and the page body both calling
+// getPost() for the same slug within one request collapse into a single
+// Supabase round trip instead of two.
+const getPost = cache(async (slug: string): Promise<PostRow | null> => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
     const { data } = await supabase
@@ -26,7 +30,7 @@ async function getPost(slug: string): Promise<PostRow | null> {
   } catch {
     return null
   }
-}
+})
 
 function firstSentence(body: string, max = 155): string {
   const text = body.replace(/\s+/g, ' ').trim()
@@ -69,6 +73,35 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
-export default function Page() {
-  return <NiftySensexTodayPostClient />
+export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const post = await getPost(slug)
+
+  const jsonLd = post
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        headline: post.title,
+        description: firstSentence(post.body),
+        datePublished: post.trade_date,
+        dateModified: post.trade_date,
+        author: { '@type': 'Organization', name: 'MarketCue' },
+        publisher: { '@type': 'Organization', name: 'MarketCue', url: SITE_URL },
+        mainEntityOfPage: { '@type': 'WebPage', '@id': `${SITE_URL}/nifty-sensex-today/${post.slug}` },
+        articleSection: post.phase === 'premarket' ? 'Pre-market' : 'Post-market',
+      }
+    : null
+
+  return (
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      <NiftySensexTodayPostClient />
+    </>
+  )
 }
