@@ -754,74 +754,79 @@ function MidVerdictInstrument({ row, mid, midSnapshot, instrument }: { row: Row;
   const shiftNote = String(midSnapshot[`shift_note_${suffix}`] ?? '')
   return <article className="verdict-instrument"><div className="verdict-instrument-head"><h3>{instrument}</h3><span>{marketBias.label} · {strategyRec.recommendation}</span></div><div className="sync-strip"><span>Spot <b>{value(mid, spotKey)}</b></span><span>Intraday change <b className={tone(mid, changeKey)}>{value(mid, changeKey, true)}</b></span></div><div className="verdict-banner"><div><p className="eyebrow">Midday strategy read</p><strong>{strategyRec.recommendation}</strong><p>{strategyRec.reason}.</p></div></div><div className="verdict-card since-morning-card"><span className="eyebrow">Since morning</span><div className="since-morning-row"><span className="since-morning-label">Bias</span><span className={`since-morning-value ${biasShifted ? 'is-shifted' : 'is-unchanged'}`}>{morningBias} → {marketBias.label}</span></div><div className="since-morning-row"><span className="since-morning-label">Strategy</span><span className={`since-morning-value ${strategyShifted ? 'is-shifted' : 'is-unchanged'}`}>{morningStrategy} → {strategyRec.recommendation}</span></div><p className="since-morning-note">{hasShifted ? (shiftNote || 'Shifted since this morning.') : 'Unchanged since this morning.'}</p></div><div className="verdict-grid"><div className="verdict-card verdict-tracks"><div className="track-columns"><div className="track-column"><div className="track-header"><i></i><span>Conservative</span></div><strong className="track-move">{calc.conservative.toFixed(1)} pts</strong><div className="track-row"><span>↑ Target</span><b className="target-value">{calc.target.toFixed(1)} pts</b><em>₹{(calc.target * effectiveDelta).toFixed(1)}</em></div><div className="track-row"><span>↓ Stop-loss</span><b className="stop-value">{calc.stop.toFixed(1)} pts</b><em>₹{(calc.stop * effectiveDelta).toFixed(1)}</em></div></div><div className="track-column"><div className="track-header"><i></i><span>Aggressive</span></div><strong className="track-move">{calc.aggressive.toFixed(1)} pts</strong><div className="track-row"><span>↑ Target</span><b className="target-value">{calc.aggressiveTarget.toFixed(1)} pts</b><em>₹{(calc.aggressiveTarget * effectiveDelta).toFixed(1)}</em></div><div className="track-row"><span>↓ Stop-loss</span><b className="stop-value">{calc.aggressiveStop.toFixed(1)} pts</b><em>₹{(calc.aggressiveStop * effectiveDelta).toFixed(1)}</em></div></div></div></div></div></article>
 }
-// Checkpoint time labels for display -- '1245' is the legacy single-checkpoint label kept for
-// historical days recorded before the 5-checkpoint (10:30/11:30/12:30/1:30/2:30) schedule.
-const checkpointLabels: Record<string, string> = { '1030': '10:30', '1130': '11:30', '1230': '12:30', '1330': '1:30', '1430': '2:30', '1245': '12:45' }
+// Fixed daily checkpoint slots in order, with display label and 24h IST minute-of-day (used to
+// decide whether a not-yet-landed checkpoint is merely "later today" vs. actually overdue).
+const CHECKPOINT_SLOTS: { id: string; label: string; minuteOfDay: number }[] = [
+  { id: '1030', label: '10:30', minuteOfDay: 10 * 60 + 30 },
+  { id: '1130', label: '11:30', minuteOfDay: 11 * 60 + 30 },
+  { id: '1230', label: '12:30', minuteOfDay: 12 * 60 + 30 },
+  { id: '1330', label: '1:30', minuteOfDay: 13 * 60 + 30 },
+  { id: '1430', label: '2:30', minuteOfDay: 14 * 60 + 30 },
+]
 
 function checkpointShifted(cp: Row) {
   return Boolean(cp.bias_shifted_nifty) || Boolean(cp.bias_shifted_sensex) || Boolean(cp.strategy_shifted_nifty) || Boolean(cp.strategy_shifted_sensex)
 }
 
-// Collapsed one-line preview shown on the spine for a checkpoint that isn't expanded: bias badge
-// per instrument plus intraday change%, so the whole day's shape is visible without opening
-// anything. Matches the approved prototype -- spine + time label + collapsed row, tap to expand.
-function MidCheckpointPreview({ cp, row }: { cp: Row; row: Row }) {
+function nowMinuteOfDayIST(): number {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date())
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0)
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? 0)
+  return hour * 60 + minute
+}
+
+// A landed checkpoint's full detail -- both instruments always rendered in full (no collapse),
+// per the approved prototype: every checkpoint visible in one scroll, no tap-to-expand.
+function MidCheckpointCard({ cp, row, label }: { cp: Row; row: Row; label: string }) {
   const mid = buildMidRow(row, cp)
-  return <div className="mid-checkpoint-preview-row">
-    {(['NIFTY', 'SENSEX'] as const).map((instrument) => {
-      const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
-      const calc = calculateVerdict(mid, instrument)
-      const bias = computeMarketBias(mid, calc, instrument)
-      const changeKey = `intraday_change_pct_${suffix}`
-      return <span className="mid-checkpoint-preview-instr" key={instrument}>
-        <b>{instrument}</b>
-        <span className={`mid-checkpoint-preview-badge ${bias.label.includes('Bullish') ? 'is-bullish' : bias.label.includes('Bearish') ? 'is-bearish' : 'is-neutral'}`}>{bias.label}</span>
-        <span className={tone(mid, changeKey)}>{value(mid, changeKey, true)}</span>
-      </span>
-    })}
+  const shifted = checkpointShifted(cp)
+  return <div className="mid-checkpoint-card">
+    <div className="mid-checkpoint-card-top">
+      <span className="mid-checkpoint-card-label">{shifted ? 'Bias shifted since morning' : 'Nifty & Sensex'}</span>
+      <span className="mid-checkpoint-updated-tag">{syncLabel(cp, label)}</span>
+    </div>
+    <div className="verdict-instruments"><MidVerdictInstrument row={row} mid={mid} midSnapshot={cp} instrument="NIFTY" /><MidVerdictInstrument row={row} mid={mid} midSnapshot={cp} instrument="SENSEX" /></div>
   </div>
 }
 
-// One spine row per checkpoint: time label on the left, a filled/accent dot on the spine (accent
-// when the bias/strategy shifted since the morning call), collapsed preview on the right that
-// expands in place to the full MidVerdictInstrument cards on click. All 5 checkpoints render
-// stacked -- no tabs, no single-selection view -- so the whole day is visible in one scroll.
-function MidCheckpointRow({ cp, row, isOpen, onToggle }: { cp: Row; row: Row; isOpen: boolean; onToggle: () => void }) {
-  const id = String(cp.checkpoint)
-  const shifted = checkpointShifted(cp)
-  const mid = buildMidRow(row, cp)
-  return <div className={`mid-checkpoint-row ${isOpen ? 'is-open' : ''}`}>
-    <div className="mid-checkpoint-time">{checkpointLabels[id] ?? id}<small>IST</small></div>
-    <div className={`mid-checkpoint-dot-marker ${shifted ? 'is-shifted' : ''}`} />
-    <div className="mid-checkpoint-card">
-      <button type="button" className="mid-checkpoint-card-toggle" onClick={onToggle} aria-expanded={isOpen}>
-        <MidCheckpointPreview cp={cp} row={row} />
-        <span className="mid-checkpoint-chevron">{isOpen ? '−' : '+'}</span>
-      </button>
-      {isOpen && <div className="mid-checkpoint-detail">
-        <p className="mid-checkpoint-synclabel">{syncLabel(cp, checkpointLabels[id] ?? '')}</p>
-        <div className="verdict-instruments"><MidVerdictInstrument row={row} mid={mid} midSnapshot={cp} instrument="NIFTY" /><MidVerdictInstrument row={row} mid={mid} midSnapshot={cp} instrument="SENSEX" /></div>
-      </div>}
+// A checkpoint slot whose cron hasn't run yet today -- rendered as a dashed placeholder instead
+// of being omitted, so the full 5-slot shape of the day is always visible on the spine.
+function MidCheckpointPending({ label }: { label: string }) {
+  return <div className="mid-checkpoint-card mid-checkpoint-card-pending">
+    <div className="mid-checkpoint-card-top">
+      <span className="mid-checkpoint-card-label">Nifty &amp; Sensex</span>
+      <span className="mid-checkpoint-updated-tag mid-checkpoint-updated-tag-pending">Not yet run</span>
     </div>
+    <p className="mid-checkpoint-pending-body">Updates automatically at {label} IST</p>
   </div>
 }
 
 function MidMarketView({ row, midCheckpoints }: { row: Row; midCheckpoints: Row[] | null | undefined }) {
-  // Latest checkpoint of the day starts expanded by default; everything else starts collapsed
-  // to keep the page scannable as more checkpoints land through the day.
-  const latestId = midCheckpoints && midCheckpoints.length > 0 ? String(midCheckpoints[midCheckpoints.length - 1].checkpoint) : null
-  const [openId, setOpenId] = useState<string | null>(null)
-  const effectiveOpenId = openId ?? latestId
+  // Re-render every minute so a slot flips from "pending" to actually landed (or from
+  // not-yet-due to overdue-looking) without needing a manual refresh.
+  const [, forceTick] = useState(0)
+  useEffect(() => { const t = window.setInterval(() => forceTick((n) => n + 1), 60000); return () => window.clearInterval(t) }, [])
 
   if (midCheckpoints === undefined) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div><p className="history-empty">Loading mid-market data…</p></section>
-  if (!midCheckpoints || midCheckpoints.length === 0) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div><p className="history-empty">Mid-market data not available yet — first checkpoint updates at 10:30 AM IST.</p></section>
+
+  const byId = new Map(midCheckpoints.map((cp) => [String(cp.checkpoint), cp]))
+  const nowMin = nowMinuteOfDayIST()
 
   return <section className="phase-view special-view mid-checkpoint-view">
     <div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div>
     <div className="mid-checkpoint-spine">
-      {midCheckpoints.map((cp) => {
-        const id = String(cp.checkpoint)
-        return <MidCheckpointRow key={id} cp={cp} row={row} isOpen={effectiveOpenId === id} onToggle={() => setOpenId(effectiveOpenId === id ? '' : id)} />
+      {CHECKPOINT_SLOTS.map((slot) => {
+        const cp = byId.get(slot.id)
+        const shifted = cp ? checkpointShifted(cp) : false
+        const isDue = nowMin >= slot.minuteOfDay
+        return <div className="mid-checkpoint-row" key={slot.id}>
+          <div className="mid-checkpoint-time">{slot.label}<small>IST</small></div>
+          <div className={`mid-checkpoint-dot-marker ${shifted ? 'is-shifted' : ''} ${!cp ? 'is-pending' : ''}`} />
+          <div className="mid-checkpoint-card-col">
+            {cp ? <MidCheckpointCard cp={cp} row={row} label={slot.label} /> : <MidCheckpointPending label={slot.label} />}
+            {!cp && isDue && <p className="mid-checkpoint-overdue-note">Running a little late — this usually lands within a few minutes of {slot.label} IST.</p>}
+          </div>
+        </div>
       })}
     </div>
   </section>
