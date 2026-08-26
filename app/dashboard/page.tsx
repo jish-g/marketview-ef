@@ -740,6 +740,27 @@ function VerdictView({ row }: { row: Row }) {
   return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open · {syncLabel(row, '09:30')}</p><h2>Verdict</h2></div><span>Calculated strategy</span></div>{eventFlag && <div className="event-caution"><AlertTriangle size={16} /><span><strong>{eventFlag.name}</strong> — high impact event at {eventFlag.time}. Trade with caution.</span></div>}<div className="verdict-instruments"><VerdictInstrument row={row} instrument="NIFTY" /><VerdictInstrument row={row} instrument="SENSEX" /></div></section>
 }
 function OutcomeBadge({ label, target, sl }: { label: string; target?: boolean; sl?: boolean }) { const text = target === true ? 'Target hit' : sl === true ? 'SL hit' : target === false && sl === false ? 'Neither' : 'Not yet available'; const cls = target === true ? 'outcome-hit' : sl === true ? 'outcome-stop' : 'outcome-neutral'; return <div className={`outcome-badge ${cls}`}><span>{label}</span><strong>{text}</strong></div> }
+// Fixed daily checkpoint slots in order, with display label and 24h IST minute-of-day (used to
+// decide whether a not-yet-landed checkpoint is merely "later today" vs. actually overdue).
+const CHECKPOINT_SLOTS: { id: string; label: string; minuteOfDay: number }[] = [
+  { id: '1030', label: '10:30', minuteOfDay: 10 * 60 + 30 },
+  { id: '1130', label: '11:30', minuteOfDay: 11 * 60 + 30 },
+  { id: '1230', label: '12:30', minuteOfDay: 12 * 60 + 30 },
+  { id: '1330', label: '1:30', minuteOfDay: 13 * 60 + 30 },
+  { id: '1430', label: '2:30', minuteOfDay: 14 * 60 + 30 },
+]
+// Ordering used to pick "the latest landed checkpoint" for a given day (History recap, etc.) --
+// derived from CHECKPOINT_SLOTS so there's one source of truth for the daily schedule, plus the
+// legacy '1245' single-checkpoint label (pre-dates the 5-checkpoint schedule) sorted last since
+// it's always the only checkpoint on whatever day it appears.
+const CHECKPOINT_ORDER = [...CHECKPOINT_SLOTS.map((s) => s.id), '1245']
+
+function nowMinuteOfDayIST(): number {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date())
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0)
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? 0)
+  return hour * 60 + minute
+}
 // One checkpoint's compact read for a single instrument -- time, bias (with the live intraday
 // % change alongside it), suggested strategy (with the IV-vs-VIX read that drove the pick), and
 // a one-line shift note when the bias/strategy actually moved since the morning call. All values
