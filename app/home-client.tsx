@@ -137,7 +137,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
                   <span className="landing-snapshot-row-sub">{showPost ? (post?.day_low_nifty != null && post?.day_high_nifty != null ? `${post.day_low_nifty} – ${post.day_high_nifty}` : '') : (pre?.days_to_expiry_nifty != null ? `${pre.days_to_expiry_nifty}d to expiry` : '')}</span>
                 </div>
                 <div className="landing-snapshot-row-value">
-                  <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Prev close'}</span>
+                  <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Prev Close'}</span>
                   <strong>{showPost ? (fmtPct(post?.day_change_pct_nifty) && <em className={tone(post?.day_change_pct_nifty)}>{fmtPct(post?.day_change_pct_nifty)}</em>) : (prevCloseNifty != null && <em className={tone(pre?.prev_day_change_pct_nifty)}>{prevCloseNifty}</em>)}</strong>
                 </div>
               </div>
@@ -148,7 +148,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
                   <span className="landing-snapshot-row-sub">{showPost ? (post?.day_low_sensex != null && post?.day_high_sensex != null ? `${post.day_low_sensex} – ${post.day_high_sensex}` : '') : (pre?.days_to_expiry_sensex != null ? `${pre.days_to_expiry_sensex}d to expiry` : '')}</span>
                 </div>
                 <div className="landing-snapshot-row-value">
-                  <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Prev close'}</span>
+                  <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Prev Close'}</span>
                   <strong>{showPost ? (fmtPct(post?.day_change_pct_sensex) && <em className={tone(post?.day_change_pct_sensex)}>{fmtPct(post?.day_change_pct_sensex)}</em>) : (prevCloseSensex != null && <em className={tone(pre?.prev_day_change_pct_sensex)}>{prevCloseSensex}</em>)}</strong>
                 </div>
               </div>
