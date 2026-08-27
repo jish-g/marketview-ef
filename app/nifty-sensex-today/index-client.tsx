@@ -126,7 +126,7 @@ export default function NiftySensexTodayIndexClient({ initialPosts, initialMarke
               ) : (
                 <div className="archive-hero-tile archive-hero-tile-empty">
                   <span className="archive-hero-tag archive-hero-tag-pre">Pre-market</span>
-                  <p>Not published yet</p>
+                  <p>Publishes daily at 9:00 AM IST</p>
                 </div>
               )}
               {todayGroup.post ? (
@@ -138,7 +138,7 @@ export default function NiftySensexTodayIndexClient({ initialPosts, initialMarke
               ) : (
                 <div className="archive-hero-tile archive-hero-tile-empty">
                   <span className="archive-hero-tag archive-hero-tag-post">Post-market</span>
-                  <p>Not published yet</p>
+                  <p>Publishes daily at 8:00 PM IST</p>
                 </div>
               )}
             </div>
