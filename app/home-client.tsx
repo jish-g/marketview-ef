@@ -78,6 +78,22 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
     { fallbackData: tradeDate === initialTradeDate ? initialPost : undefined }
   )
 
+  // Pre-market note line: the "today's opening read" this used to show reads
+  // market_bias_nifty/sensex, which is only computed once the 9:30 AM open phase runs -- so
+  // showing it on the 8:58 AM pre-market card was either blank or stale. What's genuinely
+  // known at that hour is how the PRIOR day went, so this fetches the most recent
+  // postmarket_summary row strictly before today and shows a short recap of that instead --
+  // same "prefer the AI recap_story, fall back to a short rules sentence" pattern already used
+  // on the dashboard's own Pre-market banner (see app/dashboard/page.tsx priorDayLines).
+  const { data: priorDay } = useSWR(
+    ['home-priorday', tradeDate],
+    async () => {
+      const { data, error } = await supabase.from('postmarket_summary').select('trade_date, day_change_pct_nifty, day_change_pct_sensex, recap_story_nifty').lt('trade_date', tradeDate).order('trade_date', { ascending: false }).limit(1).maybeSingle()
+      if (error) throw error
+      return data as Row | null
+    }
+  )
+
   const showPost = preferPost && !!post
   // Pre-market can't know today's gap -- that needs today's actual open price, which doesn't
   // exist until the market opens at 9:15 AM. What IS genuinely known pre-market is how the
@@ -87,9 +103,17 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
   const prevCloseNifty = fmtPrevClose(pre?.prev_day_change_pct_nifty, pre?.prev_day_change_pts_nifty)
   const prevCloseSensex = fmtPrevClose(pre?.prev_day_change_pct_sensex, pre?.prev_day_change_pts_sensex)
 
+  // Short fallback sentence when the prior day has no AI-phrased recap_story yet (e.g. it
+  // predates that feature, or the AI call failed that day) -- built only from the prior day's
+  // own close-to-close % move, so it stays honest about what's actually known rather than
+  // guessing at bias language.
+  const priorDayFallback = priorDay?.day_change_pct_nifty != null
+    ? `Nifty closed ${Number(priorDay.day_change_pct_nifty) >= 0 ? '+' : ''}${priorDay.day_change_pct_nifty}%${priorDay.day_change_pct_sensex != null ? `, Sensex ${Number(priorDay.day_change_pct_sensex) >= 0 ? '+' : ''}${priorDay.day_change_pct_sensex}%` : ''} in the prior session.`
+    : null
+
   const readLine = showPost
     ? (post?.recap_story_nifty ?? null)
-    : (pre?.market_bias_nifty ? `Nifty ${String(pre.market_bias_nifty).toLowerCase()}, Sensex ${String(pre?.market_bias_sensex ?? pre.market_bias_nifty).toLowerCase()} — today's opening read.` : null)
+    : (priorDay?.recap_story_nifty ?? priorDayFallback)
 
   return (
     <main className="landing-shell">
