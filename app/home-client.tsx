@@ -61,7 +61,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
   const { data: pre } = useSWR(
     ['home-premarket', tradeDate],
     async () => {
-      const { data, error } = await supabase.from('premarket_dashboard').select('gap_points_nifty, gap_points_sensex, prev_close_nifty, prev_close_sensex, india_vix, days_to_expiry_nifty, days_to_expiry_sensex, market_bias_nifty, market_bias_sensex').eq('trade_date', tradeDate).maybeSingle()
+      const { data, error } = await supabase.from('premarket_dashboard').select('prev_day_change_pct_nifty, prev_day_change_pct_sensex, prev_day_change_pts_nifty, prev_day_change_pts_sensex, india_vix, days_to_expiry_nifty, days_to_expiry_sensex, market_bias_nifty, market_bias_sensex').eq('trade_date', tradeDate).maybeSingle()
       if (error) throw error
       return data as Row | null
     },
@@ -79,8 +79,13 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
   )
 
   const showPost = preferPost && !!post
-  const gapPctNifty = pre?.gap_points_nifty != null && pre?.prev_close_nifty ? +((Number(pre.gap_points_nifty) / Number(pre.prev_close_nifty)) * 100).toFixed(2) : null
-  const gapPctSensex = pre?.gap_points_sensex != null && pre?.prev_close_sensex ? +((Number(pre.gap_points_sensex) / Number(pre.prev_close_sensex)) * 100).toFixed(2) : null
+  // Pre-market can't know today's gap -- that needs today's actual open price, which doesn't
+  // exist until the market opens at 9:15 AM. What IS genuinely known pre-market is how the
+  // prior session closed, so the card shows "Prev close" (% and points) instead of a "Gap" that
+  // would otherwise always read null/misleading before the open phase has run.
+  const fmtPrevClose = (pct: any, pts: any) => pct != null ? `${fmtPct(pct)}${pts != null ? ` (${Number(pts) > 0 ? '+' : ''}${Number(pts).toFixed(1)} pts)` : ''}` : null
+  const prevCloseNifty = fmtPrevClose(pre?.prev_day_change_pct_nifty, pre?.prev_day_change_pts_nifty)
+  const prevCloseSensex = fmtPrevClose(pre?.prev_day_change_pct_sensex, pre?.prev_day_change_pts_sensex)
 
   const readLine = showPost
     ? (post?.recap_story_nifty ?? null)
@@ -132,8 +137,8 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
                   <span className="landing-snapshot-row-sub">{showPost ? (post?.day_low_nifty != null && post?.day_high_nifty != null ? `${post.day_low_nifty} – ${post.day_high_nifty}` : '') : (pre?.days_to_expiry_nifty != null ? `${pre.days_to_expiry_nifty}d to expiry` : '')}</span>
                 </div>
                 <div className="landing-snapshot-row-value">
-                  <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Gap'}</span>
-                  <strong>{showPost ? (fmtPct(post?.day_change_pct_nifty) && <em className={tone(post?.day_change_pct_nifty)}>{fmtPct(post?.day_change_pct_nifty)}</em>) : (gapPctNifty != null && <em className={tone(gapPctNifty)}>{fmtPct(gapPctNifty)}</em>)}</strong>
+                  <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Prev close'}</span>
+                  <strong>{showPost ? (fmtPct(post?.day_change_pct_nifty) && <em className={tone(post?.day_change_pct_nifty)}>{fmtPct(post?.day_change_pct_nifty)}</em>) : (prevCloseNifty != null && <em className={tone(pre?.prev_day_change_pct_nifty)}>{prevCloseNifty}</em>)}</strong>
                 </div>
               </div>
               <div className="landing-snapshot-divider" />
@@ -143,8 +148,8 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
                   <span className="landing-snapshot-row-sub">{showPost ? (post?.day_low_sensex != null && post?.day_high_sensex != null ? `${post.day_low_sensex} – ${post.day_high_sensex}` : '') : (pre?.days_to_expiry_sensex != null ? `${pre.days_to_expiry_sensex}d to expiry` : '')}</span>
                 </div>
                 <div className="landing-snapshot-row-value">
-                  <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Gap'}</span>
-                  <strong>{showPost ? (fmtPct(post?.day_change_pct_sensex) && <em className={tone(post?.day_change_pct_sensex)}>{fmtPct(post?.day_change_pct_sensex)}</em>) : (gapPctSensex != null && <em className={tone(gapPctSensex)}>{fmtPct(gapPctSensex)}</em>)}</strong>
+                  <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Prev close'}</span>
+                  <strong>{showPost ? (fmtPct(post?.day_change_pct_sensex) && <em className={tone(post?.day_change_pct_sensex)}>{fmtPct(post?.day_change_pct_sensex)}</em>) : (prevCloseSensex != null && <em className={tone(pre?.prev_day_change_pct_sensex)}>{prevCloseSensex}</em>)}</strong>
                 </div>
               </div>
             </div>
@@ -160,7 +165,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
               </div>
             )}
             <div className="landing-snapshot-link">
-              <Link href="/nifty-sensex-today">Read the full {showPost ? 'post-market' : 'pre-market'} call <ArrowRight size={13} /></Link>
+              <Link href="/nifty-sensex-today">Read the full {showPost ? 'post-market' : 'pre-market'} <ArrowRight size={13} /></Link>
             </div>
           </div>
         </div>

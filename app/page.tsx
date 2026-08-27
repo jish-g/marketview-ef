@@ -55,7 +55,7 @@ async function getSnapshotData() {
   const [preRes, postRes] = await Promise.all([
     supabase
       .from('premarket_dashboard')
-      .select('gap_points_nifty, gap_points_sensex, prev_close_nifty, prev_close_sensex, india_vix, days_to_expiry_nifty, days_to_expiry_sensex, market_bias_nifty, market_bias_sensex')
+      .select('prev_day_change_pct_nifty, prev_day_change_pct_sensex, prev_day_change_pts_nifty, prev_day_change_pts_sensex, india_vix, days_to_expiry_nifty, days_to_expiry_sensex, market_bias_nifty, market_bias_sensex')
       .eq('trade_date', tradeDate)
       .maybeSingle(),
     supabase
