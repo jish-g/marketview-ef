@@ -10,6 +10,9 @@ type Post = { id: string; trade_date: string; instrument: 'NIFTY' | 'SENSEX' | '
 type Row = Record<string, any>
 type DayGroup = { tradeDate: string; pre: Post | null; post: Post | null }
 
+function todayIST() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+}
 function formatDateLabel(dateStr: string) {
   return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${dateStr}T00:00:00`))
 }
@@ -53,8 +56,9 @@ export default function NiftySensexTodayIndexPage() {
   }
   dayGroups.sort((a, b) => (a.tradeDate < b.tradeDate ? 1 : -1))
 
-  const todayGroup = dayGroups[0] ?? null
-  const olderGroups = dayGroups.slice(1)
+  const currentTradeDate = todayIST()
+  const todayGroup = dayGroups.find((g) => g.tradeDate === currentTradeDate) ?? { tradeDate: currentTradeDate, pre: null, post: null }
+  const olderGroups = dayGroups.filter((g) => g.tradeDate !== currentTradeDate)
   const dates = dayGroups.map((g) => g.tradeDate)
 
   const { data: marketRows } = useSWR(dates.length ? ['blog-index-market', dates.join(',')] : null, async () => {
