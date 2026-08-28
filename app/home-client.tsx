@@ -95,6 +95,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
   )
 
   const showPost = preferPost && !!post
+  const pending = showPost ? !post : !pre
   // Pre-market can't know today's gap -- that needs today's actual open price, which doesn't
   // exist until the market opens at 9:15 AM. What IS genuinely known pre-market is how the
   // prior session closed, so the card shows "Prev close" (% and points) instead of a "Gap" that
@@ -154,43 +155,51 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
               <span className="landing-snapshot-meta">{showPost ? 'Post-market' : 'Pre-market'} snapshot · {nowLabelIST()}</span>
               <span className={`landing-snapshot-badge ${showPost ? 'landing-snapshot-badge-post' : 'landing-snapshot-badge-pre'}`}>{showPost ? 'Post-market' : 'Pre-market'}</span>
             </div>
-            <div className="landing-snapshot-rows">
-              <div className="landing-snapshot-row">
-                <div>
-                  <span className="landing-snapshot-row-label">Nifty 50</span>
-                  <span className="landing-snapshot-row-sub">{showPost ? (post?.day_low_nifty != null && post?.day_high_nifty != null ? `${post.day_low_nifty} – ${post.day_high_nifty}` : '') : (pre?.days_to_expiry_nifty != null ? `${pre.days_to_expiry_nifty}d to expiry` : '')}</span>
-                </div>
-                <div className="landing-snapshot-row-value">
-                  <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Prev Close'}</span>
-                  <strong>{showPost ? (fmtPct(post?.day_change_pct_nifty) && <em className={tone(post?.day_change_pct_nifty)}>{fmtPct(post?.day_change_pct_nifty)}</em>) : (prevCloseNifty != null && <em className={tone(pre?.prev_day_change_pct_nifty)}>{prevCloseNifty}</em>)}</strong>
-                </div>
+            {pending ? (
+              <div className="landing-snapshot-pending">
+                <p>{showPost ? 'Post-market wrap lands here shortly after the close.' : 'Pre-market snapshot lands here at 8:59 AM IST.'}</p>
               </div>
-              <div className="landing-snapshot-divider" />
-              <div className="landing-snapshot-row">
-                <div>
-                  <span className="landing-snapshot-row-label">Sensex</span>
-                  <span className="landing-snapshot-row-sub">{showPost ? (post?.day_low_sensex != null && post?.day_high_sensex != null ? `${post.day_low_sensex} – ${post.day_high_sensex}` : '') : (pre?.days_to_expiry_sensex != null ? `${pre.days_to_expiry_sensex}d to expiry` : '')}</span>
+            ) : (
+              <>
+                <div className="landing-snapshot-rows">
+                  <div className="landing-snapshot-row">
+                    <div>
+                      <span className="landing-snapshot-row-label">Nifty 50</span>
+                      <span className="landing-snapshot-row-sub">{showPost ? (post?.day_low_nifty != null && post?.day_high_nifty != null ? `${post.day_low_nifty} – ${post.day_high_nifty}` : '') : (pre?.days_to_expiry_nifty != null ? `${pre.days_to_expiry_nifty}d to expiry` : '')}</span>
+                    </div>
+                    <div className="landing-snapshot-row-value">
+                      <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Prev Close'}</span>
+                      <strong>{showPost ? (fmtPct(post?.day_change_pct_nifty) && <em className={tone(post?.day_change_pct_nifty)}>{fmtPct(post?.day_change_pct_nifty)}</em>) : (prevCloseNifty != null && <em className={tone(pre?.prev_day_change_pct_nifty)}>{prevCloseNifty}</em>)}</strong>
+                    </div>
+                  </div>
+                  <div className="landing-snapshot-divider" />
+                  <div className="landing-snapshot-row">
+                    <div>
+                      <span className="landing-snapshot-row-label">Sensex</span>
+                      <span className="landing-snapshot-row-sub">{showPost ? (post?.day_low_sensex != null && post?.day_high_sensex != null ? `${post.day_low_sensex} – ${post.day_high_sensex}` : '') : (pre?.days_to_expiry_sensex != null ? `${pre.days_to_expiry_sensex}d to expiry` : '')}</span>
+                    </div>
+                    <div className="landing-snapshot-row-value">
+                      <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Prev Close'}</span>
+                      <strong>{showPost ? (fmtPct(post?.day_change_pct_sensex) && <em className={tone(post?.day_change_pct_sensex)}>{fmtPct(post?.day_change_pct_sensex)}</em>) : (prevCloseSensex != null && <em className={tone(pre?.prev_day_change_pct_sensex)}>{prevCloseSensex}</em>)}</strong>
+                    </div>
+                  </div>
                 </div>
-                <div className="landing-snapshot-row-value">
-                  <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Prev Close'}</span>
-                  <strong>{showPost ? (fmtPct(post?.day_change_pct_sensex) && <em className={tone(post?.day_change_pct_sensex)}>{fmtPct(post?.day_change_pct_sensex)}</em>) : (prevCloseSensex != null && <em className={tone(pre?.prev_day_change_pct_sensex)}>{prevCloseSensex}</em>)}</strong>
+                {!showPost && pre?.india_vix != null && (
+                  <div className="landing-snapshot-vix">
+                    <span>India VIX</span>
+                    <strong>{pre.india_vix}</strong>
+                  </div>
+                )}
+                {readLine && (
+                  <div className="landing-snapshot-note">
+                    <p>{readLine}</p>
+                  </div>
+                )}
+                <div className="landing-snapshot-link">
+                  <Link href="/nifty-sensex-today">Read the full {showPost ? 'post-market' : 'pre-market'} <ArrowRight size={13} /></Link>
                 </div>
-              </div>
-            </div>
-            {!showPost && pre?.india_vix != null && (
-              <div className="landing-snapshot-vix">
-                <span>India VIX</span>
-                <strong>{pre.india_vix}</strong>
-              </div>
+              </>
             )}
-            {readLine && (
-              <div className="landing-snapshot-note">
-                <p>{readLine}</p>
-              </div>
-            )}
-            <div className="landing-snapshot-link">
-              <Link href="/nifty-sensex-today">Read the full {showPost ? 'post-market' : 'pre-market'} <ArrowRight size={13} /></Link>
-            </div>
           </div>
         </div>
       </section>
