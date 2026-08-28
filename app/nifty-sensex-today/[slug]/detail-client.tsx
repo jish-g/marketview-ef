@@ -37,10 +37,6 @@ function ptsSuffix(v: any) {
   const n = Number(v)
   return `${n > 0 ? '+' : ''}${v} pts`
 }
-function fmtTimeIST(v: any) {
-  if (!v) return null
-  return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(v))
-}
 
 export default function NiftySensexTodayPostClient({ initialPost, initialMarketRow }: DetailClientProps) {
   const params = useParams<{ slug: string }>()
@@ -70,15 +66,6 @@ export default function NiftySensexTodayPostClient({ initialPost, initialMarketR
   )
 
   const isPre = data?.phase === 'premarket'
-
-  const { data: giftRow } = useSWR(
-    isPre && data?.trade_date ? ['blog-post-gift-nifty', data.trade_date] : null,
-    async () => {
-      const { data: row, error } = await supabase.from('gift_nifty_staging').select('last_price, fetched_at').eq('trade_date', data!.trade_date).maybeSingle()
-      if (error) throw error
-      return row as Row | null
-    }
-  )
 
   return (
     <main className="blog-post-shell">
@@ -121,11 +108,6 @@ export default function NiftySensexTodayPostClient({ initialPost, initialMarketR
                       </div>
                       <div className="blog-scorecard-tile">
                         <span>GIFT Nifty Gap (Nifty expected to open)</span>
-                        {giftRow?.last_price != null && marketRow.prev_close_nifty != null && (
-                          <small className="blog-scorecard-tile-detail">
-                            {giftRow.last_price} ({fmtTimeIST(giftRow.fetched_at)}) vs {marketRow.prev_close_nifty} (Prev Close)
-                          </small>
-                        )}
                         <strong className={tone(marketRow.gift_nifty_gap_pct)}>
                           {fmtPct(marketRow.gift_nifty_gap_pct)}
                           {ptsSuffix(marketRow.gift_nifty_gap_pts) && <em className="blog-scorecard-sub"> ({ptsSuffix(marketRow.gift_nifty_gap_pts)})</em>}
