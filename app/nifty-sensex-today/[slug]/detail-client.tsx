@@ -107,7 +107,7 @@ export default function NiftySensexTodayPostClient({ initialPost, initialMarketR
                         <strong>{fmtNum(marketRow.india_vix)}</strong>
                       </div>
                       <div className="blog-scorecard-tile">
-                        <span>GIFT Nifty Gap</span>
+                        <span>GIFT Nifty Gap (Nifty expected to open)</span>
                         <strong className={tone(marketRow.gift_nifty_gap_pct)}>
                           {fmtPct(marketRow.gift_nifty_gap_pct)}
                           {ptsSuffix(marketRow.gift_nifty_gap_pts) && <em className="blog-scorecard-sub"> ({ptsSuffix(marketRow.gift_nifty_gap_pts)})</em>}
