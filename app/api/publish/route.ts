@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { postTweet } from '@/lib/twitter'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +54,30 @@ function buildMessage(post: Post, marketRow: Row | null): string {
   return lines.join('\n')
 }
 
+function buildTweet(post: Post, marketRow: Row | null): string {
+  const url = `${SITE_URL}/nifty-sensex-today/${post.slug}`
+  const title = post.title.replace(/\s*\|\s*MarketCue\s*$/, '')
+  const lines: string[] = [title]
+
+  if (post.phase === 'premarket') {
+    const giftGap = fmtPct(marketRow?.gift_nifty_gap_pct)
+    const giftPts = fmtPts(marketRow?.gift_nifty_gap_pts)
+    lines.push(`GIFT Nifty gap: ${giftGap}${giftPts ? ` (${giftPts})` : ''}`)
+    if (marketRow?.market_bias_nifty) lines.push(`Bias: ${marketRow.market_bias_nifty}`)
+  } else {
+    lines.push(`NIFTY ${fmtPct(marketRow?.day_change_pct_nifty)} · SENSEX ${fmtPct(marketRow?.day_change_pct_sensex)}`)
+  }
+
+  let text = `${lines.join('\n')}\n\n${url}`
+  const overflow = text.length - 280
+  if (overflow > 0) {
+    const trimmedTitle = title.slice(0, Math.max(title.length - overflow - 1, 10)).trimEnd() + '…'
+    lines[0] = trimmedTitle
+    text = `${lines.join('\n')}\n\n${url}`
+  }
+  return text
+}
+
 async function getPost(phase: Phase, tradeDate: string): Promise<Post | null> {
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
   const { data } = await supabase
@@ -104,9 +129,18 @@ export async function GET(request: NextRequest) {
   }
 
   const marketRow = await getMarketRow(phase, tradeDate)
-  const text = buildMessage(post, marketRow)
 
-  await sendToTelegram(text)
+  const [telegramResult, twitterResult] = await Promise.allSettled([
+    sendToTelegram(buildMessage(post, marketRow)),
+    postTweet(buildTweet(post, marketRow)),
+  ])
 
-  return NextResponse.json({ ok: true, tradeDate, phase, slug: post.slug })
+  return NextResponse.json({
+    ok: telegramResult.status === 'fulfilled' && twitterResult.status === 'fulfilled',
+    tradeDate,
+    phase,
+    slug: post.slug,
+    telegram: telegramResult.status === 'fulfilled' ? { ok: true } : { ok: false, error: String(telegramResult.reason) },
+    twitter: twitterResult.status === 'fulfilled' ? { ok: true } : { ok: false, error: String(twitterResult.reason) },
+  })
 }
