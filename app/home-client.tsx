@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
-import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Moon, Newspaper, Sun } from 'lucide-react'
+import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Moon, Newspaper, Send, Sun } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
 import { createClient } from '@/lib/supabase/client'
 
@@ -126,6 +126,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
         <div className="topbar-meta">
           <Link href="/dashboard" className="topbar-link">Dashboard</Link>
           <Link href="/nifty-sensex-today" className="topbar-link">Nifty and Sensex today</Link>
+          <a href="https://t.me/marketcue_in" target="_blank" rel="noopener noreferrer" className="sign-in-link"><Send size={13} /> Join Telegram</a>
           {!loading && (session ? (
             <button type="button" className="sign-in-link" onClick={() => signOut()}><LogOut size={13} /> Sign out</button>
           ) : (
@@ -145,6 +146,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           <div className="landing-hero-ctas">
             <Link href="/dashboard" className="landing-cta-primary">Enter dashboard <ArrowRight size={15} /></Link>
             <Link href="/nifty-sensex-today" className="landing-cta-secondary"><Newspaper size={15} /> Nifty and Sensex today</Link>
+            <a href="https://t.me/marketcue_in" target="_blank" rel="noopener noreferrer" className="landing-cta-secondary"><Send size={15} /> Join Telegram</a>
           </div>
         </div>
 
@@ -274,6 +276,10 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
             <span>About</span>
             <Link href="/nifty-sensex-today">How it works</Link>
             <Link href="/nifty-sensex-today">Disclaimer</Link>
+          </div>
+          <div className="landing-footer-col">
+            <span>Community</span>
+            <a href="https://t.me/marketcue_in" target="_blank" rel="noopener noreferrer">Telegram channel</a>
           </div>
         </div>
         <div className="landing-footer-bottom">
