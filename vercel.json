@@ -1,6 +1,6 @@
 {
   "crons": [
     { "path": "/api/telegram/publish?phase=premarket", "schedule": "40 3 * * 1-5" },
-    { "path": "/api/telegram/publish?phase=postmarket", "schedule": "54 9 * * 1-5" }
+    { "path": "/api/telegram/publish?phase=postmarket", "schedule": "20 10 * * 1-5" }
   ]
 }
