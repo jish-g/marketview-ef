@@ -1,9 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
-import { CheckCircle2, RotateCcw, Eye, EyeOff } from 'lucide-react'
+import { CheckCircle2, ImagePlus, RotateCcw, Eye, EyeOff, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+
+const SCREENSHOT_BUCKET = 'journal-screenshots'
 
 // Log entries are collapsed to a short preview by default so a journal spanning many days
 // stays scannable -- a "View" button next to Edit expands the full text for that one row.
@@ -31,7 +33,7 @@ type Trade = Row & {
   entry_premium: number | null
   qty: number | null
 }
-type JournalEntry = { id: string; trade_date: string; entry_text: string; created_at: string; updated_at: string | null }
+type JournalEntry = { id: string; trade_date: string; entry_text: string; screenshot_urls: string[] | null; created_at: string; updated_at: string | null }
 
 function todayIST() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -100,6 +102,10 @@ export function JournalView() {
   const [noteDirty, setNoteDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [screenshotUrls, setScreenshotUrls] = useState<string[]>([])
+  const [uploadingCount, setUploadingCount] = useState(0)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   // Which past log entries are currently expanded to full text -- everything starts
   // collapsed to a short preview so a long-running journal doesn't turn into one huge
   // scroll. Keyed by trade_date; toggled independently per row via the View button.
@@ -134,7 +140,10 @@ export function JournalView() {
   // existing note (to continue/replace it) or a past day's note when "Edit" was clicked.
   // Only runs when not mid-edit (noteDirty false) so it doesn't clobber unsaved typing.
   useMemo(() => {
-    if (!noteDirty) setNoteText(existingEntryForEditingDate?.entry_text ?? '')
+    if (!noteDirty) {
+      setNoteText(existingEntryForEditingDate?.entry_text ?? '')
+      setScreenshotUrls(existingEntryForEditingDate?.screenshot_urls ?? [])
+    }
   }, [existingEntryForEditingDate, editingDate, noteDirty])
 
   // Group past entries' trade context by date so the log shows each entry alongside that
@@ -159,12 +168,37 @@ export function JournalView() {
     // saving again for the same date replaces it in place instead of adding a new row.
     const { error: upsertError } = await supabase
       .from('journal_entries')
-      .upsert({ trade_date: editingDate, entry_text: noteText.trim(), updated_at: new Date().toISOString() }, { onConflict: 'trade_date' })
+      .upsert({ trade_date: editingDate, entry_text: noteText.trim(), screenshot_urls: screenshotUrls, updated_at: new Date().toISOString() }, { onConflict: 'trade_date' })
     setSaving(false)
     if (upsertError) { setSaveError(upsertError.message); return }
     setNoteDirty(false)
     if (editingDate !== tradeDate) setEditingDate(tradeDate)
     void mutate()
+  }
+
+  // Uploads go straight to Storage on selection (not deferred to Save) so the thumbnail
+  // shows up immediately -- the resulting public URLs just sit in local state until the note
+  // itself is saved, same as noteText.
+  const handleFilesSelected = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setUploadError(null)
+    setUploadingCount(files.length)
+    const uploaded: string[] = []
+    for (const file of Array.from(files)) {
+      const path = `${editingDate}/${crypto.randomUUID()}-${file.name}`
+      const { error: uploadErr } = await supabase.storage.from(SCREENSHOT_BUCKET).upload(path, file)
+      if (uploadErr) { setUploadError(uploadErr.message); continue }
+      const { data } = supabase.storage.from(SCREENSHOT_BUCKET).getPublicUrl(path)
+      uploaded.push(data.publicUrl)
+    }
+    setScreenshotUrls((prev) => [...prev, ...uploaded])
+    setUploadingCount(0)
+    setNoteDirty(true)
+  }
+
+  const removeScreenshot = (url: string) => {
+    setScreenshotUrls((prev) => prev.filter((u) => u !== url))
+    setNoteDirty(true)
   }
 
   const startEdit = (date: string) => {
@@ -198,39 +232,74 @@ export function JournalView() {
         placeholder="e.g. Took the system's Iron Condor on NIFTY, held through midday chop, conservative target hit around 1pm. Should have trusted the lock instead of watching it fall back near close."
         aria-label="Journal entry text"
       />
+      {(screenshotUrls.length > 0 || uploadingCount > 0) && (
+        <div className="journal-screenshot-row">
+          {screenshotUrls.map((url) => (
+            <div className="journal-screenshot-thumb" key={url}>
+              <a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt="Journal screenshot" /></a>
+              <button type="button" className="journal-screenshot-remove" onClick={() => removeScreenshot(url)} aria-label="Remove screenshot"><X size={11} /></button>
+            </div>
+          ))}
+          {Array.from({ length: uploadingCount }).map((_, i) => (
+            <div className="journal-screenshot-thumb journal-screenshot-thumb-loading" key={`uploading-${i}`}>Uploading...</div>
+          ))}
+        </div>
+      )}
+      {uploadError && <p className="history-empty">Could not upload: {uploadError}</p>}
       {saveError && <p className="history-empty">Could not save: {saveError}</p>}
       <div className="trade-confirmation">
         <button type="button" className="action-button action-button-success" onClick={submitEntry} disabled={saving || !noteText.trim()}>
           <CheckCircle2 size={14} /> {saving ? 'Saving...' : existingEntryForEditingDate ? 'Save changes' : 'Save entry'}
         </button>
+        <button type="button" className="action-button" onClick={() => fileInputRef.current?.click()} disabled={uploadingCount > 0}>
+          <ImagePlus size={14} /> Add screenshot
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => { void handleFilesSelected(e.target.files); e.target.value = '' }}
+        />
         {editingDate !== tradeDate && <button type="button" className="action-button" onClick={cancelEdit} disabled={saving}>Cancel</button>}
       </div>
     </div>
 
     <section className="trade-log journal-log">
       <div className="review-section-head"><div><p className="eyebrow">All saved notes</p><h2>Journal log</h2></div></div>
-      {entries.length === 0 ? <p className="history-empty">No journal entries yet — write your first note above.</p> : <div className="history-list">
+      {entries.length === 0 ? <p className="history-empty">No journal entries yet — write your first note above.</p> : <div className="history-list journal-log-list">
         {entries.map((entry) => {
           const isExpanded = expandedDates.has(entry.trade_date)
           const isLong = entry.entry_text.length > PREVIEW_CHARS
-          return <article className={`journal-log-entry ${entry.trade_date === editingDate ? 'journal-log-entry-active' : ''}`} key={entry.id}>
-            <div className="journal-log-head">
+          const dayTrades = tradesByDate[entry.trade_date] ?? []
+          const shots = entry.screenshot_urls ?? []
+          return <article className={`journal-log-entry ${entry.trade_date === editingDate ? 'journal-log-entry-active' : ''} ${isExpanded ? 'journal-log-entry-expanded' : ''}`} key={entry.id}>
+            <div className="journal-log-row">
               <span className="journal-log-date">{formatDateLabel(entry.trade_date)}{entry.updated_at && entry.updated_at !== entry.created_at && <em className="journal-log-edited"> · edited</em>}</span>
+              <span className="journal-trade-cards journal-trade-cards-compact">
+                {dayTrades.length === 0
+                  ? <span className="journal-trade-chip journal-chip-neutral">No trade</span>
+                  : dayTrades.map((trade) => <TradeChip key={String(trade.id)} trade={trade} />)}
+              </span>
+              <p className="journal-log-text">{isExpanded || !isLong ? entry.entry_text : previewText(entry.entry_text)}</p>
               <span className="journal-log-actions">
+                {shots.length > 0 && <span className="journal-log-shot-count"><ImagePlus size={11} /> {shots.length}</span>}
                 {isLong && (
                   <button type="button" className="action-button journal-view-button" onClick={() => toggleExpanded(entry.trade_date)}>
-                    {isExpanded ? <><EyeOff size={12} /> Hide</> : <><Eye size={12} /> View</>}
+                    {isExpanded ? <EyeOff size={12} /> : <Eye size={12} />}
                   </button>
                 )}
-                <button type="button" className="action-button journal-edit-button" onClick={() => startEdit(entry.trade_date)}><RotateCcw size={12} /> Edit</button>
+                <button type="button" className="action-button journal-edit-button" onClick={() => startEdit(entry.trade_date)}><RotateCcw size={12} /></button>
               </span>
             </div>
-            <div className="journal-trade-cards journal-trade-cards-compact">
-              {(tradesByDate[entry.trade_date] ?? []).length === 0
-                ? <span className="journal-trade-chip journal-chip-neutral">No trade</span>
-                : (tradesByDate[entry.trade_date] ?? []).map((trade) => <TradeChip key={String(trade.id)} trade={trade} />)}
-            </div>
-            <p className="journal-log-text">{isExpanded || !isLong ? entry.entry_text : previewText(entry.entry_text)}</p>
+            {isExpanded && shots.length > 0 && (
+              <div className="journal-screenshot-row">
+                {shots.map((url) => (
+                  <a className="journal-screenshot-thumb" href={url} target="_blank" rel="noopener noreferrer" key={url}><img src={url} alt="Journal screenshot" /></a>
+                ))}
+              </div>
+            )}
           </article>
         })}
       </div>}
