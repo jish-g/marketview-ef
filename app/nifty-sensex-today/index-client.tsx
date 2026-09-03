@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
-import { BarChart3, Moon, Sun, ArrowRight } from 'lucide-react'
+import { BarChart3, Moon, Send, Sun, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Post = { id: string; trade_date: string; instrument: 'NIFTY' | 'SENSEX' | 'BOTH'; phase: 'premarket' | 'postmarket'; slug: string; title: string; badges: string[]; published_at: string }
@@ -98,9 +98,12 @@ export default function NiftySensexTodayIndexClient({ initialPosts, initialMarke
           <div className="brand-symbol"><BarChart3 size={16} /></div>
           <div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div>
         </Link>
-        <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">
-          {dark ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
+        <div className="topbar-meta">
+          <a href="https://t.me/marketcue_in" target="_blank" rel="noopener noreferrer" className="sign-in-link"><Send size={13} /> Join Telegram</a>
+          <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">
+            {dark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+        </div>
       </header>
 
       <div className="blog-index-main">
