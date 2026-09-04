@@ -71,7 +71,7 @@ export default async function Image() {
             maxWidth: 820,
           }}
         >
-          A daily read on Nifty and Sensex, built from a rules engine you can audit.
+          The day&apos;s option data, read into bias and readiness — so the call is yours, with context behind it.
         </div>
       </div>
     ),

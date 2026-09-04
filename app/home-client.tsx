@@ -140,9 +140,9 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
 
       <section className="landing-hero">
         <div className="landing-hero-copy">
-          <p className="eyebrow">Market intelligence platform</p>
+          <p className="eyebrow">Market intelligence for Nifty and Sensex option traders</p>
           <h1 className="landing-headline">Everyone gives you data. <span className="landing-headline-accent">We read it.</span></h1>
-          <p className="landing-lede">A daily read on Nifty and Sensex, built from a rules engine you can audit — not a black box.</p>
+          <p className="landing-lede">The day&apos;s option data, read into bias and readiness — so the call is yours, with context behind it.</p>
           <div className="landing-hero-ctas">
             <Link href="/dashboard" className="landing-cta-primary">Enter dashboard <ArrowRight size={15} /></Link>
             <Link href="/nifty-sensex-today" className="landing-cta-secondary"><Newspaper size={15} /> Nifty and Sensex today</Link>
