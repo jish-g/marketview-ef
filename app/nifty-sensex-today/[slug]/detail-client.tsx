@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import useSWR from 'swr'
@@ -44,6 +44,69 @@ function ptsSuffix(v: any) {
   if (v === null || v === undefined || v === '') return null
   const n = Number(v)
   return `${n > 0 ? '+' : ''}${v} pts`
+}
+
+// "Read" column text below reuses the exact band definitions published on
+// /rules (VIX Score, Gap %, DTE Score) so the table's interpretation can
+// never drift from the documented methodology it's describing.
+function vixRead(v: any): string {
+  if (v == null || v === '') return '—'
+  const n = Number(v)
+  if (n < 11) return 'Thin, theta-heavy premium'
+  if (n <= 14) return 'Ideal, low-risk premium'
+  if (n <= 18) return 'Elevated premium'
+  if (n <= 22) return 'High — IV crush risk'
+  return 'Blocks fresh option buying'
+}
+function gapRead(pct: any): string {
+  if (pct == null || pct === '') return '—'
+  const n = Number(pct)
+  if (n > 0.75) return 'Strong Gap Up'
+  if (n >= 0.25) return 'Normal Gap Up'
+  if (n >= -0.25) return 'Flat'
+  if (n >= -0.75) return 'Normal Gap Down'
+  return 'Strong Gap Down'
+}
+function dteRead(d: any): string {
+  if (d == null || d === '') return '—'
+  const n = Number(d)
+  if (n <= 1) return 'High gamma risk'
+  if (n <= 4) return 'Ideal window'
+  return 'Lower gamma risk'
+}
+function closeRead(pct: any): string {
+  if (pct == null || pct === '') return '—'
+  const n = Number(pct)
+  if (n > 0) return 'Bullish close'
+  if (n < 0) return 'Bearish close'
+  return 'Flat close'
+}
+
+type MetricRow = { metric: string; value: ReactNode; read: string }
+
+function buildMetricRows(isPre: boolean, marketRow: Row): MetricRow[] {
+  if (isPre) {
+    return [
+      { metric: 'India VIX', value: fmtNum(marketRow.india_vix), read: vixRead(marketRow.india_vix) },
+      {
+        metric: 'GIFT Nifty Gap (Nifty expected to open)',
+        value: <span className={tone(marketRow.gift_nifty_gap_pct)}>{fmtPct(marketRow.gift_nifty_gap_pct)}{ptsSuffix(marketRow.gift_nifty_gap_pts) ? ` (${ptsSuffix(marketRow.gift_nifty_gap_pts)})` : ''}</span>,
+        read: gapRead(marketRow.gift_nifty_gap_pct),
+      },
+      { metric: 'Nifty Expiry', value: fmtNum(marketRow.days_to_expiry_nifty, marketRow.days_to_expiry_nifty === 1 ? ' day' : ' days'), read: dteRead(marketRow.days_to_expiry_nifty) },
+      { metric: 'Sensex Expiry', value: fmtNum(marketRow.days_to_expiry_sensex, marketRow.days_to_expiry_sensex === 1 ? ' day' : ' days'), read: dteRead(marketRow.days_to_expiry_sensex) },
+      { metric: 'Nifty 5D Avg Move', value: `${fmtNum(marketRow.avg_move_5d_nifty)} pts`, read: `Support ${fmtNum(marketRow.oi_support_nifty)} · Resistance ${fmtNum(marketRow.oi_resistance_nifty)}` },
+      { metric: 'Sensex 5D Avg Move', value: `${fmtNum(marketRow.avg_move_5d_sensex)} pts`, read: `Support ${fmtNum(marketRow.oi_support_sensex)} · Resistance ${fmtNum(marketRow.oi_resistance_sensex)}` },
+    ]
+  }
+  return [
+    { metric: 'Nifty Closed', value: <span className={tone(marketRow.day_change_pct_nifty)}>{fmtPct(marketRow.day_change_pct_nifty)}</span>, read: closeRead(marketRow.day_change_pct_nifty) },
+    { metric: 'Sensex Closed', value: <span className={tone(marketRow.day_change_pct_sensex)}>{fmtPct(marketRow.day_change_pct_sensex)}</span>, read: closeRead(marketRow.day_change_pct_sensex) },
+    { metric: 'Nifty Range', value: `${fmtNum(marketRow.day_low_nifty)} – ${fmtNum(marketRow.day_high_nifty)}`, read: 'Full session range' },
+    { metric: 'Sensex Range', value: `${fmtNum(marketRow.day_low_sensex)} – ${fmtNum(marketRow.day_high_sensex)}`, read: 'Full session range' },
+    { metric: 'Nifty Close Price', value: fmtNum(marketRow.close_nifty), read: marketRow.target_hit_nifty ? 'Target hit' : marketRow.sl_hit_nifty ? 'Stop hit' : 'Neither target nor stop hit' },
+    { metric: 'Sensex Close Price', value: fmtNum(marketRow.close_sensex), read: marketRow.target_hit_sensex ? 'Target hit' : marketRow.sl_hit_sensex ? 'Stop hit' : 'Neither target nor stop hit' },
+  ]
 }
 
 export default function NiftySensexTodayPostClient({ initialPost, initialMarketRow, publishedAtIST }: DetailClientProps) {
@@ -115,82 +178,20 @@ export default function NiftySensexTodayPostClient({ initialPost, initialMarketR
             {marketRow && (
               <section className="blog-scorecard">
                 <p className="blog-scorecard-eyebrow">{isPre ? 'Pre-market readout' : 'Post-market readout'}</p>
-                <div className="blog-scorecard-grid">
-                  {isPre ? (
-                    <>
-                      <div className="blog-scorecard-tile">
-                        <span>India VIX</span>
-                        <strong>{fmtNum(marketRow.india_vix)}</strong>
-                      </div>
-                      <div className="blog-scorecard-tile">
-                        <span>GIFT Nifty Gap (Nifty expected to open)</span>
-                        <strong className={tone(marketRow.gift_nifty_gap_pct)}>
-                          {fmtPct(marketRow.gift_nifty_gap_pct)}
-                          {ptsSuffix(marketRow.gift_nifty_gap_pts) && <em className="blog-scorecard-sub"> ({ptsSuffix(marketRow.gift_nifty_gap_pts)})</em>}
-                          {marketRow.gift_nifty_gap_pct != null && <em className="blog-scorecard-sub"> expected open</em>}
-                        </strong>
-                      </div>
-                      <div className="blog-scorecard-tile">
-                        <span>Nifty Expiry</span>
-                        <strong>{fmtNum(marketRow.days_to_expiry_nifty, marketRow.days_to_expiry_nifty === 1 ? ' day' : ' days')}</strong>
-                      </div>
-                      <div className="blog-scorecard-tile">
-                        <span>Sensex Expiry</span>
-                        <strong>{fmtNum(marketRow.days_to_expiry_sensex, marketRow.days_to_expiry_sensex === 1 ? ' day' : ' days')}</strong>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="blog-scorecard-tile">
-                        <span>Nifty Closed</span>
-                        <strong className={tone(marketRow.day_change_pct_nifty)}>{fmtPct(marketRow.day_change_pct_nifty)}</strong>
-                      </div>
-                      <div className="blog-scorecard-tile">
-                        <span>Sensex Closed</span>
-                        <strong className={tone(marketRow.day_change_pct_sensex)}>{fmtPct(marketRow.day_change_pct_sensex)}</strong>
-                      </div>
-                      <div className="blog-scorecard-tile">
-                        <span>Nifty Range</span>
-                        <strong>{fmtNum(marketRow.day_low_nifty)} – {fmtNum(marketRow.day_high_nifty)}</strong>
-                      </div>
-                      <div className="blog-scorecard-tile">
-                        <span>Sensex Range</span>
-                        <strong>{fmtNum(marketRow.day_low_sensex)} – {fmtNum(marketRow.day_high_sensex)}</strong>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div className="blog-scorecard-compare">
-                  <div className="blog-scorecard-compare-card">
-                    <span>NIFTY</span>
-                    {isPre ? (
-                      <>
-                        <strong>{fmtNum(marketRow.avg_move_5d_nifty)} pts <em>5D avg move</em></strong>
-                        <small>Support {fmtNum(marketRow.oi_support_nifty)} · Resistance {fmtNum(marketRow.oi_resistance_nifty)}</small>
-                      </>
-                    ) : (
-                      <>
-                        <strong className={tone(marketRow.day_change_pct_nifty)}>{fmtNum(marketRow.close_nifty)}</strong>
-                        <small>{marketRow.target_hit_nifty ? 'Target hit' : marketRow.sl_hit_nifty ? 'Stop hit' : 'Neither target nor stop hit'}</small>
-                      </>
-                    )}
-                  </div>
-                  <div className="blog-scorecard-compare-card">
-                    <span>SENSEX</span>
-                    {isPre ? (
-                      <>
-                        <strong>{fmtNum(marketRow.avg_move_5d_sensex)} pts <em>5D avg move</em></strong>
-                        <small>Support {fmtNum(marketRow.oi_support_sensex)} · Resistance {fmtNum(marketRow.oi_resistance_sensex)}</small>
-                      </>
-                    ) : (
-                      <>
-                        <strong className={tone(marketRow.day_change_pct_sensex)}>{fmtNum(marketRow.close_sensex)}</strong>
-                        <small>{marketRow.target_hit_sensex ? 'Target hit' : marketRow.sl_hit_sensex ? 'Stop hit' : 'Neither target nor stop hit'}</small>
-                      </>
-                    )}
-                  </div>
-                </div>
+                <table className="blog-metrics-table">
+                  <thead>
+                    <tr><th scope="col">Metric</th><th scope="col">Value</th><th scope="col">Read</th></tr>
+                  </thead>
+                  <tbody>
+                    {buildMetricRows(isPre, marketRow).map((row) => (
+                      <tr key={row.metric}>
+                        <th scope="row">{row.metric}</th>
+                        <td>{row.value}</td>
+                        <td>{row.read}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </section>
             )}
 
