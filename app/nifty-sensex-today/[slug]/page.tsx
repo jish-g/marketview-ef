@@ -191,6 +191,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
         '@type': 'Article',
         headline: bareHeadline(post.title),
         description: purposefulDescription(post, marketRow),
+        image: `${SITE_URL}/opengraph-image`,
         datePublished: toISTISOString(post.published_at),
         dateModified: toISTISOString(post.published_at),
         author: { '@type': 'Person', name: 'Jishnu', jobTitle: 'Founder, MarketCue', url: `${SITE_URL}/about` },
