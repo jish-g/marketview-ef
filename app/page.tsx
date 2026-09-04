@@ -12,12 +12,12 @@ const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_PREMARKET_SUPABASE_KEY || 'sb_publishable_-am88LW21cvkYYA_H9vqWA_K42a7bXG'
 
 export const metadata: Metadata = {
-  title: 'MarketCue — Nifty & Sensex market reads, built on rules you can audit',
+  title: 'MarketCue — Nifty & Sensex reads built on rules',
   description:
     'A daily Nifty and Sensex read from a documented, rules-based scoring framework — pre-market call before the open, post-market recap after the close.',
   alternates: { canonical: `${SITE_URL}/` },
   openGraph: {
-    title: 'MarketCue — Nifty & Sensex market reads, built on rules you can audit',
+    title: 'MarketCue — Nifty & Sensex reads built on rules',
     description:
       'A daily read on Nifty and Sensex from a documented, rules-based scoring framework — pre-market call before the open, post-market recap after the close.',
     url: `${SITE_URL}/`,
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MarketCue — Nifty & Sensex market reads, built on rules you can audit',
+    title: 'MarketCue — Nifty & Sensex reads built on rules',
     description:
       'A daily read on Nifty and Sensex from a documented, rules-based scoring framework — pre-market call before the open, post-market recap after the close.',
   },

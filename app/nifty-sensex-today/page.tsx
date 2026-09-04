@@ -14,7 +14,7 @@ const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_PREMARKET_SUPABASE_KEY || 'sb_publishable_-am88LW21cvkYYA_H9vqWA_K42a7bXG'
 
 export const metadata: Metadata = {
-  title: 'Nifty & Sensex Today — Daily pre-market and post-market reads | MarketCue',
+  title: 'Nifty & Sensex Today — Pre/post-market reads | MarketCue',
   description:
     'Daily gap, PCR, Max Pain, and option-readiness reads for Nifty and Sensex — published before the open and after the close, from the MarketCue rules engine.',
   alternates: { canonical: `${SITE_URL}/nifty-sensex-today` },
