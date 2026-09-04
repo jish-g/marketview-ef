@@ -13,10 +13,18 @@ type Row = Record<string, any>
 type DetailClientProps = {
   initialPost: Post | null
   initialMarketRow: Row | null
+  publishedAtIST: string | null
 }
 
 function formatDateLabel(dateStr: string) {
   return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(`${dateStr}T00:00:00`))
+}
+
+// The generated headline already carries its own "| MarketCue" suffix --
+// stripped here so the visible H1 doesn't double up, mirroring the same fix
+// applied to <title> and the Article schema headline in page.tsx.
+function bareHeadline(title: string): string {
+  return title.replace(/\s*\|\s*MarketCue\s*$/i, '').trim()
 }
 
 function fmtPct(v: any) {
@@ -38,7 +46,7 @@ function ptsSuffix(v: any) {
   return `${n > 0 ? '+' : ''}${v} pts`
 }
 
-export default function NiftySensexTodayPostClient({ initialPost, initialMarketRow }: DetailClientProps) {
+export default function NiftySensexTodayPostClient({ initialPost, initialMarketRow, publishedAtIST }: DetailClientProps) {
   const params = useParams<{ slug: string }>()
   const [dark, setDark] = useState(false)
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
@@ -95,8 +103,8 @@ export default function NiftySensexTodayPostClient({ initialPost, initialMarketR
               <div className="blog-post-badges">
                 <span className={`blog-post-badge blog-post-badge-${data.phase}`}>{data.phase === 'premarket' ? 'Pre-market' : 'Post-market'}</span>
               </div>
-              <h1 className="blog-post-title">{data.title}</h1>
-              <time className="blog-post-time">{formatDateLabel(data.trade_date)}</time>
+              <h1 className="blog-post-title">{bareHeadline(data.title)}</h1>
+              <time className="blog-post-time" dateTime={publishedAtIST ?? undefined}>{formatDateLabel(data.trade_date)}</time>
             </div>
 
             {marketRow && (

@@ -154,7 +154,7 @@ export default function NiftySensexTodayIndexClient({ initialPosts, initialMarke
 
         {olderGroups.length > 0 && (
           <div className="archive-table-block">
-            <p className="archive-table-eyebrow">Archive</p>
+            <h2 className="archive-table-eyebrow">Archive</h2>
             <div className="archive-table">
               <div className="archive-table-head">
                 <span>Date</span><span>Nifty</span><span>Sensex</span><span>Bias</span><span>Read</span>

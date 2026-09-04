@@ -25,7 +25,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/`, changeFrequency: 'daily', priority: 1 },
     { url: `${SITE_URL}/nifty-sensex-today`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${SITE_URL}/rules`, changeFrequency: 'monthly', priority: 0.5 },
-    { url: `${SITE_URL}/login`, changeFrequency: 'yearly', priority: 0.2 },
   ]
 
   let postEntries: MetadataRoute.Sitemap = []
