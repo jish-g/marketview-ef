@@ -355,6 +355,30 @@ function mapRecommendationToStrategy(recommendation: string): { strategy: Strate
 // vertical price-level lines too. For seller strategies (Credit Spread, Iron Condor), target/stop
 // are net-premium-based (already computed as actualConservativeTarget/Stop, in rupees), so they're
 // drawn as horizontal P&L threshold lines on the y-axis instead — no invented price level.
+function TargetStopCard({ instrument, calc, delta = 0.5 }: { instrument?: Instrument; calc: ReturnType<typeof calculateVerdict>; delta?: number }) {
+  const target = calc.target * delta
+  const stop = calc.stop * delta
+  const aggressiveTarget = calc.aggressiveTarget * delta
+  const aggressiveStop = calc.aggressiveStop * delta
+  return <div className="verdict-card verdict-tracks">
+    {instrument && <p className="eyebrow target-stop-instrument">{instrument}</p>}
+    <div className="track-columns">
+      <div className="track-column">
+        <div className="track-header"><i></i><span>Conservative</span></div>
+        <strong className="track-move">{calc.conservative.toFixed(1)} pts</strong>
+        <div className="track-row"><span>↑ Target (est.)</span><b className="target-value">{calc.target.toFixed(1)} pts</b><em>₹{target.toFixed(1)}</em></div>
+        <div className="track-row"><span>↓ Stop-loss (est.)</span><b className="stop-value">{calc.stop.toFixed(1)} pts</b><em>₹{stop.toFixed(1)}</em></div>
+      </div>
+      <div className="track-column">
+        <div className="track-header"><i></i><span>Aggressive</span></div>
+        <strong className="track-move">{calc.aggressive.toFixed(1)} pts</strong>
+        <div className="track-row"><span>↑ Target (est.)</span><b className="target-value">{calc.aggressiveTarget.toFixed(1)} pts</b><em>₹{aggressiveTarget.toFixed(1)}</em></div>
+        <div className="track-row"><span>↓ Stop-loss (est.)</span><b className="stop-value">{calc.aggressiveStop.toFixed(1)} pts</b><em>₹{aggressiveStop.toFixed(1)}</em></div>
+      </div>
+    </div>
+  </div>
+}
+
 function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarget, spotEstStop, spotAggressiveTarget, spotAggressiveStop, actualConservativeTarget, actualConservativeStop, actualAggressiveTarget, actualAggressiveStop, qty }: {
   legRows: { key: string; label: string; side: 'Buy' | 'Sell'; strike: number }[]
   atmNumber: number
@@ -654,22 +678,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
       <small>Delta auto-fills from the strike-offset step table; editing a leg&apos;s strike below will not resync it — only changing &quot;Strikes from ATM&quot; does.</small>
     </div>
     <div className="verdict-grid">
-      <div className="verdict-card verdict-tracks">
-        <div className="track-columns">
-          <div className="track-column">
-            <div className="track-header"><i></i><span>Conservative</span></div>
-            <strong className="track-move">{calc.conservative.toFixed(1)} pts</strong>
-            <div className="track-row"><span>↑ Target (est.)</span><b className="target-value">{calc.target.toFixed(1)} pts</b><em>₹{estTarget.toFixed(1)}</em></div>
-            <div className="track-row"><span>↓ Stop-loss (est.)</span><b className="stop-value">{calc.stop.toFixed(1)} pts</b><em>₹{estStop.toFixed(1)}</em></div>
-          </div>
-          <div className="track-column">
-            <div className="track-header"><i></i><span>Aggressive</span></div>
-            <strong className="track-move">{calc.aggressive.toFixed(1)} pts</strong>
-            <div className="track-row"><span>↑ Target (est.)</span><b className="target-value">{calc.aggressiveTarget.toFixed(1)} pts</b><em>₹{estAggressiveTarget.toFixed(1)}</em></div>
-            <div className="track-row"><span>↓ Stop-loss (est.)</span><b className="stop-value">{calc.aggressiveStop.toFixed(1)} pts</b><em>₹{estAggressiveStop.toFixed(1)}</em></div>
-          </div>
-        </div>
-      </div>
+      <TargetStopCard calc={calc} />
       <div className="verdict-card verdict-editable">
         <div className="verdict-controls">
           <label>Lots<input type="number" min="0" step="1" value={lots} onChange={(e) => setLots(e.target.value)} aria-label={`${instrument} lots`} /></label>
@@ -966,7 +975,11 @@ function PhaseView({ phase, row, historyData }: { phase: Phase; row: Row | null;
   // to show, so this shows an explicit not-yet message instead of a mostly-empty field grid.
   const openDataMissing = phase === 'open' && row?.gap_points_nifty == null && row?.gap_points_sensex == null
   if (openDataMissing) return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><span>Session snapshot</span></div><p className="history-empty">Market Open data not available yet — updates at 9:30 AM IST once the market opens.</p></section>
-  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><span>Session snapshot</span></div>{phase === 'premarket' && priorDayLines && priorDayLines.story && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p><p className="prior-session-line prior-session-story">{priorDayLines.story}</p></div>}<div className="metric-groups">{renderGroup('Common market data', common)}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div></section>
+  const openTargetCards = phase === 'open' && row ? <div className="market-open-target-row">
+    <TargetStopCard instrument="NIFTY" calc={calculateVerdict(row, 'NIFTY')} />
+    <TargetStopCard instrument="SENSEX" calc={calculateVerdict(row, 'SENSEX')} />
+  </div> : null
+  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><span>Session snapshot</span></div>{phase === 'premarket' && priorDayLines && priorDayLines.story && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p><p className="prior-session-line prior-session-story">{priorDayLines.story}</p></div>}<div className="metric-groups">{renderGroup('Common market data', common)}{openTargetCards}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div></section>
 }
 export default function Dashboard() {
   const [phase, setPhase] = useState<Phase>('premarket'); const [dark, setDark] = useState(false); const [navOpen, setNavOpen] = useState(true); const [liveDate, setLiveDate] = useState(''); const [liveDay, setLiveDay] = useState(''); const [liveTime, setLiveTime] = useState('')
