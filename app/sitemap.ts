@@ -25,6 +25,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/`, changeFrequency: 'daily', priority: 1 },
     { url: `${SITE_URL}/nifty-sensex-today`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${SITE_URL}/rules`, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${SITE_URL}/about`, changeFrequency: 'monthly', priority: 0.3 },
+    { url: `${SITE_URL}/sensex-option-chain`, changeFrequency: 'daily', priority: 0.7 },
+    { url: `${SITE_URL}/india-vix-today`, changeFrequency: 'daily', priority: 0.7 },
+    { url: `${SITE_URL}/gift-nifty-today`, changeFrequency: 'daily', priority: 0.7 },
+    { url: `${SITE_URL}/nse-option-chain-analysis`, changeFrequency: 'daily', priority: 0.7 },
+    { url: `${SITE_URL}/fii-dii-data-today`, changeFrequency: 'daily', priority: 0.7 },
+    { url: `${SITE_URL}/nifty-pcr-today`, changeFrequency: 'daily', priority: 0.7 },
+    { url: `${SITE_URL}/nifty-max-pain-today`, changeFrequency: 'daily', priority: 0.7 },
+    { url: `${SITE_URL}/nifty-support-resistance-today`, changeFrequency: 'daily', priority: 0.7 },
   ]
 
   let postEntries: MetadataRoute.Sitemap = []
