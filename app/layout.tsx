@@ -35,6 +35,16 @@ export const viewport: Viewport = {
   ],
 }
 
+const organizationJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'MarketCue',
+  url: 'https://marketcue.in',
+  logo: 'https://marketcue.in/apple-icon.png',
+  description: 'Rules-based market reads on Nifty and Sensex for option traders.',
+  sameAs: ['https://t.me/marketcue_in', 'https://x.com/marketcue_in'],
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -43,6 +53,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
+        <script
+          type="application/ld+json"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
         <Script async src="https://www.googletagmanager.com/gtag/js?id=G-45YLMT11SF" strategy="afterInteractive" />

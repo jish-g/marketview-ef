@@ -91,6 +91,11 @@ export default function NiftySensexTodayPostClient({ initialPost, initialMarketR
       </header>
 
       <div className="blog-post-main">
+        <nav className="blog-post-breadcrumb" aria-label="Breadcrumb">
+          <Link href="/">Home</Link><span aria-hidden="true"> / </span>
+          <Link href="/nifty-sensex-today">Nifty &amp; Sensex Today</Link>
+          {data && <><span aria-hidden="true"> / </span><span>{bareHeadline(data.title)}</span></>}
+        </nav>
         <Link href="/nifty-sensex-today" className="blog-post-back"><ArrowLeft size={13} /> All Nifty & Sensex Today posts</Link>
 
         {error && <p className="history-empty">Unable to load this post right now.</p>}

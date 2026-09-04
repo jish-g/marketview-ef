@@ -134,10 +134,22 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
         description: firstSentence(post.body),
         datePublished: toISTISOString(post.published_at),
         dateModified: toISTISOString(post.published_at),
-        author: { '@type': 'Organization', name: 'MarketCue' },
+        author: { '@type': 'Person', name: 'Jishnu', jobTitle: 'Founder, MarketCue', url: `${SITE_URL}/about` },
         publisher: { '@type': 'Organization', name: 'MarketCue', url: SITE_URL },
         mainEntityOfPage: { '@type': 'WebPage', '@id': `${SITE_URL}/nifty-sensex-today/${post.slug}` },
         articleSection: post.phase === 'premarket' ? 'Pre-market' : 'Post-market',
+      }
+    : null
+
+  const breadcrumbJsonLd = post
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+          { '@type': 'ListItem', position: 2, name: 'Nifty & Sensex Today', item: `${SITE_URL}/nifty-sensex-today` },
+          { '@type': 'ListItem', position: 3, name: bareHeadline(post.title), item: `${SITE_URL}/nifty-sensex-today/${post.slug}` },
+        ],
       }
     : null
 
@@ -148,6 +160,13 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
           type="application/ld+json"
           // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      {breadcrumbJsonLd && (
+        <script
+          type="application/ld+json"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
         />
       )}
       <NiftySensexTodayPostClient initialPost={post} initialMarketRow={marketRow} publishedAtIST={post ? toISTISOString(post.published_at) : null} />

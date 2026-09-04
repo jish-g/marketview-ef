@@ -13,6 +13,7 @@ type DayGroup = { tradeDate: string; pre: Post | null; post: Post | null }
 type IndexClientProps = {
   initialPosts: Post[]
   initialMarketRows: Record<string, Row>
+  faqSlot?: React.ReactNode
 }
 
 function todayIST() {
@@ -40,7 +41,7 @@ function biasFrom(pctNifty: any, pctSensex: any, openBiasNifty: any) {
   return '—'
 }
 
-export default function NiftySensexTodayIndexClient({ initialPosts, initialMarketRows }: IndexClientProps) {
+export default function NiftySensexTodayIndexClient({ initialPosts, initialMarketRows, faqSlot }: IndexClientProps) {
   const [dark, setDark] = useState(false)
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   const supabase = createClient()
@@ -179,6 +180,7 @@ export default function NiftySensexTodayIndexClient({ initialPosts, initialMarke
             </div>
           </div>
         )}
+        {faqSlot}
       </div>
     </main>
   )
