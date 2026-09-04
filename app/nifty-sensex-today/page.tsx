@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { createClient } from '@supabase/supabase-js'
 import NiftySensexTodayIndexClient from './index-client'
+import { FaqBlock } from '@/components/faq-block'
+import { SEED_FAQ, faqJsonLd } from '@/lib/faq'
 
 export const revalidate = 60
 
@@ -80,7 +82,16 @@ export default async function Page() {
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <NiftySensexTodayIndexClient initialPosts={initialPosts} initialMarketRows={initialMarketRows} />
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(SEED_FAQ)) }}
+      />
+      <NiftySensexTodayIndexClient
+        initialPosts={initialPosts}
+        initialMarketRows={initialMarketRows}
+        faqSlot={<FaqBlock items={SEED_FAQ} />}
+      />
     </>
   )
 }
