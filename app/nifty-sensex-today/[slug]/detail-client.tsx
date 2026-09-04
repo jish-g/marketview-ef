@@ -10,10 +10,15 @@ import { createClient } from '@/lib/supabase/client'
 type Post = { id: string; trade_date: string; instrument: 'NIFTY' | 'SENSEX' | 'BOTH'; phase: 'premarket' | 'postmarket'; slug: string; title: string; body: string; badges: string[]; published_at: string }
 type Row = Record<string, any>
 
+type PrevPost = { slug: string; title: string; phase: 'premarket' | 'postmarket'; trade_date: string }
+type EvergreenLink = { href: string; label: string }
+
 type DetailClientProps = {
   initialPost: Post | null
   initialMarketRow: Row | null
   publishedAtIST: string | null
+  previousPost: PrevPost | null
+  evergreenLink: EvergreenLink | null
 }
 
 function formatDateLabel(dateStr: string) {
@@ -109,7 +114,7 @@ function buildMetricRows(isPre: boolean, marketRow: Row): MetricRow[] {
   ]
 }
 
-export default function NiftySensexTodayPostClient({ initialPost, initialMarketRow, publishedAtIST }: DetailClientProps) {
+export default function NiftySensexTodayPostClient({ initialPost, initialMarketRow, publishedAtIST, previousPost, evergreenLink }: DetailClientProps) {
   const params = useParams<{ slug: string }>()
   const [dark, setDark] = useState(false)
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
@@ -196,6 +201,23 @@ export default function NiftySensexTodayPostClient({ initialPost, initialMarketR
             )}
 
             <div className="blog-post-body">{data.body.split(/\n\s*\n/).map((para, i) => <p key={i}>{para.trim()}</p>)}</div>
+
+            <nav className="blog-post-related" aria-label="Related reading">
+              <p className="eyebrow">Related reading</p>
+              <ul>
+                {previousPost && (
+                  <li>
+                    <Link href={`/nifty-sensex-today/${previousPost.slug}`}>
+                      Previous session: {formatDateLabel(previousPost.trade_date)} {previousPost.phase === 'premarket' ? 'pre-market' : 'post-market'} read
+                    </Link>
+                  </li>
+                )}
+                <li><Link href="/nifty-sensex-today">All Nifty &amp; Sensex Today reads</Link></li>
+                <li><Link href="/rules">The MarketCue rules engine methodology</Link></li>
+                {evergreenLink && <li><Link href={evergreenLink.href}>{evergreenLink.label}</Link></li>}
+              </ul>
+            </nav>
+
             <div className="blog-post-cta">
               <div className="blog-post-cta-text">
                 <strong>Want the live, session-by-session read?</strong>

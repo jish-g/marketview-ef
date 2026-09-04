@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { postTweet } from '@/lib/twitter'
+import { indexNow } from '@/lib/indexnow'
 
 export const dynamic = 'force-dynamic'
 
@@ -134,6 +135,8 @@ export async function GET(request: NextRequest) {
     sendToTelegram(buildMessage(post, marketRow)),
     postTweet(buildTweet(post, marketRow)),
   ])
+
+  await indexNow([`${SITE_URL}/nifty-sensex-today/${post.slug}`])
 
   return NextResponse.json({
     ok: telegramResult.status === 'fulfilled' && twitterResult.status === 'fulfilled',

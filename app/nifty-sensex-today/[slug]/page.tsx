@@ -35,7 +35,11 @@ const getPost = cache(async (slug: string): Promise<PostRow | null> => {
   }
 })
 
-async function getMarketRow(post: PostRow): Promise<Row | null> {
+// Wrapped in cache() for the same reason as getPost above -- generateMetadata
+// and the page body both need this, and getPost's own cache guarantees they
+// receive the identical `post` object reference, so this collapses to one
+// Supabase round trip per request too.
+const getMarketRow = cache(async (post: PostRow): Promise<Row | null> => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
     const table = post.phase === 'premarket' ? 'premarket_dashboard' : 'postmarket_summary'
@@ -44,12 +48,58 @@ async function getMarketRow(post: PostRow): Promise<Row | null> {
   } catch {
     return null
   }
+})
+
+type PrevPost = { slug: string; title: string; phase: 'premarket' | 'postmarket'; trade_date: string }
+
+const getPreviousPost = cache(async (post: PostRow): Promise<PrevPost | null> => {
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+    const { data } = await supabase
+      .from('blog_posts')
+      .select('slug, title, phase, trade_date')
+      .lt('published_at', post.published_at)
+      .order('published_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    return (data as PrevPost | null) ?? null
+  } catch {
+    return null
+  }
+})
+
+// One evergreen page per phase -- premarket reads pair naturally with GIFT
+// Nifty (the leading indicator premarket is built from), postmarket reads
+// with FII/DII flow (published alongside the post-market recap).
+function relatedEvergreenLink(phase: 'premarket' | 'postmarket'): { href: string; label: string } {
+  return phase === 'premarket'
+    ? { href: '/gift-nifty-today', label: 'GIFT Nifty Today' }
+    : { href: '/fii-dii-data-today', label: 'FII DII Data Today' }
 }
 
-function firstSentence(body: string, max = 155): string {
-  const text = body.replace(/\s+/g, ' ').trim()
-  if (text.length <= max) return text
-  return text.slice(0, max - 1).trimEnd() + '…'
+function shortDateLabel(dateStr: string) {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${dateStr}T00:00:00`))
+}
+
+// Purpose-built meta description leading with the actual numbers and stated
+// bias, rather than the old approach of truncating the post body's first
+// sentence mid-word with an ellipsis -- this always reads as a complete
+// sentence and always surfaces the day's headline figures in the SERP snippet.
+function purposefulDescription(post: PostRow, marketRow: Row | null): string {
+  const date = shortDateLabel(post.trade_date)
+  if (post.phase === 'premarket') {
+    const giftPts = marketRow?.gift_nifty_gap_pts
+    const giftStr = giftPts != null ? `GIFT Nifty ${Number(giftPts) > 0 ? '+' : ''}${giftPts} pts` : 'GIFT Nifty gap pending'
+    const bias = marketRow?.market_bias_nifty ? String(marketRow.market_bias_nifty).toLowerCase() : 'neutral'
+    const vix = marketRow?.india_vix != null ? `, India VIX ${marketRow.india_vix}` : ''
+    return `Pre-market read for ${date}: ${giftStr}, bias ${bias}${vix}. Full rules-based scoring inside.`
+  }
+  const niftyPct = marketRow?.day_change_pct_nifty
+  const sensexPct = marketRow?.day_change_pct_sensex
+  const niftyStr = niftyPct != null ? `Nifty ${Number(niftyPct) > 0 ? '+' : ''}${niftyPct}%` : 'Nifty close pending'
+  const sensexStr = sensexPct != null ? `, Sensex ${Number(sensexPct) > 0 ? '+' : ''}${sensexPct}%` : ''
+  const bias = niftyPct != null ? (Number(niftyPct) > 0 ? 'bullish' : Number(niftyPct) < 0 ? 'bearish' : 'neutral') : 'neutral'
+  return `Post-market read for ${date}: ${niftyStr}${sensexStr}, bias ${bias}. Full rules-based scoring inside.`
 }
 
 const BRAND_SUFFIX = ' | MarketCue'
@@ -97,8 +147,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     }
   }
 
+  const marketRow = await getMarketRow(post)
   const headline = bareHeadline(post.title)
-  const description = firstSentence(post.body)
+  const description = purposefulDescription(post, marketRow)
   const url = `${SITE_URL}/nifty-sensex-today/${post.slug}`
 
   return {
@@ -125,13 +176,14 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   const { slug } = await params
   const post = await getPost(slug)
   const marketRow = post ? await getMarketRow(post) : null
+  const previousPost = post ? await getPreviousPost(post) : null
 
   const jsonLd = post
     ? {
         '@context': 'https://schema.org',
         '@type': 'Article',
         headline: bareHeadline(post.title),
-        description: firstSentence(post.body),
+        description: purposefulDescription(post, marketRow),
         datePublished: toISTISOString(post.published_at),
         dateModified: toISTISOString(post.published_at),
         author: { '@type': 'Person', name: 'Jishnu', jobTitle: 'Founder, MarketCue', url: `${SITE_URL}/about` },
@@ -169,7 +221,13 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
         />
       )}
-      <NiftySensexTodayPostClient initialPost={post} initialMarketRow={marketRow} publishedAtIST={post ? toISTISOString(post.published_at) : null} />
+      <NiftySensexTodayPostClient
+        initialPost={post}
+        initialMarketRow={marketRow}
+        publishedAtIST={post ? toISTISOString(post.published_at) : null}
+        previousPost={previousPost}
+        evergreenLink={post ? relatedEvergreenLink(post.phase) : null}
+      />
     </>
   )
 }
