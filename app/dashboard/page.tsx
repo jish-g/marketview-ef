@@ -857,7 +857,7 @@ function PostInstrumentCard({ row, postSummary, instrument }: { row: Row; postSu
 }
 function PostMarketView({ row, postSummary }: { row: Row; postSummary: Row | null | undefined }) {
   if (postSummary === undefined) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Post market review · {syncLabel(null, '15:45')}</p><h2>Close the loop</h2></div><span>Instrument outcomes</span></div><p className="history-empty">Loading post-market data…</p></section>
-  if (!postSummary) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Post market review · {syncLabel(null, '15:45')}</p><h2>Close the loop</h2></div><span>Instrument outcomes</span></div><p className="history-empty">Post-market data not available yet — updates at 8:00 PM IST.</p></section>
+  if (!postSummary) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Post market review · {syncLabel(null, '15:45')}</p><h2>Close the loop</h2></div><span>Instrument outcomes</span></div><p className="history-empty">Post-market data not available yet — updates at 9:00 PM IST.</p></section>
   const fii = postSummary.fii_net_cash_cr
   const dii = postSummary.dii_net_cash_cr
   const asOf = postSummary.fii_dii_data_date
