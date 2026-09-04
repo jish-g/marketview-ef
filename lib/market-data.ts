@@ -21,13 +21,52 @@ export type Row = Record<string, any>
 // windows, this falls back to the most recent available row so the page
 // always has a real number, and the caller can label it with the row's own
 // trade_date instead of assuming "today".
+//
+// updated_at is always appended to the requested columns (rather than left
+// to each caller to remember) since every evergreen page needs it for its
+// visible "Updated ..." <time> line and Dataset.dateModified -- using the
+// row's own last-write timestamp rather than the page's render time, so the
+// freshness claim reflects when the underlying data actually changed, not
+// just when this particular request happened to run.
 export async function getLatestRow(table: 'premarket_dashboard' | 'postmarket_summary', columns: string): Promise<Row | null> {
   const supabase = getSupabase()
+  const fullColumns = columns.includes('updated_at') ? columns : `${columns}, updated_at`
   const today = todayIST()
-  const { data: todayRow } = await supabase.from(table).select(columns).eq('trade_date', today).maybeSingle()
+  const { data: todayRow } = await supabase.from(table).select(fullColumns).eq('trade_date', today).maybeSingle()
   if (todayRow) return todayRow as Row
-  const { data: latest } = await supabase.from(table).select(columns).order('trade_date', { ascending: false }).limit(1).maybeSingle()
+  const { data: latest } = await supabase.from(table).select(fullColumns).order('trade_date', { ascending: false }).limit(1).maybeSingle()
   return (latest as Row | null) ?? null
+}
+
+// Mirrors the same UTC -> fixed +05:30 reformat used for post pages (see
+// toISTISOString in app/nifty-sensex-today/[slug]/page.tsx) -- duplicated
+// here rather than imported since that one lives in a route file, not a
+// shared module; kept identical so both produce the same offset format.
+export function toISTISOString(isoUtc: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).formatToParts(new Date(isoUtc))
+  const get = (type: string) => parts.find((p) => p.type === type)?.value
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}+05:30`
+}
+
+// Visible "Updated 2:30 PM IST · 4 September 2026" label for the evergreen
+// pages, from the same raw UTC updated_at value used for the ISO datetime.
+export function updatedLabel(isoUtc: string): string {
+  const time = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(isoUtc)).replace(/am|pm/i, (m) => m.toUpperCase())
+  const date = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(isoUtc))
+  return `Updated ${time} IST · ${date}`
+}
+
+// Single source of truth for an evergreen page's freshness signal: the
+// row's own updated_at when available, falling back to render time only in
+// the (untested-in-practice) case a table has no rows at all yet -- a
+// missing timestamp would otherwise mean an invalid <time datetime>.
+export function getUpdatedMeta(row: Row | null): { iso: string; label: string; tradeDate: string | null } {
+  const raw = row?.updated_at ?? new Date().toISOString()
+  return { iso: toISTISOString(raw), label: updatedLabel(raw), tradeDate: row?.trade_date ?? null }
 }
 
 export type RecentPost = { slug: string; title: string; phase: 'premarket' | 'postmarket'; trade_date: string }

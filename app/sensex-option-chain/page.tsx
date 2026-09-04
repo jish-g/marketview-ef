@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { EvergreenPage } from '@/components/evergreen-page'
 import { faqJsonLd, type FaqItem } from '@/lib/faq'
 import {
-  getLatestRow, getRecentPosts, fmtNum, formatDateLabel,
+  getLatestRow, getRecentPosts, fmtNum, formatDateLabel, getUpdatedMeta,
   pcrRead, maxPainRead, oiRead, vixRead,
 } from '@/lib/market-data'
 
@@ -40,6 +40,7 @@ export default async function SensexOptionChainPage() {
     'trade_date, pcr_sensex, max_pain_sensex, oi_support_sensex, oi_resistance_sensex, oi_change_support_sensex, oi_change_resistance_sensex, atm_iv_sensex, india_vix, prev_close_sensex'
   )
   const recentPosts = await getRecentPosts(5)
+  const updated = getUpdatedMeta(row)
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -47,6 +48,9 @@ export default async function SensexOptionChainPage() {
     name: 'Sensex Option Chain Analysis',
     description: metadata.description,
     url: `${SITE_URL}/sensex-option-chain`,
+    dateModified: updated.iso,
+    temporalCoverage: updated.tradeDate ?? undefined,
+    creator: { '@type': 'Organization', name: 'MarketCue' },
   }
 
   const pcr = row?.pcr_sensex
@@ -75,6 +79,8 @@ export default async function SensexOptionChainPage() {
       <EvergreenPage
         eyebrow="Sensex Option Chain"
         h1="Sensex Option Chain Analysis Today"
+        updatedISO={updated.iso}
+        updatedLabel={updated.label}
         metricLabel="PCR"
         metricValue={fmtNum(pcr)}
         metricSub={`As of ${asOfLabel} — Max Pain ${fmtNum(maxPain)}`}

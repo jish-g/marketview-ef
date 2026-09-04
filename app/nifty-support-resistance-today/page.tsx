@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { EvergreenPage } from '@/components/evergreen-page'
 import { faqJsonLd, type FaqItem } from '@/lib/faq'
-import { getLatestRow, getRecentPosts, fmtNum, formatDateLabel, oiRead } from '@/lib/market-data'
+import { getLatestRow, getRecentPosts, fmtNum, formatDateLabel, getUpdatedMeta, oiRead } from '@/lib/market-data'
 
 export const revalidate = 300
 
@@ -37,6 +37,7 @@ export default async function NiftySupportResistanceTodayPage() {
     'trade_date, oi_support_nifty, oi_resistance_nifty, oi_change_support_nifty, oi_change_resistance_nifty, prev_close_nifty'
   )
   const recentPosts = await getRecentPosts(5)
+  const updated = getUpdatedMeta(row)
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -44,6 +45,9 @@ export default async function NiftySupportResistanceTodayPage() {
     name: 'Nifty Support & Resistance Today',
     description: metadata.description,
     url: `${SITE_URL}/nifty-support-resistance-today`,
+    dateModified: updated.iso,
+    temporalCoverage: updated.tradeDate ?? undefined,
+    creator: { '@type': 'Organization', name: 'MarketCue' },
   }
 
   const support = row?.oi_support_nifty
@@ -69,6 +73,8 @@ export default async function NiftySupportResistanceTodayPage() {
       <EvergreenPage
         eyebrow="Nifty Support & Resistance"
         h1="Nifty Support & Resistance Today"
+        updatedISO={updated.iso}
+        updatedLabel={updated.label}
         metricLabel="Support / Resistance"
         metricValue={`${fmtNum(support)} / ${fmtNum(resistance)}`}
         metricSub={`As of ${asOfLabel}`}
