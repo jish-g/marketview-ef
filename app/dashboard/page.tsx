@@ -824,7 +824,7 @@ function MidMarketView({ row, midCheckpoints }: { row: Row; midCheckpoints: Row[
 
   if (midCheckpoints === undefined) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div><p className="history-empty">Loading mid-market data…</p></section>
 
-  const byId = new Map(midCheckpoints.map((cp) => [String(cp.checkpoint), cp]))
+  const byId = new Map((midCheckpoints ?? []).map((cp) => [String(cp.checkpoint), cp]))
   const nowMin = nowMinuteOfDayIST()
 
   return <section className="phase-view special-view mid-checkpoint-view">
@@ -981,7 +981,7 @@ export default function Dashboard() {
     if (error) throw error
     const rows = (dashboardRows ?? []) as Row[]
     const tradeDates = rows.map((r) => r.trade_date).filter((d): d is string => typeof d === 'string')
-    if (tradeDates.length === 0) return { rows, mid: {}, post: {}, trade: {} }
+    if (tradeDates.length === 0) return { rows, mid: {}, midAll: {}, post: {}, trade: {} }
     const [{ data: midRows, error: midError }, { data: postRows, error: postError }, { data: tradeRows, error: tradeError }] = await Promise.all([
       supabase.from('midmarket_snapshot').select('*').in('trade_date', tradeDates),
       supabase.from('postmarket_summary').select('*').in('trade_date', tradeDates),
