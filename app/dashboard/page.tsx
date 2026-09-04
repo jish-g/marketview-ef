@@ -24,7 +24,7 @@ const phases = [
 ]
 const phaseFields: Partial<Record<Phase, { label: string; key: string; pct?: boolean }[]>> & Pick<Record<Phase, { label: string; key: string; pct?: boolean }[]>, 'premarket' | 'open' | 'mid' | 'post'> = {
   premarket: ([
-    ['Event today', 'event_today'], ['India VIX', 'india_vix'], ['GIFT Nifty gap', 'gift_nifty_gap_pct', true], ['Expiry', 'days_to_expiry_nifty'], ['Expiry', 'days_to_expiry_sensex'], ['5D average move', 'avg_move_5d_nifty'], ['5D average move', 'avg_move_5d_sensex'], ['Prior Day Closed', 'prev_day_change_pct_nifty', true], ['Prior Day Closed', 'prev_day_change_pct_sensex', true], ['Chart Support (1D Pivot)', 'chart_support_nifty'], ['Chart Resistance (1D Pivot)', 'chart_resistance_nifty'], ['Chart Support (1D Pivot)', 'chart_support_sensex'], ['Chart Resistance (1D Pivot)', 'chart_resistance_sensex'], ['OI support', 'oi_support_nifty'], ['OI resistance', 'oi_resistance_nifty'], ['OI support', 'oi_support_sensex'], ['OI resistance', 'oi_resistance_sensex'],
+    ['Event today', 'event_today'], ['India VIX', 'india_vix'], ['GIFT Nifty gap (Nifty expected to open)', 'gift_nifty_gap_pct', true], ['Expiry', 'days_to_expiry_nifty'], ['Expiry', 'days_to_expiry_sensex'], ['5D average move', 'avg_move_5d_nifty'], ['5D average move', 'avg_move_5d_sensex'], ['Prior Day Closed', 'prev_day_change_pct_nifty', true], ['Prior Day Closed', 'prev_day_change_pct_sensex', true], ['Chart Support (1D Pivot)', 'chart_support_nifty'], ['Chart Resistance (1D Pivot)', 'chart_resistance_nifty'], ['Chart Support (1D Pivot)', 'chart_support_sensex'], ['Chart Resistance (1D Pivot)', 'chart_resistance_sensex'], ['OI support', 'oi_support_nifty'], ['OI resistance', 'oi_resistance_nifty'], ['OI support', 'oi_support_sensex'], ['OI resistance', 'oi_resistance_sensex'],
   ] as const).map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
   open: ([
     ['Opening points', 'nifty_opening_points'], ['Advance / decline', 'advance_decline_ratio'], ['Previous close', 'prev_close_nifty'], ['Previous close', 'prev_close_sensex'], ['Gap points', 'gap_points_nifty'], ['Gap points', 'gap_points_sensex'], ['ATM IV', 'atm_iv_nifty', true], ['ATM IV', 'atm_iv_sensex', true], ['Straddle', 'atm_straddle_price_nifty'], ['Straddle', 'atm_straddle_price_sensex'], ['Delta', 'atm_straddle_delta_nifty'], ['Delta', 'atm_straddle_delta_sensex'], ['Theta', 'atm_straddle_theta_nifty'], ['Theta', 'atm_straddle_theta_sensex'], ['PCR', 'pcr_nifty'], ['PCR', 'pcr_sensex'], ['Max pain', 'max_pain_nifty'], ['Max pain', 'max_pain_sensex'],
@@ -55,6 +55,7 @@ const visualRow: Row = {
 }
 
 function value(row: Row | null, key: string, pct = false) { const v = row?.[key]; if (v === null || v === undefined || v === '') return '—'; const numeric = Number(v); const display = String(v); if (pct) return `${numeric > 0 ? '+' : ''}${display}%`; if (/days_to_expiry/.test(key)) return `${display} day${numeric === 1 ? '' : 's'}`; if (/points|support|resistance|prev_close|opening|straddle|max_pain|avg_move|theta|close/.test(key)) return display; return display }
+function fmtTimeIST(v: any) { if (!v) return null; return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(v)) }
 function tone(row: Row | null, key: string) { const n = Number(row?.[key]); return Number.isNaN(n) || n === 0 ? '' : n > 0 ? 'positive' : 'negative' }
 function gapBandLabel(gapPct: number) { if (gapPct > 0.75) return 'Strong Gap Up'; if (gapPct >= 0.25) return 'Normal Gap Up'; if (gapPct >= -0.25) return 'Flat'; if (gapPct >= -0.75) return 'Normal Gap Down'; return 'Strong Gap Down' }
 function highImpactEvent(eventToday: string | null | undefined) { const text = String(eventToday ?? ''); if (!text.includes('(High')) return null; const match = text.match(/^(.*?)\s*\(High,\s*([^)]+)\)/); if (!match) return null; return { name: match[1].trim(), time: match[2].trim() } }
@@ -128,11 +129,17 @@ function historyOutcomeRead(trade: Row | undefined) {
 }
 
 // One trading day told as a 4-beat story: Opening (real gap), Expected (fresh morning-call recompute),
-// Through the day (fresh midday recompute vs. the morning call), Close (actual outcome). Beats 2 and 3 are
-// recomputed here with the same computeMarketBias/computeOptionReadiness/computeStrategyRecommendation
-// functions the Verdict and Mid-market pages use — never read from the stale stored bias/strategy columns.
+// Through the day (midday bias read from midmarket_snapshot's own stored value), Close (actual outcome).
+// Beat 2 is recomputed here with the same computeMarketBias/computeOptionReadiness/computeStrategyRecommendation
+// functions the Verdict page uses -- pre-market has all 4 inputs those functions need, so recomputing is fine.
+// Beat 3 reads midSnapshot's market_bias_{suffix}_mid / suggested_strategy_{suffix}_mid directly instead,
+// since midmarket_snapshot has no open-interest columns and no gap field -- recomputing here was silently
+// missing 2 of computeMarketBias's 4 inputs and pinning almost every midday reading to "Neutral" regardless
+// of the real intraday move (verified against real PCR/spot/max-pain swings on 2026-08-26, where the stored
+// value correctly moved Neutral -> Bearish -> Strong Bearish through the day).
 function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid: Row | undefined; post: Row | undefined; trade: Row | undefined }) {
   const instrument: Instrument = 'NIFTY'
+  const suffix = 'nifty'
 
   // Beat 1 — Opening: NIFTY's own real opening gap (gap_points_nifty / prev_close_nifty), not GIFT Nifty's
   // predicted overnight gap.
@@ -147,16 +154,11 @@ function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid:
   const morningReadiness = useMemo(() => computeOptionReadiness(morningCalc), [morningCalc])
   const morningStrategy = useMemo(() => computeStrategyRecommendation(morningBias.label, morningReadiness.ivCondition, morningCalc.vix, morningCalc.dte), [morningBias, morningReadiness, morningCalc])
 
-  // Beat 3 — Through the day: midday read, recomputed fresh the same way from midmarket_snapshot's raw
-  // inputs merged over the morning row (buildMidRow), then compared against the Beat 2 result to decide
-  // whether it actually shifted.
-  const mid = useMemo(() => (midSnapshot ? buildMidRow(row, midSnapshot) : null), [row, midSnapshot])
-  const midCalc = useMemo(() => (mid ? calculateVerdict(mid, instrument) : null), [mid])
-  const midBias = useMemo(() => (mid && midCalc ? computeMarketBias(mid, midCalc, instrument) : null), [mid, midCalc])
-  const midReadiness = useMemo(() => (midCalc ? computeOptionReadiness(midCalc) : null), [midCalc])
-  const midStrategy = useMemo(() => (midBias && midReadiness && midCalc ? computeStrategyRecommendation(midBias.label, midReadiness.ivCondition, midCalc.vix, midCalc.dte) : null), [midBias, midReadiness, midCalc])
-  const hasMidday = Boolean(mid && midBias && midStrategy)
-  const shifted = midBias && midStrategy ? (midBias.label !== morningBias.label || midStrategy.recommendation !== morningStrategy.recommendation) : false
+  // Beat 3 — Through the day: midday bias/strategy read directly from midSnapshot's own stored columns.
+  const hasMidday = Boolean(midSnapshot && midSnapshot[`market_bias_${suffix}_mid`] != null)
+  const middayBiasLabel = midSnapshot ? String(midSnapshot[`market_bias_${suffix}_mid`] ?? '—') : '—'
+  const middayStrategy = midSnapshot ? String(midSnapshot[`suggested_strategy_${suffix}_mid`] ?? '—') : '—'
+  const shifted = midSnapshot ? Boolean(midSnapshot[`bias_shifted_${suffix}`]) || Boolean(midSnapshot[`strategy_shifted_${suffix}`]) : false
 
   // Beat 4 — Close: postmarket_summary as-is (day_change_pct_nifty already reflects the corrected net_change
   // calculation), plus the actual logged auto_trades outcome for the day — not a range-based estimate.
@@ -178,7 +180,7 @@ function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid:
       </div>
       <div className="history-beat">
         <span className="history-beat-label">Through the day</span>
-        {hasMidday && midBias && midStrategy ? <p><b className={shifted ? 'is-shifted' : ''}>{midBias.label}</b> bias · {midStrategy.recommendation}<br /><span className="history-beat-note">{shifted ? 'Shifted since the morning call' : 'Unchanged since the morning call'}</span></p> : <p className="history-beat-empty">No midday snapshot recorded</p>}
+        {hasMidday ? <p><b className={shifted ? 'is-shifted' : ''}>{middayBiasLabel}</b> bias · {middayStrategy}<br /><span className="history-beat-note">{shifted ? 'Shifted since the morning call' : 'Unchanged since the morning call'}</span></p> : <p className="history-beat-empty">No midday snapshot recorded</p>}
       </div>
       <div className="history-beat">
         <span className="history-beat-label">Close</span>
@@ -739,30 +741,6 @@ function VerdictView({ row }: { row: Row }) {
   return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open · {syncLabel(row, '09:30')}</p><h2>Verdict</h2></div><span>Calculated strategy</span></div>{eventFlag && <div className="event-caution"><AlertTriangle size={16} /><span><strong>{eventFlag.name}</strong> — high impact event at {eventFlag.time}. Trade with caution.</span></div>}<div className="verdict-instruments"><VerdictInstrument row={row} instrument="NIFTY" /><VerdictInstrument row={row} instrument="SENSEX" /></div></section>
 }
 function OutcomeBadge({ label, target, sl }: { label: string; target?: boolean; sl?: boolean }) { const text = target === true ? 'Target hit' : sl === true ? 'SL hit' : target === false && sl === false ? 'Neither' : 'Not yet available'; const cls = target === true ? 'outcome-hit' : sl === true ? 'outcome-stop' : 'outcome-neutral'; return <div className={`outcome-badge ${cls}`}><span>{label}</span><strong>{text}</strong></div> }
-function MidVerdictInstrument({ row, mid, midSnapshot, instrument }: { row: Row; mid: Row; midSnapshot: Row; instrument: Instrument }) {
-  const calc = useMemo(() => calculateVerdict(mid, instrument), [mid, instrument])
-  const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
-  const spotKey = `spot_${suffix}`
-  const changeKey = `intraday_change_pct_${suffix}`
-  // Same 3-stage Bias / Option Readiness / Strategy Recommendation framework the Verdict page's
-  // VerdictInstrument uses (replacing the old vote-based calc.bias, Trend/Range calc.strategy, and "IV
-  // rich"/"IV fair" reading here), fed the merged mid-row (buildMidRow output) so it reflects midday data.
-  // calc.bias/calc.strategy themselves are left untouched since calculateVerdict still drives other logic.
-  const marketBias = useMemo(() => computeMarketBias(mid, calc, instrument), [mid, calc, instrument])
-  const optionReadiness = useMemo(() => computeOptionReadiness(calc), [calc])
-  const strategyRec = useMemo(() => computeStrategyRecommendation(marketBias.label, optionReadiness.ivCondition, calc.vix, calc.dte), [marketBias, optionReadiness, calc])
-  const effectiveDelta = strikeDefaults[calc.strike]
-  // "Since morning" comparison: morning bias/strategy read from the original premarket_dashboard row (not the
-  // mid-merged row), and the shift flags/note read from the raw midmarket_snapshot row — neither is currently
-  // overlaid into `mid` by buildMidRow.
-  const morningBias = String(row[`market_bias_${suffix}`] ?? '—')
-  const morningStrategy = String(row[`suggested_strategy_${suffix}`] ?? '—')
-  const biasShifted = Boolean(midSnapshot[`bias_shifted_${suffix}`])
-  const strategyShifted = Boolean(midSnapshot[`strategy_shifted_${suffix}`])
-  const hasShifted = biasShifted || strategyShifted
-  const shiftNote = String(midSnapshot[`shift_note_${suffix}`] ?? '')
-  return <article className="verdict-instrument"><div className="verdict-instrument-head"><h3>{instrument}</h3><span>{marketBias.label} · {strategyRec.recommendation}</span></div><div className="sync-strip"><span>Spot <b>{value(mid, spotKey)}</b></span><span>Intraday change <b className={tone(mid, changeKey)}>{value(mid, changeKey, true)}</b></span></div><div className="verdict-banner"><div><p className="eyebrow">Midday strategy read</p><strong>{strategyRec.recommendation}</strong><p>{strategyRec.reason}.</p></div></div><div className="verdict-card since-morning-card"><span className="eyebrow">Since morning</span><div className="since-morning-row"><span className="since-morning-label">Bias</span><span className={`since-morning-value ${biasShifted ? 'is-shifted' : 'is-unchanged'}`}>{morningBias} → {marketBias.label}</span></div><div className="since-morning-row"><span className="since-morning-label">Strategy</span><span className={`since-morning-value ${strategyShifted ? 'is-shifted' : 'is-unchanged'}`}>{morningStrategy} → {strategyRec.recommendation}</span></div><p className="since-morning-note">{hasShifted ? (shiftNote || 'Shifted since this morning.') : 'Unchanged since this morning.'}</p></div></article>
-}
 // Fixed daily checkpoint slots in order, with display label and 24h IST minute-of-day (used to
 // decide whether a not-yet-landed checkpoint is merely "later today" vs. actually overdue).
 const CHECKPOINT_SLOTS: { id: string; label: string; minuteOfDay: number }[] = [
@@ -778,40 +756,63 @@ const CHECKPOINT_SLOTS: { id: string; label: string; minuteOfDay: number }[] = [
 // it's always the only checkpoint on whatever day it appears.
 const CHECKPOINT_ORDER = [...CHECKPOINT_SLOTS.map((s) => s.id), '1245']
 
-function checkpointShifted(cp: Row) {
-  return Boolean(cp.bias_shifted_nifty) || Boolean(cp.bias_shifted_sensex) || Boolean(cp.strategy_shifted_nifty) || Boolean(cp.strategy_shifted_sensex)
-}
-
 function nowMinuteOfDayIST(): number {
   const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date())
   const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0)
   const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? 0)
   return hour * 60 + minute
 }
+// One checkpoint's compact read for a single instrument -- time, bias (with the live intraday
+// % change alongside it), suggested strategy (with the IV-vs-VIX read that drove the pick), and
+// a one-line shift note when the bias/strategy actually moved since the morning call. All values
+// read directly from the stored midmarket_snapshot row (see the bias-source fix above) rather than
+// recalculated. intraday_change_pct_{suffix} is a genuine derived value -- (spot - prev_close) /
+// prev_close * 100 off two real captured prices, verified against today's actual spot/prev_close --
+// not a placeholder or estimate.
+function MidCheckpointRow({ cp, suffix, label }: { cp: Row; suffix: 'nifty' | 'sensex'; label: string }) {
+  const biasLabel = String(cp[`market_bias_${suffix}_mid`] ?? '—')
+  const strategy = String(cp[`suggested_strategy_${suffix}_mid`] ?? '—')
+  const ivRead = cp[`iv_vs_vix_${suffix}_mid`] != null ? String(cp[`iv_vs_vix_${suffix}_mid`]).toLowerCase() : null
+  const changePct = cp[`intraday_change_pct_${suffix}`]
+  const changeLabel = changePct != null ? `${Number(changePct) > 0 ? '+' : ''}${Number(changePct).toFixed(2)}%` : null
+  const shifted = Boolean(cp[`bias_shifted_${suffix}`]) || Boolean(cp[`strategy_shifted_${suffix}`])
+  const shiftNote = String(cp[`shift_note_${suffix}`] ?? '')
+  const tone = /bearish/i.test(biasLabel) ? 'negative' : /bullish/i.test(biasLabel) ? 'positive' : ''
 
-// A landed checkpoint's full detail -- both instruments always rendered in full (no collapse),
-// per the approved prototype: every checkpoint visible in one scroll, no tap-to-expand.
-function MidCheckpointCard({ cp, row, label }: { cp: Row; row: Row; label: string }) {
-  const mid = buildMidRow(row, cp)
-  const shifted = checkpointShifted(cp)
-  return <div className="mid-checkpoint-card">
-    <div className="mid-checkpoint-card-top">
-      <span className="mid-checkpoint-card-label">{shifted ? 'Bias shifted since morning' : 'Nifty & Sensex'}</span>
-      <span className="mid-checkpoint-updated-tag">{syncLabel(cp, label)}</span>
+  return <div className={`mid-row-card ${shifted ? 'mid-row-card-shifted' : ''}`}>
+    <div className="mid-row-top">
+      <span className="mid-row-time">{label}</span>
+      <span className={`mid-row-bias ${tone}`}>{biasLabel}{changeLabel && <em className="mid-row-change">{changeLabel}</em>}</span>
     </div>
-    <div className="verdict-instruments"><MidVerdictInstrument row={row} mid={mid} midSnapshot={cp} instrument="NIFTY" /><MidVerdictInstrument row={row} mid={mid} midSnapshot={cp} instrument="SENSEX" /></div>
+    <p className="mid-row-strategy">{strategy}{ivRead && <span className="mid-row-iv"> · IV {ivRead}</span>}</p>
+    {shifted && shiftNote && <p className="mid-row-shift-note">{shiftNote}</p>}
   </div>
 }
 
-// A checkpoint slot whose cron hasn't run yet today -- rendered as a dashed placeholder instead
-// of being omitted, so the full 5-slot shape of the day is always visible on the spine.
-function MidCheckpointPending({ label }: { label: string }) {
-  return <div className="mid-checkpoint-card mid-checkpoint-card-pending">
-    <div className="mid-checkpoint-card-top">
-      <span className="mid-checkpoint-card-label">Nifty &amp; Sensex</span>
-      <span className="mid-checkpoint-updated-tag mid-checkpoint-updated-tag-pending">Not yet run</span>
+// A checkpoint slot whose cron hasn't run yet today, for one instrument column.
+function MidCheckpointRowPending({ label }: { label: string }) {
+  return <div className="mid-row-card mid-row-card-pending">
+    <span className="mid-row-time">{label}</span>
+    <span className="mid-row-pending-tag">Pending</span>
+  </div>
+}
+
+// One instrument's full day at a glance: all 5 checkpoints stacked, expanded by default (no
+// tap-to-expand) so the whole session is visible in one compact column.
+function MidInstrumentColumn({ instrument, byId, nowMin }: { instrument: Instrument; byId: Map<string, Row>; nowMin: number }) {
+  const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
+  return <div className="mid-instrument-col">
+    <p className="mid-instrument-col-label">{instrument === 'NIFTY' ? 'Nifty' : 'Sensex'}</p>
+    <div className="mid-instrument-col-rows">
+      {CHECKPOINT_SLOTS.map((slot) => {
+        const cp = byId.get(slot.id)
+        const isDue = nowMin >= slot.minuteOfDay
+        return <div key={slot.id}>
+          {cp ? <MidCheckpointRow cp={cp} suffix={suffix} label={slot.label} /> : <MidCheckpointRowPending label={slot.label} />}
+          {!cp && isDue && <p className="mid-row-overdue-note">Running a little late</p>}
+        </div>
+      })}
     </div>
-    <p className="mid-checkpoint-pending-body">Updates automatically at {label} IST</p>
   </div>
 }
 
@@ -828,23 +829,13 @@ function MidMarketView({ row, midCheckpoints }: { row: Row; midCheckpoints: Row[
 
   return <section className="phase-view special-view mid-checkpoint-view">
     <div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div>
-    <div className="mid-checkpoint-spine">
-      {CHECKPOINT_SLOTS.map((slot) => {
-        const cp = byId.get(slot.id)
-        const shifted = cp ? checkpointShifted(cp) : false
-        const isDue = nowMin >= slot.minuteOfDay
-        return <div className="mid-checkpoint-row" key={slot.id}>
-          <div className="mid-checkpoint-time">{slot.label}<small>IST</small></div>
-          <div className={`mid-checkpoint-dot-marker ${shifted ? 'is-shifted' : ''} ${!cp ? 'is-pending' : ''}`} />
-          <div className="mid-checkpoint-card-col">
-            {cp ? <MidCheckpointCard cp={cp} row={row} label={slot.label} /> : <MidCheckpointPending label={slot.label} />}
-            {!cp && isDue && <p className="mid-checkpoint-overdue-note">Running a little late — this usually lands within a few minutes of {slot.label} IST.</p>}
-          </div>
-        </div>
-      })}
+    <div className="mid-instrument-grid">
+      <MidInstrumentColumn instrument="NIFTY" byId={byId} nowMin={nowMin} />
+      <MidInstrumentColumn instrument="SENSEX" byId={byId} nowMin={nowMin} />
     </div>
   </section>
 }
+
 function PostInstrumentCard({ row, postSummary, instrument }: { row: Row; postSummary: Row; instrument: Instrument }) {
   const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
   const calc = useMemo(() => calculateVerdict(row, instrument), [row, instrument])
@@ -865,6 +856,15 @@ function PostMarketView({ row, postSummary }: { row: Row; postSummary: Row | nul
 }
 
 function PhaseView({ phase, row, historyData }: { phase: Phase; row: Row | null; historyData?: HistoryExtras | null }) {
+  const supabase = useMemo(() => createClient(), [])
+  const { data: giftRow } = useSWR(
+    phase === 'premarket' && row?.trade_date ? ['gift-nifty-staging', row.trade_date] : null,
+    async () => {
+      const { data, error } = await supabase.from('gift_nifty_staging').select('last_price, fetched_at').eq('trade_date', row!.trade_date).maybeSingle()
+      if (error) throw error
+      return data as Row | null
+    }
+  )
   const fields = phaseFields[phase] ?? []
   const phaseHeadings: Record<'premarket' | 'open', [string, string]> = { premarket: ['Overnight → Open setup', 'Build the market thesis'], open: ['Market Open snapshot', 'Read the opening auction'] }
   const phaseSyncTimes: Record<'premarket' | 'open', string> = { premarket: '08:58', open: '09:30' }
@@ -893,7 +893,7 @@ function PhaseView({ phase, row, historyData }: { phase: Phase; row: Row | null;
     const gapText = `Opened ${gapPct >= 0 ? '+' : ''}${gapPct.toFixed(2)}% (${Number(gapPts).toFixed(1)} pts)${predictedText ? ` — ${predictedText}` : ''}`
     return [gapText, vixText, oiText].filter(Boolean).join('. ') + '.'
   }
-  const renderGroup = (title: string, group: typeof fields) => { const isIndex = title === 'Nifty' || title === 'Sensex'; const bias = title === 'Nifty' ? marketOpenBias('gap_points_nifty') : marketOpenBias('gap_points_sensex'); const summary = isIndex ? openSummary(title) : null; return <section className={`metric-group ${title === 'Common market data' ? 'common-group' : ''}`}><div className="group-heading">{title !== 'Common market data' && <h3>{title}{phase === 'open' && isIndex && <em className={`market-open-bias ${bias.toLowerCase()}`}> ({bias})</em>} {isIndex && <button type="button" className="semantic-info" aria-label={`${title} market color and OI action guidance`}><Info size={14} aria-hidden="true" /><span className="semantic-tooltip" role="tooltip"><b className="key-positive">Green</b> bullish / positive · <b className="key-negative">Red</b> bearish / negative · OI Addition = building interest · OI Unwinding = reducing interest</span></button>}</h3>}</div>{summary && <div className="verdict-banner prior-sessions-banner open-summary-banner"><p className="eyebrow">{title} at open</p><p className="prior-session-line">{summary}</p></div>}<div className="field-grid">{group.map((f) => { const isVix = f.key === 'india_vix'; const isOiAction = f.key.startsWith('oi_change_'); const actionTone = isOiAction ? (String(row?.[f.key] ?? '').toLowerCase() === 'addition' ? 'positive' : String(row?.[f.key] ?? '').toLowerCase().includes('unwinding') ? 'negative' : '') : ''; const relatedAction = f.key === 'oi_support_nifty' ? row?.oi_change_support_nifty : f.key === 'oi_support_sensex' ? row?.oi_change_support_sensex : f.key === 'oi_resistance_nifty' ? row?.oi_change_resistance_nifty : f.key === 'oi_resistance_sensex' ? row?.oi_change_resistance_sensex : null; const breadth = f.key === 'advance_decline_ratio' ? breadthDirection(row?.[f.key]) : null; const isNiftyGap = f.key === 'gap_points_nifty'; const predictedGap = isNiftyGap ? (num(row ?? {}, 'gift_nifty_gap_pct') / 100) * num(row ?? {}, 'prev_close_nifty') : null; return <div className={`field-card ${row?.[f.key] == null ? 'is-empty' : ''}`} key={f.key}><span>{f.label}</span><strong className={tone(row, f.key)}>{value(row, f.key, f.pct)}{isVix && row?.india_vix_change_pct != null && <em className={`vix-change ${tone(row, 'india_vix_change_pct')}`}> ({value(row, 'india_vix_change_pct', true)})</em>}{f.key.startsWith('prev_day_change_pct_') && row?.[f.key.replace('_pct_', '_pts_')] != null && <em className="prior-day-pts"> ({Number(row[f.key.replace('_pct_', '_pts_')]) > 0 ? '+' : ''}{row[f.key.replace('_pct_', '_pts_')]} pts)</em>}{f.key === 'gift_nifty_gap_pct' && row?.gift_nifty_gap_pts != null && <em className="prior-day-pts"> ({Number(row.gift_nifty_gap_pts) > 0 ? '+' : ''}{row.gift_nifty_gap_pts} pts)</em>}{relatedAction != null && <em className={`oi-action ${String(relatedAction).toLowerCase() === 'addition' ? 'positive' : String(relatedAction).toLowerCase().includes('unwinding') ? 'negative' : ''}`}> ({String(relatedAction)})</em>}{breadth && <em className={`breadth-flag ${breadth.tone}`}> {breadth.arrow} {breadth.label}</em>}{isNiftyGap && predictedGap != null && row?.[f.key] != null && <em className="predicted-gap"> (Predicted: {predictedGap.toFixed(1)}, Difference: {(predictedGap - Number(row[f.key])).toFixed(1)})</em>}</strong>{isOiAction && <small className={`oi-action ${actionTone}`}>{String(row?.[f.key] ?? '—')}</small>}</div> })}</div></section> }
+  const renderGroup = (title: string, group: typeof fields) => { const isIndex = title === 'Nifty' || title === 'Sensex'; const bias = title === 'Nifty' ? marketOpenBias('gap_points_nifty') : marketOpenBias('gap_points_sensex'); const summary = isIndex ? openSummary(title) : null; return <section className={`metric-group ${title === 'Common market data' ? 'common-group' : ''}`}><div className="group-heading">{title !== 'Common market data' && <h3>{title}{phase === 'open' && isIndex && <em className={`market-open-bias ${bias.toLowerCase()}`}> ({bias})</em>} {isIndex && <button type="button" className="semantic-info" aria-label={`${title} market color and OI action guidance`}><Info size={14} aria-hidden="true" /><span className="semantic-tooltip" role="tooltip"><b className="key-positive">Green</b> bullish / positive · <b className="key-negative">Red</b> bearish / negative · OI Addition = building interest · OI Unwinding = reducing interest</span></button>}</h3>}</div>{summary && <div className="verdict-banner prior-sessions-banner open-summary-banner"><p className="eyebrow">{title} at open</p><p className="prior-session-line">{summary}</p></div>}<div className="field-grid">{group.map((f) => { const isVix = f.key === 'india_vix'; const isOiAction = f.key.startsWith('oi_change_'); const actionTone = isOiAction ? (String(row?.[f.key] ?? '').toLowerCase() === 'addition' ? 'positive' : String(row?.[f.key] ?? '').toLowerCase().includes('unwinding') ? 'negative' : '') : ''; const relatedAction = f.key === 'oi_support_nifty' ? row?.oi_change_support_nifty : f.key === 'oi_support_sensex' ? row?.oi_change_support_sensex : f.key === 'oi_resistance_nifty' ? row?.oi_change_resistance_nifty : f.key === 'oi_resistance_sensex' ? row?.oi_change_resistance_sensex : null; const breadth = f.key === 'advance_decline_ratio' ? breadthDirection(row?.[f.key]) : null; const isNiftyGap = f.key === 'gap_points_nifty'; const predictedGap = isNiftyGap ? (num(row ?? {}, 'gift_nifty_gap_pct') / 100) * num(row ?? {}, 'prev_close_nifty') : null; const isGiftGap = f.key === 'gift_nifty_gap_pct'; return <div className={`field-card ${row?.[f.key] == null ? 'is-empty' : ''}`} key={f.key}><span>{f.label}</span><strong className={tone(row, f.key)}>{value(row, f.key, f.pct)}{isVix && row?.india_vix_change_pct != null && <em className={`vix-change ${tone(row, 'india_vix_change_pct')}`}> ({value(row, 'india_vix_change_pct', true)})</em>}{f.key.startsWith('prev_day_change_pct_') && row?.[f.key.replace('_pct_', '_pts_')] != null && <em className="prior-day-pts"> ({Number(row[f.key.replace('_pct_', '_pts_')]) > 0 ? '+' : ''}{row[f.key.replace('_pct_', '_pts_')]} pts)</em>}{isGiftGap && row?.gift_nifty_gap_pts != null && <em className="prior-day-pts"> ({Number(row.gift_nifty_gap_pts) > 0 ? '+' : ''}{row.gift_nifty_gap_pts} pts) expected open</em>}{relatedAction != null && <em className={`oi-action ${String(relatedAction).toLowerCase() === 'addition' ? 'positive' : String(relatedAction).toLowerCase().includes('unwinding') ? 'negative' : ''}`}> ({String(relatedAction)})</em>}{breadth && <em className={`breadth-flag ${breadth.tone}`}> {breadth.arrow} {breadth.label}</em>}{isNiftyGap && predictedGap != null && row?.[f.key] != null && <em className="predicted-gap"> (Predicted: {predictedGap.toFixed(1)}, Difference: {(predictedGap - Number(row[f.key])).toFixed(1)})</em>}</strong>{isOiAction && <small className={`oi-action ${actionTone}`}>{String(row?.[f.key] ?? '—')}</small>}{isGiftGap && giftRow?.last_price != null && row?.prev_close_nifty != null && <small className="gift-raw-compare">{giftRow.last_price} ({fmtTimeIST(giftRow.fetched_at)}) vs {row.prev_close_nifty} (Prev Close)</small>}</div> })}</div></section> }
   const [eyebrow, heading] = phaseHeadings[phase as 'premarket' | 'open']
   const scheduledTime = phaseSyncTimes[phase as 'premarket' | 'open']
   // D-1 recap for Pre-market only: the single most recent trading day strictly before
