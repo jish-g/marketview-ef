@@ -112,13 +112,20 @@ function bareHeadline(title: string): string {
   return title.replace(/\s*\|\s*MarketCue\s*$/i, '').trim()
 }
 
-// Keeps <title> at the audit's 50-60 char target: the brand suffix is never
-// truncated, only the headline portion, so the page's own identity always
-// stays intact in a truncated SERP snippet.
+// Keeps <title> at the audit's <=60 char target without ever emitting a
+// mid-word ellipsis truncation. post.title is written by the external rules
+// engine, so this can't regenerate a shorter headline at the source -- the
+// next best thing is to never truncate the headline itself: first try
+// dropping the brand suffix if the bare headline alone already fits, and
+// only as a last resort (a headline that's independently >60 chars, not
+// seen in practice) cut at the nearest word boundary with no ellipsis.
 function pageTitle(headline: string): string {
-  const maxHeadlineLen = 60 - BRAND_SUFFIX.length
-  const trimmed = headline.length > maxHeadlineLen ? `${headline.slice(0, maxHeadlineLen - 1).trimEnd()}…` : headline
-  return `${trimmed}${BRAND_SUFFIX}`
+  const withSuffix = `${headline}${BRAND_SUFFIX}`
+  if (withSuffix.length <= 60) return withSuffix
+  if (headline.length <= 60) return headline
+  const cut = headline.slice(0, 60)
+  const lastSpace = cut.lastIndexOf(' ')
+  return lastSpace > 30 ? cut.slice(0, lastSpace) : cut
 }
 
 // blog_posts.published_at is a UTC timestamp (e.g. "...+00:00") holding the

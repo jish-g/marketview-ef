@@ -32,6 +32,22 @@ function bareHeadline(title: string): string {
   return title.replace(/\s*\|\s*MarketCue\s*$/i, '').trim()
 }
 
+const BODY_SECTION_HEADINGS = ['What the option chain shows', 'Bias and readiness', 'Levels to watch']
+
+// The generated body (data.body) is one flowing block of prose from the
+// external rules engine, with no per-paragraph topic tags -- so rather than
+// rewriting the generated copy to fit predetermined sections, this splits
+// the existing paragraphs into three roughly even groups under the three
+// required H2s, preserving the generated text verbatim.
+function bodySections(body: string): { heading: string; paragraphs: string[] }[] {
+  const paragraphs = body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+  const perSection = Math.max(1, Math.ceil(paragraphs.length / BODY_SECTION_HEADINGS.length))
+  return BODY_SECTION_HEADINGS.map((heading, i) => ({
+    heading,
+    paragraphs: paragraphs.slice(i * perSection, (i + 1) * perSection),
+  }))
+}
+
 function fmtPct(v: any) {
   if (v === null || v === undefined || v === '') return '—'
   const n = Number(v)
@@ -200,7 +216,16 @@ export default function NiftySensexTodayPostClient({ initialPost, initialMarketR
               </section>
             )}
 
-            <div className="blog-post-body">{data.body.split(/\n\s*\n/).map((para, i) => <p key={i}>{para.trim()}</p>)}</div>
+            <div className="blog-post-body">
+              {bodySections(data.body).map(({ heading, paragraphs }) => (
+                paragraphs.length > 0 && (
+                  <section key={heading}>
+                    <h2>{heading}</h2>
+                    {paragraphs.map((para, i) => <p key={i}>{para}</p>)}
+                  </section>
+                )
+              ))}
+            </div>
 
             <nav className="blog-post-related" aria-label="Related reading">
               <p className="eyebrow">Related reading</p>
