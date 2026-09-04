@@ -210,6 +210,13 @@ button, input { font: inherit; }
 .landing-positioning .eyebrow { display: block; margin-bottom: 6px; }
 .landing-positioning .landing-body-text { max-width: 680px; }
 
+.landing-evergreen { padding: clamp(52px, 7vw, 80px) 0; }
+.landing-evergreen .eyebrow { display: block; margin-bottom: 6px; }
+.landing-evergreen .landing-body-text { max-width: 680px; margin-bottom: 20px; }
+.landing-evergreen-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.landing-evergreen-link { display: block; padding: 14px 16px; border: 1px solid var(--border); background: var(--card); border-radius: 8px; color: var(--foreground); font-size: 13px; font-weight: 600; text-decoration: none; }
+.landing-evergreen-link:hover { border-color: var(--primary); color: var(--primary); }
+@media (max-width: 760px) { .landing-evergreen-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .landing-differentiators { max-width: 960px; margin: 0 auto; padding: clamp(60px, 8vw, 96px) 24px; }
 .landing-differentiators .eyebrow { display: block; margin-bottom: 20px; }
 .landing-diff-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }

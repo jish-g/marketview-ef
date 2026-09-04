@@ -242,11 +242,28 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
         </div>
       </section>
 
+      <section className="landing-band landing-evergreen">
+        <div className="landing-section-inner">
+          <h2 className="eyebrow">Today's numbers</h2>
+          <p className="landing-body-text">Live, single-metric reads that update on every checkpoint — each one pulled straight from the same rules engine behind the daily pre-market and post-market calls.</p>
+          <div className="landing-evergreen-grid">
+            <Link href="/india-vix-today" className="landing-evergreen-link">India VIX today</Link>
+            <Link href="/gift-nifty-today" className="landing-evergreen-link">GIFT Nifty today</Link>
+            <Link href="/sensex-option-chain" className="landing-evergreen-link">Sensex option chain</Link>
+            <Link href="/nse-option-chain-analysis" className="landing-evergreen-link">NSE option chain analysis</Link>
+            <Link href="/nifty-pcr-today" className="landing-evergreen-link">Nifty PCR today</Link>
+            <Link href="/nifty-max-pain-today" className="landing-evergreen-link">Nifty Max Pain today</Link>
+            <Link href="/nifty-support-resistance-today" className="landing-evergreen-link">Nifty support &amp; resistance today</Link>
+            <Link href="/fii-dii-data-today" className="landing-evergreen-link">FII DII data today</Link>
+          </div>
+        </div>
+      </section>
+
       <section className="landing-closing">
         <div className="landing-closing-card">
           <div className="landing-closing-ctas">
-            <Link href="/dashboard" className="landing-cta-primary">Enter dashboard <ArrowRight size={15} /></Link>
-            <Link href="/nifty-sensex-today" className="landing-cta-secondary"><Newspaper size={15} /> Nifty and Sensex today</Link>
+            <Link href="/nifty-sensex-today" className="landing-cta-primary"><Newspaper size={15} /> Nifty and Sensex today</Link>
+            <Link href="/rules" className="landing-cta-secondary">Read the rules engine</Link>
           </div>
         </div>
       </section>
@@ -262,15 +279,15 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           </div>
           <div className="landing-footer-col">
             <span>Product</span>
-            <Link href="/dashboard">Dashboard</Link>
             <Link href="/nifty-sensex-today">Nifty and Sensex today</Link>
-            <Link href="/dashboard">Journal</Link>
+            <Link href="/rules">Rules engine</Link>
+            <Link href="/about">About</Link>
           </div>
           <div className="landing-footer-col">
-            <span>Session</span>
-            <Link href="/dashboard">Pre-market</Link>
-            <Link href="/dashboard">Mid-market</Link>
-            <Link href="/dashboard">Post-market</Link>
+            <span>Today's numbers</span>
+            <Link href="/india-vix-today">India VIX</Link>
+            <Link href="/gift-nifty-today">GIFT Nifty</Link>
+            <Link href="/sensex-option-chain">Sensex option chain</Link>
           </div>
           <div className="landing-footer-col">
             <span>About</span>
