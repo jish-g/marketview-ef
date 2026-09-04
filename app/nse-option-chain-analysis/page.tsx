@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { EvergreenPage } from '@/components/evergreen-page'
 import { faqJsonLd, type FaqItem } from '@/lib/faq'
 import {
-  getLatestRow, getRecentPosts, fmtNum, formatDateLabel,
+  getLatestRow, getRecentPosts, fmtNum, formatDateLabel, getUpdatedMeta,
   pcrRead, maxPainRead, oiRead, vixRead,
 } from '@/lib/market-data'
 
@@ -40,6 +40,7 @@ export default async function NseOptionChainAnalysisPage() {
     'trade_date, pcr_nifty, max_pain_nifty, oi_support_nifty, oi_resistance_nifty, oi_change_support_nifty, oi_change_resistance_nifty, atm_iv_nifty, india_vix, prev_close_nifty'
   )
   const recentPosts = await getRecentPosts(5)
+  const updated = getUpdatedMeta(row)
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -47,6 +48,9 @@ export default async function NseOptionChainAnalysisPage() {
     name: 'NSE Option Chain Analysis',
     description: metadata.description,
     url: `${SITE_URL}/nse-option-chain-analysis`,
+    dateModified: updated.iso,
+    temporalCoverage: updated.tradeDate ?? undefined,
+    creator: { '@type': 'Organization', name: 'MarketCue' },
   }
 
   const pcr = row?.pcr_nifty
@@ -75,6 +79,8 @@ export default async function NseOptionChainAnalysisPage() {
       <EvergreenPage
         eyebrow="NSE Option Chain"
         h1="NSE Option Chain Analysis Today"
+        updatedISO={updated.iso}
+        updatedLabel={updated.label}
         metricLabel="Nifty PCR"
         metricValue={fmtNum(pcr)}
         metricSub={`As of ${asOfLabel} — Max Pain ${fmtNum(maxPain)}`}

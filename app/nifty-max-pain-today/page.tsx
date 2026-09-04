@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { EvergreenPage } from '@/components/evergreen-page'
 import { faqJsonLd, type FaqItem } from '@/lib/faq'
-import { getLatestRow, getRecentPosts, fmtNum, formatDateLabel, maxPainRead } from '@/lib/market-data'
+import { getLatestRow, getRecentPosts, fmtNum, formatDateLabel, getUpdatedMeta, maxPainRead } from '@/lib/market-data'
 
 export const revalidate = 300
 
@@ -34,6 +34,7 @@ const FAQ: FaqItem[] = [
 export default async function NiftyMaxPainTodayPage() {
   const row = await getLatestRow('premarket_dashboard', 'trade_date, max_pain_nifty, prev_close_nifty')
   const recentPosts = await getRecentPosts(5)
+  const updated = getUpdatedMeta(row)
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -41,6 +42,9 @@ export default async function NiftyMaxPainTodayPage() {
     name: 'Nifty Max Pain Today',
     description: metadata.description,
     url: `${SITE_URL}/nifty-max-pain-today`,
+    dateModified: updated.iso,
+    temporalCoverage: updated.tradeDate ?? undefined,
+    creator: { '@type': 'Organization', name: 'MarketCue' },
   }
 
   const maxPain = row?.max_pain_nifty
@@ -67,6 +71,8 @@ export default async function NiftyMaxPainTodayPage() {
       <EvergreenPage
         eyebrow="Nifty Max Pain"
         h1="Nifty Max Pain Today"
+        updatedISO={updated.iso}
+        updatedLabel={updated.label}
         metricLabel="Max Pain"
         metricValue={fmtNum(maxPain)}
         metricSub={`As of ${asOfLabel}`}

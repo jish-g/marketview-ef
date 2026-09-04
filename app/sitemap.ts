@@ -20,25 +20,53 @@ const SUPABASE_KEY =
 
 type BlogPostRow = { slug: string; phase: 'premarket' | 'postmarket'; published_at: string }
 
+// The 7 premarket_dashboard-backed evergreen pages share one lastModified
+// (that table's own latest updated_at); fii-dii-data-today is the only one
+// backed by postmarket_summary, so it gets its own. Both fall back to "now"
+// if the table is briefly unreachable or genuinely empty, same fallback
+// getUpdatedMeta uses on the pages themselves.
+const PREMARKET_BACKED_EVERGREEN_PATHS = [
+  'sensex-option-chain',
+  'india-vix-today',
+  'gift-nifty-today',
+  'nse-option-chain-analysis',
+  'nifty-pcr-today',
+  'nifty-max-pain-today',
+  'nifty-support-resistance-today',
+]
+
+async function latestUpdatedAt(supabase: any, table: 'premarket_dashboard' | 'postmarket_summary'): Promise<Date> {
+  try {
+    const { data } = await supabase.from(table).select('updated_at').order('updated_at', { ascending: false }).limit(1).maybeSingle()
+    return data?.updated_at ? new Date(data.updated_at as string) : new Date()
+  } catch {
+    return new Date()
+  }
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+  const [premarketLastModified, postmarketLastModified] = await Promise.all([
+    latestUpdatedAt(supabase, 'premarket_dashboard'),
+    latestUpdatedAt(supabase, 'postmarket_summary'),
+  ])
+
   const staticEntries: MetadataRoute.Sitemap = [
     { url: `${SITE_URL}/`, changeFrequency: 'daily', priority: 1 },
     { url: `${SITE_URL}/nifty-sensex-today`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${SITE_URL}/rules`, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${SITE_URL}/about`, changeFrequency: 'monthly', priority: 0.3 },
-    { url: `${SITE_URL}/sensex-option-chain`, changeFrequency: 'daily', priority: 0.7 },
-    { url: `${SITE_URL}/india-vix-today`, changeFrequency: 'daily', priority: 0.7 },
-    { url: `${SITE_URL}/gift-nifty-today`, changeFrequency: 'daily', priority: 0.7 },
-    { url: `${SITE_URL}/nse-option-chain-analysis`, changeFrequency: 'daily', priority: 0.7 },
-    { url: `${SITE_URL}/fii-dii-data-today`, changeFrequency: 'daily', priority: 0.7 },
-    { url: `${SITE_URL}/nifty-pcr-today`, changeFrequency: 'daily', priority: 0.7 },
-    { url: `${SITE_URL}/nifty-max-pain-today`, changeFrequency: 'daily', priority: 0.7 },
-    { url: `${SITE_URL}/nifty-support-resistance-today`, changeFrequency: 'daily', priority: 0.7 },
+    ...PREMARKET_BACKED_EVERGREEN_PATHS.map((path) => ({
+      url: `${SITE_URL}/${path}`,
+      lastModified: premarketLastModified,
+      changeFrequency: 'daily' as const,
+      priority: 0.7,
+    })),
+    { url: `${SITE_URL}/fii-dii-data-today`, lastModified: postmarketLastModified, changeFrequency: 'daily', priority: 0.7 },
   ]
 
   let postEntries: MetadataRoute.Sitemap = []
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
     const { data } = await supabase
       .from('blog_posts')
       .select('slug, phase, published_at')

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { EvergreenPage } from '@/components/evergreen-page'
 import { faqJsonLd, type FaqItem } from '@/lib/faq'
-import { getLatestRow, getRecentPosts, fmtNum, formatDateLabel, pcrRead } from '@/lib/market-data'
+import { getLatestRow, getRecentPosts, fmtNum, formatDateLabel, getUpdatedMeta, pcrRead } from '@/lib/market-data'
 
 export const revalidate = 300
 
@@ -34,6 +34,7 @@ const FAQ: FaqItem[] = [
 export default async function NiftyPcrTodayPage() {
   const row = await getLatestRow('premarket_dashboard', 'trade_date, pcr_nifty, prev_close_nifty')
   const recentPosts = await getRecentPosts(5)
+  const updated = getUpdatedMeta(row)
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -41,6 +42,9 @@ export default async function NiftyPcrTodayPage() {
     name: 'Nifty PCR Today',
     description: metadata.description,
     url: `${SITE_URL}/nifty-pcr-today`,
+    dateModified: updated.iso,
+    temporalCoverage: updated.tradeDate ?? undefined,
+    creator: { '@type': 'Organization', name: 'MarketCue' },
   }
 
   const pcr = row?.pcr_nifty
@@ -64,6 +68,8 @@ export default async function NiftyPcrTodayPage() {
       <EvergreenPage
         eyebrow="Nifty PCR"
         h1="Nifty PCR Today"
+        updatedISO={updated.iso}
+        updatedLabel={updated.label}
         metricLabel="PCR"
         metricValue={fmtNum(pcr)}
         metricSub={`As of ${asOfLabel}`}

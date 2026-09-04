@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { EvergreenPage } from '@/components/evergreen-page'
 import { faqJsonLd, type FaqItem } from '@/lib/faq'
-import { getLatestRow, getRecentPosts, fmtNum, formatDateLabel } from '@/lib/market-data'
+import { getLatestRow, getRecentPosts, fmtNum, formatDateLabel, getUpdatedMeta } from '@/lib/market-data'
 
 export const revalidate = 300
 
@@ -42,6 +42,7 @@ function flowRead(v: any): string {
 export default async function FiiDiiDataTodayPage() {
   const row = await getLatestRow('postmarket_summary', 'trade_date, fii_net_cash_cr, dii_net_cash_cr, fii_dii_data_date')
   const recentPosts = await getRecentPosts(5)
+  const updated = getUpdatedMeta(row)
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -49,6 +50,9 @@ export default async function FiiDiiDataTodayPage() {
     name: 'FII DII Data Today',
     description: metadata.description,
     url: `${SITE_URL}/fii-dii-data-today`,
+    dateModified: updated.iso,
+    temporalCoverage: updated.tradeDate ?? undefined,
+    creator: { '@type': 'Organization', name: 'MarketCue' },
   }
 
   const fii = row?.fii_net_cash_cr
@@ -74,6 +78,8 @@ export default async function FiiDiiDataTodayPage() {
       <EvergreenPage
         eyebrow="FII / DII Data"
         h1="FII DII Data Today"
+        updatedISO={updated.iso}
+        updatedLabel={updated.label}
         metricLabel="FII Net Flow"
         metricValue={fii != null ? `₹${fii} Cr` : '—'}
         metricSub={`As of ${asOfDisplay} — DII ₹${fmtNum(dii)} Cr`}

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { EvergreenPage } from '@/components/evergreen-page'
 import { faqJsonLd, type FaqItem } from '@/lib/faq'
-import { getLatestRow, getRecentPosts, fmtNum, fmtPct, formatDateLabel, gapRead } from '@/lib/market-data'
+import { getLatestRow, getRecentPosts, fmtNum, fmtPct, formatDateLabel, getUpdatedMeta, gapRead } from '@/lib/market-data'
 
 export const revalidate = 300
 
@@ -34,6 +34,7 @@ const FAQ: FaqItem[] = [
 export default async function GiftNiftyTodayPage() {
   const row = await getLatestRow('premarket_dashboard', 'trade_date, gift_nifty_gap_pct, gift_nifty_gap_pts, prev_close_nifty')
   const recentPosts = await getRecentPosts(5)
+  const updated = getUpdatedMeta(row)
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -41,6 +42,9 @@ export default async function GiftNiftyTodayPage() {
     name: 'GIFT Nifty Today',
     description: metadata.description,
     url: `${SITE_URL}/gift-nifty-today`,
+    dateModified: updated.iso,
+    temporalCoverage: updated.tradeDate ?? undefined,
+    creator: { '@type': 'Organization', name: 'MarketCue' },
   }
 
   const gapPct = row?.gift_nifty_gap_pct
@@ -69,6 +73,8 @@ export default async function GiftNiftyTodayPage() {
       <EvergreenPage
         eyebrow="GIFT Nifty"
         h1="GIFT Nifty Today"
+        updatedISO={updated.iso}
+        updatedLabel={updated.label}
         metricLabel="GIFT Nifty Gap"
         metricValue={fmtPct(gapPct)}
         metricSub={`As of ${asOfLabel}${predictedOpen ? ` — predicted open ${predictedOpen}` : ''}`}

@@ -10,6 +10,8 @@ export type MetricRow = { metric: string; value: ReactNode; read: string }
 type EvergreenPageProps = {
   eyebrow: string
   h1: string
+  updatedISO: string
+  updatedLabel: string
   metricLabel: string
   metricValue: ReactNode
   metricSub: string
@@ -19,7 +21,7 @@ type EvergreenPageProps = {
   recentPosts: RecentPost[]
 }
 
-export function EvergreenPage({ eyebrow, h1, metricLabel, metricValue, metricSub, tableRows, paragraphs, faq, recentPosts }: EvergreenPageProps) {
+export function EvergreenPage({ eyebrow, h1, updatedISO, updatedLabel, metricLabel, metricValue, metricSub, tableRows, paragraphs, faq, recentPosts }: EvergreenPageProps) {
   return (
     <main className="rules-doc-shell">
       <header className="rules-doc-topbar">
@@ -34,6 +36,7 @@ export function EvergreenPage({ eyebrow, h1, metricLabel, metricValue, metricSub
           <div className="doc-hero">
             <p className="eyebrow">{eyebrow}</p>
             <h1>{h1}</h1>
+            <time className="evergreen-updated" dateTime={updatedISO}>{updatedLabel}</time>
             <div className="evergreen-metric-callout">
               <span>{metricLabel}</span>
               <strong>{metricValue}</strong>

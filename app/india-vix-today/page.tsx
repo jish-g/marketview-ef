@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { EvergreenPage } from '@/components/evergreen-page'
 import { faqJsonLd, type FaqItem } from '@/lib/faq'
-import { getLatestRow, getRecentPosts, fmtNum, fmtPct, formatDateLabel, vixRead } from '@/lib/market-data'
+import { getLatestRow, getRecentPosts, fmtNum, fmtPct, formatDateLabel, getUpdatedMeta, vixRead } from '@/lib/market-data'
 
 export const revalidate = 300
 
@@ -34,6 +34,7 @@ const FAQ: FaqItem[] = [
 export default async function IndiaVixTodayPage() {
   const row = await getLatestRow('premarket_dashboard', 'trade_date, india_vix, india_vix_change_pct')
   const recentPosts = await getRecentPosts(5)
+  const updated = getUpdatedMeta(row)
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -41,6 +42,9 @@ export default async function IndiaVixTodayPage() {
     name: 'India VIX Today',
     description: metadata.description,
     url: `${SITE_URL}/india-vix-today`,
+    dateModified: updated.iso,
+    temporalCoverage: updated.tradeDate ?? undefined,
+    creator: { '@type': 'Organization', name: 'MarketCue' },
   }
 
   const vix = row?.india_vix
@@ -64,6 +68,8 @@ export default async function IndiaVixTodayPage() {
       <EvergreenPage
         eyebrow="India VIX"
         h1="India VIX Today"
+        updatedISO={updated.iso}
+        updatedLabel={updated.label}
         metricLabel="India VIX"
         metricValue={fmtNum(vix)}
         metricSub={`As of ${asOfLabel}`}
