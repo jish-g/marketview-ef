@@ -208,14 +208,14 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
 
       <section className="landing-band landing-positioning">
         <div className="landing-section-inner">
-          <p className="eyebrow">Why MarketCue</p>
+          <h2 className="eyebrow">Why MarketCue</h2>
           <p className="landing-body-text">Raw options data — gap, OI, PCR, max pain, IV, VIX — is available everywhere and looks the same on every terminal. The edge isn&apos;t access to data, it&apos;s reading it the same disciplined way every session.</p>
           <p className="landing-body-text">MarketCue runs that data through a documented, rules-based framework to produce one read instead of six charts to interpret yourself.</p>
         </div>
       </section>
 
       <section className="landing-differentiators">
-        <p className="eyebrow">What makes it different</p>
+        <h2 className="eyebrow">What makes it different</h2>
         <div className="landing-diff-grid">
           {differentiators.map(({ icon: Icon, title, description }) => (
             <article className="landing-diff-card" key={title}>
@@ -229,7 +229,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
 
       <section className="landing-band landing-how">
         <div className="landing-section-inner">
-          <p className="eyebrow">How it works</p>
+          <h2 className="eyebrow">How it works</h2>
           <div className="landing-how-grid">
             {howItWorks.map(({ step, title, description }) => (
               <article className="landing-how-card" key={step}>
