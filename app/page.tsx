@@ -14,7 +14,7 @@ const SUPABASE_KEY =
 export const metadata: Metadata = {
   title: 'MarketCue — Nifty & Sensex market reads, built on rules you can audit',
   description:
-    'A daily read on Nifty and Sensex from a documented, rules-based scoring framework — pre-market call before the open, post-market recap after the close. Not a black box.',
+    'A daily Nifty and Sensex read from a documented, rules-based scoring framework — pre-market call before the open, post-market recap after the close.',
   alternates: { canonical: `${SITE_URL}/` },
   openGraph: {
     title: 'MarketCue — Nifty & Sensex market reads, built on rules you can audit',
