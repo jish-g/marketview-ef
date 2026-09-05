@@ -297,6 +297,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           <div className="landing-footer-col">
             <span>Community</span>
             <a href="https://t.me/marketcue_in" target="_blank" rel="noopener noreferrer">Telegram channel</a>
+            <a href="https://www.linkedin.com/company/marketcue-in" target="_blank" rel="noopener noreferrer">LinkedIn</a>
           </div>
         </div>
         <div className="landing-footer-bottom">

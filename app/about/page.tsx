@@ -55,8 +55,9 @@ export default function AboutPage() {
                 publicly available market data.
               </p>
               <p className="doc-hero-links">
-                Follow updates on <a href="https://t.me/marketcue_in" target="_blank" rel="noopener noreferrer">Telegram</a> or{' '}
-                <a href="https://x.com/marketcue_in" target="_blank" rel="noopener noreferrer">X</a>.
+                Follow updates on <a href="https://t.me/marketcue_in" target="_blank" rel="noopener noreferrer">Telegram</a>,{' '}
+                <a href="https://x.com/marketcue_in" target="_blank" rel="noopener noreferrer">X</a>, or{' '}
+                <a href="https://www.linkedin.com/company/marketcue-in" target="_blank" rel="noopener noreferrer">LinkedIn</a>.
               </p>
             </div>
           </article>
