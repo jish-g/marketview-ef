@@ -42,7 +42,7 @@ const organizationJsonLd = {
   url: 'https://marketcue.in',
   logo: 'https://marketcue.in/apple-icon.png',
   description: 'Rules-based market reads on Nifty and Sensex for option traders.',
-  sameAs: ['https://t.me/marketcue_in', 'https://x.com/marketcue_in'],
+  sameAs: ['https://t.me/marketcue_in', 'https://x.com/marketcue_in', 'https://www.linkedin.com/company/marketcue-in'],
 }
 
 export default function RootLayout({
