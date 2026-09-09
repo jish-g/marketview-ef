@@ -11,24 +11,24 @@ const SUPABASE_URL =
 const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_PREMARKET_SUPABASE_KEY || 'sb_publishable_-am88LW21cvkYYA_H9vqWA_K42a7bXG'
 
+const POSITIONING_DESCRIPTION =
+  'MarketCue is an AI-Agentic Option Intelligence Platform for Indian Stock Market — reading data continuously through the trading day and turning it into a decision, not another chart to interpret.'
+
 export const metadata: Metadata = {
-  title: 'MarketCue — Nifty & Sensex reads built on rules',
-  description:
-    'A daily Nifty and Sensex read from a documented, rules-based scoring framework — pre-market call before the open, post-market recap after the close.',
+  title: 'AI-Agentic Option Intelligence Platform for Indian Stock Market | MarketCue',
+  description: POSITIONING_DESCRIPTION,
   alternates: { canonical: `${SITE_URL}/` },
   openGraph: {
-    title: 'MarketCue — Nifty & Sensex reads built on rules',
-    description:
-      'A daily read on Nifty and Sensex from a documented, rules-based scoring framework — pre-market call before the open, post-market recap after the close.',
+    title: 'MarketCue — AI-Agentic Option Intelligence Platform for Indian Stock Market',
+    description: POSITIONING_DESCRIPTION,
     url: `${SITE_URL}/`,
     siteName: 'MarketCue',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MarketCue — Nifty & Sensex reads built on rules',
-    description:
-      'A daily read on Nifty and Sensex from a documented, rules-based scoring framework — pre-market call before the open, post-market recap after the close.',
+    title: 'AI-Agentic Option Intelligence Platform for Indian Stock Market | MarketCue',
+    description: POSITIONING_DESCRIPTION,
   },
 }
 
@@ -37,8 +37,20 @@ const jsonLd = {
   '@type': 'WebSite',
   name: 'MarketCue',
   url: `${SITE_URL}/`,
-  description: 'A daily read on Nifty and Sensex, built from a rules engine you can audit.',
+  description: POSITIONING_DESCRIPTION,
   publisher: { '@type': 'Organization', name: 'MarketCue', url: `${SITE_URL}/` },
+}
+
+const softwareApplicationJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'MarketCue',
+  applicationCategory: 'FinanceApplication',
+  description: POSITIONING_DESCRIPTION,
+  audience: {
+    '@type': 'Audience',
+    audienceType: 'Indian options traders',
+  },
 }
 
 // Same IST-date helper used client-side, duplicated here (rather than shared)
@@ -81,6 +93,11 @@ export default async function Page() {
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationJsonLd) }}
       />
       <HomeClient tradeDate={tradeDate} initialPre={initialPre} initialPost={initialPost} />
     </>
