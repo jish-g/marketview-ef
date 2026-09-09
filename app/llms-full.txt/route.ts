@@ -66,7 +66,7 @@ export async function GET() {
 
   const body = `# MarketCue — Full Reference
 
-> A daily read on Nifty and Sensex, built from a documented, rules-based scoring framework -- pre-market call before the open, post-market recap after the close. Not a black box, and not trade advice.
+> MarketCue is an AI-Agentic Option Intelligence Platform for Indian Stock Market -- reading data continuously through the trading day and turning it into a decision, not another chart to interpret. Not trade advice.
 
 This document contains the complete scoring methodology and today's full reads inline, so it can be consumed in a single fetch. For just the current archive links, see ${SITE_URL}/llms.txt instead.
 

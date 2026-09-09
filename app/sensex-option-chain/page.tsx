@@ -12,7 +12,7 @@ const SITE_URL = 'https://marketcue.in'
 
 export const metadata: Metadata = {
   title: 'Sensex Option Chain Analysis Today | MarketCue',
-  description: "Today's live Sensex option chain read: PCR, Max Pain, and OI support/resistance, from MarketCue's documented rules engine.",
+  description: "Today's live Sensex option chain read: PCR, Max Pain, and OI support/resistance, from MarketCue's AI-Agentic Option Intelligence Platform.",
   alternates: { canonical: `${SITE_URL}/sensex-option-chain` },
 }
 
@@ -67,9 +67,9 @@ export default async function SensexOptionChainPage() {
   ]
 
   const paragraphs = [
-    `As of ${asOfLabel}, Sensex's option chain reads a Put-Call Ratio of ${fmtNum(pcr)} — ${pcrRead(pcr).toLowerCase()}. PCR compares outstanding put contracts to call contracts across all strikes; a high ratio means more puts are written relative to calls, which MarketCue's rules engine reads as a contrarian bullish signal since heavy put-writing usually reflects sellers betting the market won't fall to that strike, rather than traders expecting a decline.`,
+    `As of ${asOfLabel}, Sensex's option chain reads a Put-Call Ratio of ${fmtNum(pcr)} — ${pcrRead(pcr).toLowerCase()}. PCR compares outstanding put contracts to call contracts across all strikes; a high ratio means more puts are written relative to calls, which MarketCue's AI-Agentic platform reads as a contrarian bullish signal since heavy put-writing usually reflects sellers betting the market won't fall to that strike, rather than traders expecting a decline.`,
     `Max Pain for Sensex currently sits at ${fmtNum(maxPain)}${row?.prev_close_sensex != null ? `, against a previous close of ${fmtNum(row.prev_close_sensex)}` : ''}. Max Pain is the strike at which option writers as a group would lose the least money at expiry — price tends to gravitate toward this level as expiry approaches because writers (who collectively hold more capital at risk than buyers) have an incentive to defend it. The distance between spot and Max Pain is read as a directional pull: ${maxPainRead(row?.prev_close_sensex, maxPain).toLowerCase()}.`,
-    `Open interest structure at the key support (${fmtNum(row?.oi_support_sensex)}) and resistance (${fmtNum(row?.oi_resistance_sensex)}) strikes rounds out the picture. Whether OI is being added or unwound at these levels — tracked day-over-day — signals whether large positions are defending that level or abandoning it. Support with fresh Addition suggests the floor is being reinforced; Unwinding at resistance suggests sellers are losing conviction, a breakout signal. Every one of these bands is documented in full on MarketCue's rules engine, so this read is reproducible, not a discretionary call.`,
+    `Open interest structure at the key support (${fmtNum(row?.oi_support_sensex)}) and resistance (${fmtNum(row?.oi_resistance_sensex)}) strikes rounds out the picture. Whether OI is being added or unwound at these levels — tracked day-over-day — signals whether large positions are defending that level or abandoning it. Support with fresh Addition suggests the floor is being reinforced; Unwinding at resistance suggests sellers are losing conviction, a breakout signal. Every one of these bands is documented in full on MarketCue's rules page, so this read is reproducible, not a discretionary call.`,
   ]
 
   return (
