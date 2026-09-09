@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og'
 
 export const runtime = 'edge'
-export const alt = 'MarketCue — Nifty & Sensex market reads, built on rules you can audit'
+export const alt = 'MarketCue — AI-Agentic Option Intelligence Platform for Indian Stock Market'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
@@ -58,8 +58,8 @@ export default async function Image() {
             maxWidth: 920,
           }}
         >
-          Everyone gives you data.{' '}
-          <span style={{ color: '#1f8a4c' }}>We read it.</span>
+          AI-Agentic Option Intelligence{' '}
+          <span style={{ color: '#1f8a4c' }}>for Indian Stock Market</span>
         </div>
 
         <div
@@ -71,7 +71,7 @@ export default async function Image() {
             maxWidth: 820,
           }}
         >
-          The day&apos;s option data, read into bias and readiness — so the call is yours, with context behind it.
+          Reading data continuously through the trading day and turning it into a decision, not another chart to interpret.
         </div>
       </div>
     ),

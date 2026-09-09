@@ -9,7 +9,7 @@ const SITE_URL = 'https://marketcue.in'
 
 export const metadata: Metadata = {
   title: 'Nifty Max Pain Today — Live Strike & Read | MarketCue',
-  description: "Today's live Nifty Max Pain strike and what the distance from spot implies, from MarketCue's documented rules engine.",
+  description: "Today's live Nifty Max Pain strike and what the distance from spot implies, from MarketCue's AI-Agentic Option Intelligence Platform.",
   alternates: { canonical: `${SITE_URL}/nifty-max-pain-today` },
 }
 
@@ -27,7 +27,7 @@ const FAQ: FaqItem[] = [
   {
     question: 'Is Max Pain a reliable predictor of Nifty\'s expiry close?',
     answer:
-      'It\'s a directional tendency, not a guarantee -- Max Pain reflects one input among several (Gap %, OI structure, PCR) that MarketCue\'s rules engine weighs together, and it contributes a fixed 10% to the overall Market Bias score regardless of days to expiry.',
+      'It\'s a directional tendency, not a guarantee -- Max Pain reflects one input among several (Gap %, OI structure, PCR) that MarketCue\'s AI-Agentic platform weighs together, and it contributes a fixed 10% to the overall Market Bias score regardless of days to expiry.',
   },
 ]
 
@@ -59,7 +59,7 @@ export default async function NiftyMaxPainTodayPage() {
   ]
 
   const paragraphs = [
-    `Nifty's Max Pain strike currently sits at ${fmtNum(maxPain)} as of ${asOfLabel}${prevClose != null ? `, against a previous close of ${fmtNum(prevClose)}` : ''}. MarketCue's rules engine reads this distance as: "${maxPainRead(prevClose, maxPain)}". Max Pain is the strike price at which option writers as a group would lose the least money if Nifty expired exactly there — every point away from it in either direction increases the aggregate payout writers owe to option buyers.`,
+    `Nifty's Max Pain strike currently sits at ${fmtNum(maxPain)} as of ${asOfLabel}${prevClose != null ? `, against a previous close of ${fmtNum(prevClose)}` : ''}. MarketCue's AI-Agentic platform reads this distance as: "${maxPainRead(prevClose, maxPain)}". Max Pain is the strike price at which option writers as a group would lose the least money if Nifty expired exactly there — every point away from it in either direction increases the aggregate payout writers owe to option buyers.`,
     `The reasoning behind why price tends to drift toward Max Pain as expiry nears comes down to capital at risk: option writers collectively have far more capital exposed than buyers, whose maximum loss is capped at the premium paid. That asymmetry gives writers more influence over price action close to expiry, and a real incentive to see the underlying settle near the strike that minimizes their collective payout.`,
     `MarketCue reads the spot-to-Max-Pain distance in three bands: more than 0.3% above Max Pain implies a downward pull toward expiry, more than 0.3% below implies an upward pull, and within ±0.3% suggests pinning is likely. This contributes a fixed 10% weight to the overall Market Bias score — smaller than Gap % or OI structure, but part of the same documented, auditable framework rather than a standalone prediction.`,
   ]

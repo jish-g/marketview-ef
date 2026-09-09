@@ -9,7 +9,7 @@ const SITE_URL = 'https://marketcue.in'
 
 export const metadata: Metadata = {
   title: 'GIFT Nifty Today — Live Gap & Predicted Open | MarketCue',
-  description: "Today's GIFT Nifty gap and the predicted Nifty opening level it implies, from MarketCue's documented rules engine.",
+  description: "Today's GIFT Nifty gap and the predicted Nifty opening level it implies, from MarketCue's AI-Agentic Option Intelligence Platform.",
   alternates: { canonical: `${SITE_URL}/gift-nifty-today` },
 }
 
@@ -61,7 +61,7 @@ export default async function GiftNiftyTodayPage() {
   ]
 
   const paragraphs = [
-    `GIFT Nifty is showing a gap of ${fmtPct(gapPct)}${gapPts != null ? ` (${Number(gapPts) > 0 ? '+' : ''}${gapPts} points)` : ''} as of ${asOfLabel} — MarketCue's rules engine reads this as a "${gapRead(gapPct)}". GIFT Nifty (formerly SGX Nifty) trades at GIFT City, Gujarat during hours that overlap with the Indian pre-market session, so its move relative to the previous close is used as the leading indicator for where Nifty is likely to open before the NSE cash market itself opens at 9:15 AM IST.`,
+    `GIFT Nifty is showing a gap of ${fmtPct(gapPct)}${gapPts != null ? ` (${Number(gapPts) > 0 ? '+' : ''}${gapPts} points)` : ''} as of ${asOfLabel} — MarketCue's AI-Agentic platform reads this as a "${gapRead(gapPct)}". GIFT Nifty (formerly SGX Nifty) trades at GIFT City, Gujarat during hours that overlap with the Indian pre-market session, so its move relative to the previous close is used as the leading indicator for where Nifty is likely to open before the NSE cash market itself opens at 9:15 AM IST.`,
     `The predicted opening level is calculated directly from this gap: Predicted Open (points) = GIFT Nifty gap % ÷ 100 × Nifty's previous close.${prevClose != null ? ` With Nifty's previous close at ${fmtNum(prevClose)}, that puts the predicted open near ${predictedOpen}.` : ''} This is a mechanical calculation, not a forecast model — the actual opening print can and does deviate from it based on overnight global cues, news, and order flow that GIFT Nifty itself may not fully capture by the time the cash market opens.`,
     `Gap % is also one of four weighted inputs to MarketCue's Stage 1 Market Bias score, contributing up to 45% of the total when more than 3 trading days remain to expiry (dropping to 25% inside the last 3 days, when Open Interest structure takes over as the dominant signal). Note that Sensex has no equivalent leading indicator to GIFT Nifty — its opening gap is only knowable once the BSE cash market itself opens.`,
   ]

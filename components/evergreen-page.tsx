@@ -57,7 +57,7 @@ export function EvergreenPage({ eyebrow, h1, updatedISO, updatedLabel, metricLab
 
           <section className="doc-section">
             {paragraphs.map((p, i) => <p className="doc-intro evergreen-paragraph" key={i}>{p}</p>)}
-            <p className="doc-hero-links"><Link href="/rules"><BookOpen size={13} style={{ display: 'inline', verticalAlign: '-2px', marginRight: '4px' }} />Read the full MarketCue rules engine methodology</Link></p>
+            <p className="doc-hero-links"><Link href="/rules"><BookOpen size={13} style={{ display: 'inline', verticalAlign: '-2px', marginRight: '4px' }} />Read the full MarketCue scoring methodology</Link></p>
           </section>
 
           <FaqBlock items={faq} />

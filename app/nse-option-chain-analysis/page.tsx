@@ -12,7 +12,7 @@ const SITE_URL = 'https://marketcue.in'
 
 export const metadata: Metadata = {
   title: 'NSE Option Chain Analysis Today — Nifty | MarketCue',
-  description: "Today's live NSE option chain read for Nifty: PCR, Max Pain, and OI support/resistance, from MarketCue's documented rules engine.",
+  description: "Today's live NSE option chain read for Nifty: PCR, Max Pain, and OI support/resistance, from MarketCue's AI-Agentic Option Intelligence Platform.",
   alternates: { canonical: `${SITE_URL}/nse-option-chain-analysis` },
 }
 
@@ -68,7 +68,7 @@ export default async function NseOptionChainAnalysisPage() {
 
   const paragraphs = [
     `The NSE's headline index, Nifty 50, currently shows a Put-Call Ratio of ${fmtNum(pcr)} as of ${asOfLabel} — ${pcrRead(pcr).toLowerCase()}. PCR compares outstanding put open interest to call open interest across all strikes; a high ratio (more puts written than calls) is read as a contrarian bullish signal, since heavy put-writing typically reflects sellers confident the market won't fall that far, not traders expecting a decline.`,
-    `Max Pain for Nifty sits at ${fmtNum(maxPain)}${row?.prev_close_nifty != null ? `, against a previous close of ${fmtNum(row.prev_close_nifty)}` : ''}. This is the strike at which option writers as a group would lose the least money at expiry — price tends to drift toward it as expiry nears, since writers collectively have more capital at risk than buyers and an incentive to defend the level. MarketCue's rules engine reads the current spot-to-Max-Pain distance as: ${maxPainRead(row?.prev_close_nifty, maxPain).toLowerCase()}.`,
+    `Max Pain for Nifty sits at ${fmtNum(maxPain)}${row?.prev_close_nifty != null ? `, against a previous close of ${fmtNum(row.prev_close_nifty)}` : ''}. This is the strike at which option writers as a group would lose the least money at expiry — price tends to drift toward it as expiry nears, since writers collectively have more capital at risk than buyers and an incentive to defend the level. MarketCue's AI-Agentic platform reads the current spot-to-Max-Pain distance as: ${maxPainRead(row?.prev_close_nifty, maxPain).toLowerCase()}.`,
     `Rounding out the option chain read, OI at the key support (${fmtNum(row?.oi_support_nifty)}) and resistance (${fmtNum(row?.oi_resistance_nifty)}) strikes shows whether those levels are being defended or abandoned day over day. Support with fresh Addition reinforces the floor; Unwinding at resistance signals sellers are losing conviction there — a breakout risk. All of these bands (PCR, Max Pain distance, and OI direction) feed directly into MarketCue's documented Market Bias score, published in full on the rules page.`,
   ]
 

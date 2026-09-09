@@ -43,7 +43,7 @@ export async function GET() {
 
   const body = `# MarketCue
 
-> A daily read on Nifty and Sensex, built from a documented, rules-based scoring framework -- pre-market call before the open, post-market recap after the close. Not a black box, and not trade advice.
+> MarketCue is an AI-Agentic Option Intelligence Platform for Indian Stock Market -- reading data continuously through the trading day and turning it into a decision, not another chart to interpret. Not trade advice.
 
 MarketCue publishes descriptive market reads for the Nifty 50 and Sensex indices twice each trading day: a pre-market call before the open, and a post-market recap after the close. Every read is derived from a fixed, auditable set of rules applied to gap, open interest, put-call ratio, max pain, and volatility data -- not a discretionary call and not a buy/sell recommendation.
 

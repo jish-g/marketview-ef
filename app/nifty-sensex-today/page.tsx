@@ -16,7 +16,7 @@ const SUPABASE_KEY =
 export const metadata: Metadata = {
   title: 'Nifty & Sensex Today — Pre/post-market reads | MarketCue',
   description:
-    'Daily gap, PCR, Max Pain, and option-readiness reads for Nifty and Sensex — published before the open and after the close, from the MarketCue rules engine.',
+    'AI-Agentic reads for Nifty and Sensex — gap, PCR, Max Pain, and option-readiness, published before the open and after the close.',
   alternates: { canonical: `${SITE_URL}/nifty-sensex-today` },
   openGraph: {
     title: 'Nifty & Sensex Today — Daily pre-market and post-market reads',

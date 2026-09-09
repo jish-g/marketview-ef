@@ -9,7 +9,7 @@ const SITE_URL = 'https://marketcue.in'
 
 export const metadata: Metadata = {
   title: 'India VIX Today — Live Reading & Read | MarketCue',
-  description: "Today's India VIX level and what it means for option buying and selling strategies, from MarketCue's documented rules engine.",
+  description: "Today's India VIX level and what it means for option buying and selling strategies, from MarketCue's AI-Agentic Option Intelligence Platform.",
   alternates: { canonical: `${SITE_URL}/india-vix-today` },
 }
 
@@ -57,8 +57,8 @@ export default async function IndiaVixTodayPage() {
 
   const paragraphs = [
     `India VIX stood at ${fmtNum(vix)} as of ${asOfLabel} — ${vixRead(vix).toLowerCase()}. India VIX (the "fear gauge") measures the market's expectation of Nifty's volatility over the next 30 days, derived from the prices of out-of-the-money Nifty options. It doesn't predict direction — only magnitude: a higher VIX means the market is pricing in bigger swings, in either direction, and option premiums get richer as a result.`,
-    `MarketCue's rules engine uses India VIX as the first of three inputs to its Stage 2 Option Readiness score (alongside IV-vs-VIX and days-to-expiry). The bands are fixed and documented: 11–14 is the ideal, lowest-risk range for buying option premium; below 11 is unusually thin, theta-heavy premium; 14–18 is elevated; 18–22 carries real IV-crush risk; and above 22 blocks fresh option-buying strategies specifically — though selling strategies like credit spreads and iron condors remain allowed at any VIX level, since a seller benefits from elevated premium rather than being exposed to it decaying.`,
-    `Today's reading of ${fmtNum(vix)} means the rules engine currently scores India VIX as "${vixRead(vix)}" for the purposes of picking a strategy — this feeds directly into whether a Naked Call/Put, a Debit Spread, a Credit Spread, or an Iron Condor gets recommended for a given Market Bias, alongside the IV-vs-VIX and days-to-expiry scores. The full scoring table is on the rules page linked below.`,
+    `MarketCue's AI-Agentic platform uses India VIX as the first of three inputs to its Stage 2 Option Readiness score (alongside IV-vs-VIX and days-to-expiry). The bands are fixed and documented: 11–14 is the ideal, lowest-risk range for buying option premium; below 11 is unusually thin, theta-heavy premium; 14–18 is elevated; 18–22 carries real IV-crush risk; and above 22 blocks fresh option-buying strategies specifically — though selling strategies like credit spreads and iron condors remain allowed at any VIX level, since a seller benefits from elevated premium rather than being exposed to it decaying.`,
+    `Today's reading of ${fmtNum(vix)} means MarketCue's AI-Agentic platform currently scores India VIX as "${vixRead(vix)}" for the purposes of picking a strategy — this feeds directly into whether a Naked Call/Put, a Debit Spread, a Credit Spread, or an Iron Condor gets recommended for a given Market Bias, alongside the IV-vs-VIX and days-to-expiry scores. The full scoring table is on the rules page linked below.`,
   ]
 
   return (

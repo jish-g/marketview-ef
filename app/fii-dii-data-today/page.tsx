@@ -9,7 +9,7 @@ const SITE_URL = 'https://marketcue.in'
 
 export const metadata: Metadata = {
   title: 'FII DII Data Today — Net Cash Flow | MarketCue',
-  description: "Today's FII and DII net cash flow figures for Indian equities, from MarketCue's daily post-market data.",
+  description: "Today's FII and DII net cash flow figures for Indian equities, from MarketCue's AI-Agentic Option Intelligence Platform.",
   alternates: { canonical: `${SITE_URL}/fii-dii-data-today` },
 }
 

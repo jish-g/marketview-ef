@@ -9,7 +9,7 @@ const SITE_URL = 'https://marketcue.in'
 
 export const metadata: Metadata = {
   title: 'Nifty Support & Resistance Today — OI Levels | MarketCue',
-  description: "Today's live Nifty support and resistance strikes from open interest, and whether they're strengthening or weakening.",
+  description: "Today's live Nifty support and resistance strikes from open interest, from MarketCue's AI-Agentic Option Intelligence Platform.",
   alternates: { canonical: `${SITE_URL}/nifty-support-resistance-today` },
 }
 
@@ -62,7 +62,7 @@ export default async function NiftySupportResistanceTodayPage() {
 
   const paragraphs = [
     `Nifty's options-derived support sits at ${fmtNum(support)} and resistance at ${fmtNum(resistance)} as of ${asOfLabel}${row?.prev_close_nifty != null ? `, with spot at ${fmtNum(row.prev_close_nifty)}` : ''}. These levels come from open interest concentration: support is the strike with the heaviest put open interest below spot, and resistance the strike with the heaviest call open interest above spot — the levels where option writers have the largest positions, and therefore the strongest financial incentive to defend.`,
-    `MarketCue's rules engine tracks whether OI at each level is being added to or unwound, comparing the two most recently completed trading days. At support, the current read is "${oiRead(row?.oi_change_support_nifty, true)}" — Addition means the floor is being reinforced with fresh contracts, while Unwinding means existing positions are being closed out, read as breakdown risk. At resistance, the read is "${oiRead(row?.oi_change_resistance_nifty, false)}" — Addition strengthens the ceiling, while Unwinding suggests sellers are losing conviction there, a breakout signal.`,
+    `MarketCue's AI-Agentic platform tracks whether OI at each level is being added to or unwound, comparing the two most recently completed trading days. At support, the current read is "${oiRead(row?.oi_change_support_nifty, true)}" — Addition means the floor is being reinforced with fresh contracts, while Unwinding means existing positions are being closed out, read as breakdown risk. At resistance, the read is "${oiRead(row?.oi_change_resistance_nifty, false)}" — Addition strengthens the ceiling, while Unwinding suggests sellers are losing conviction there, a breakout signal.`,
     `This OI-based support/resistance read is one of four weighted inputs to MarketCue's Stage 1 Market Bias score, contributing 25% of the total when more than 3 days remain to expiry and rising to 45% — the single largest weight of any input — inside the last 3 days, when open interest positioning typically dominates price action into expiry.`,
   ]
 
