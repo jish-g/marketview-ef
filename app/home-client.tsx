@@ -140,9 +140,8 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
 
       <section className="landing-hero">
         <div className="landing-hero-copy">
-          <p className="eyebrow">Market intelligence for Nifty and Sensex option traders</p>
-          <h1 className="landing-headline">Everyone gives you data. <span className="landing-headline-accent">We read it.</span></h1>
-          <p className="landing-lede">The day&apos;s option data, read into bias and readiness — so the call is yours, with context behind it.</p>
+          <p className="eyebrow">AI-Agentic Option Intelligence Platform for Indian Stock Market</p>
+          <h1 className="landing-headline landing-headline-long">MarketCue is an AI-Agentic Option Intelligence Platform for Indian Stock Market — reading data continuously through the trading day and turning it into a decision, not another chart to interpret.</h1>
           <div className="landing-hero-ctas">
             <Link href="/dashboard" className="landing-cta-primary">Enter dashboard <ArrowRight size={15} /></Link>
             <Link href="/nifty-sensex-today" className="landing-cta-secondary"><Newspaper size={15} /> Nifty and Sensex today</Link>
