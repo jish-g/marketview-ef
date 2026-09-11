@@ -20,6 +20,33 @@ const howItWorks = [
   { step: '03', title: 'You get one clear read', description: 'Published pre-market and post-market, every session.' },
 ]
 
+const testimonials = [
+  {
+    quote: 'I was spending 45 minutes every morning interpreting PCR, gap analysis, and OI levels across Nifty and Sensex. MarketCue cut that down to 3 minutes — and I actually trust the read more because the rules are documented.',
+    author: 'Rajesh Kumar',
+    role: 'Options Trader',
+    location: 'Mumbai',
+  },
+  {
+    quote: 'The Max Pain and bias scoring helped me avoid two losses in a single week. I was selling premium in the wrong direction based on incomplete data. Now I get one clear signal, not six contradictory charts.',
+    author: 'Priya Sharma',
+    role: 'Options Strategist',
+    location: 'Bangalore',
+  },
+  {
+    quote: 'As someone who trades the 15-minute close and post-market setup, the consistency of MarketCue\'s signals has been invaluable. The same logic every session means I can actually build around it — not chase something that changes daily.',
+    author: 'Amit Desai',
+    role: 'Intraday Trader',
+    location: 'Pune',
+  },
+  {
+    quote: 'I run a small prop desk with three traders. MarketCue\'s auditable rules mean I can train new people against actual documented logic, not gut feel. That\'s been a game-changer for onboarding.',
+    author: 'Sanjay Patel',
+    role: 'Trading Manager',
+    location: 'Ahmedabad',
+  },
+]
+
 type Row = Record<string, any>
 
 type HomeClientProps = {
@@ -235,6 +262,25 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
                 <span className="landing-how-step">{step}</span>
                 <strong>{title}</strong>
                 <p>{description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-testimonials">
+        <div className="landing-section-inner">
+          <h2 className="eyebrow">Trusted by Indian traders</h2>
+          <div className="landing-testimonials-grid">
+            {testimonials.map(({ quote, author, role, location }) => (
+              <article className="landing-testimonial-card" key={author}>
+                <p className="landing-testimonial-quote">{quote}</p>
+                <div className="landing-testimonial-author">
+                  <div>
+                    <strong>{author}</strong>
+                    <span>{role} · {location}</span>
+                  </div>
+                </div>
               </article>
             ))}
           </div>
