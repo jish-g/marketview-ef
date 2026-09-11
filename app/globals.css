@@ -236,6 +236,15 @@ button, input { font: inherit; }
 .landing-how-card strong { font-size: 14.5px; letter-spacing: -.01em; }
 .landing-how-card p { margin: 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.65; }
 
+.landing-testimonials { padding: clamp(60px, 8vw, 96px) 0; }
+.landing-testimonials .eyebrow { display: block; margin-bottom: 30px; }
+.landing-testimonials-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.landing-testimonial-card { display: grid; gap: 16px; padding: 26px; border: 1px solid var(--border); background: var(--card); border-radius: 12px; }
+.landing-testimonial-quote { margin: 0; color: var(--foreground); font-size: 14px; line-height: 1.7; font-weight: 500; letter-spacing: -.01em; }
+.landing-testimonial-author { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.landing-testimonial-author strong { display: block; font-size: 13px; letter-spacing: -.01em; color: var(--foreground); }
+.landing-testimonial-author span { display: block; color: var(--muted-foreground); font-size: 12px; letter-spacing: .02em; }
+
 .landing-closing { padding: clamp(44px, 6vw, 68px) 24px; }
 .landing-closing-card { max-width: 680px; margin: 0 auto; padding: clamp(30px, 5vw, 42px); border: 1px solid var(--border); border-radius: 14px; background: var(--card); text-align: center; }
 .landing-closing-ctas { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
@@ -251,7 +260,7 @@ button, input { font: inherit; }
 .landing-footer-col a { font-size: 13px; color: var(--foreground); opacity: .8; text-decoration: none; }
 .landing-footer-col a:hover { opacity: 1; text-decoration: underline; }
 .landing-footer-bottom { max-width: 900px; margin: 32px auto 0; padding-top: 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 11px; color: var(--muted-foreground); }
-@media (max-width: 720px) { .landing-how-grid { grid-template-columns: 1fr; gap: 22px; } .landing-how-card:not(:first-child) { border-left: 0; border-top: 1px solid var(--border); padding-top: 22px; } .landing-footer-grid { grid-template-columns: 1fr 1fr; } .landing-snapshot-row { flex-wrap: wrap; } }
+@media (max-width: 720px) { .landing-how-grid { grid-template-columns: 1fr; gap: 22px; } .landing-how-card:not(:first-child) { border-left: 0; border-top: 1px solid var(--border); padding-top: 22px; } .landing-testimonials-grid { grid-template-columns: 1fr; } .landing-footer-grid { grid-template-columns: 1fr 1fr; } .landing-snapshot-row { flex-wrap: wrap; } }
 @media (max-width: 640px) { .landing-topbar { padding: 0 16px; } .landing-shell .topbar-meta { gap: 10px; } .landing-shell .topbar-link { display: none; } .landing-diff-grid { grid-template-columns: 1fr; } .landing-differentiators { padding: 48px 18px; } .landing-section-inner { padding-left: 18px; padding-right: 18px; } }
 .login-shell { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 68px); padding: 24px; } .login-card { display: grid; gap: 6px; width: 100%; max-width: 360px; padding: 28px; border: 1px solid var(--border); background: var(--card); border-radius: 6px; } .login-card h1 { margin: 4px 0 0; font: 700 20px ui-monospace, monospace; letter-spacing: -.02em; text-transform: none; } .login-lede { margin: 0 0 14px; color: var(--muted-foreground); font-size: 13px; } .login-field { display: grid; gap: 5px; margin-top: 10px; color: var(--muted-foreground); font-size: 11px; } .login-field input { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 4px; background: var(--background); color: var(--foreground); padding: 8px 9px; font: 13px ui-sans-serif, system-ui, sans-serif; } .login-error { margin: 12px 0 0; color: #c62828; font-size: 12.5px; } .dark .login-error { color: #ff6b6b; } .login-submit { justify-content: center; width: 100%; margin-top: 18px; padding: 10px; }
 .sign-in-link { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; color: var(--muted-foreground); font-size: 12px; text-decoration: none; } .sign-in-link:hover { background: var(--accent); color: var(--foreground); } .landing-shell .topbar-link { color: var(--muted-foreground); font-size: 13px; text-decoration: none; } .landing-shell .topbar-link:hover { color: var(--foreground); } .landing-shell .topbar-meta { gap: 20px; } .landing-shell .sign-in-link { border-color: var(--brand-green); color: var(--brand-green); } .landing-shell .sign-in-link:hover { background: color-mix(in srgb, var(--brand-green) 10%, transparent); color: var(--brand-green); }
