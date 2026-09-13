@@ -68,7 +68,6 @@ function LoginView() {
 
       <section className="login-shell">
         <form className="login-card" onSubmit={handleSubmit}>
-          <p className="eyebrow">Admin sign in</p>
           <h1>Sign in to MarketCue</h1>
           <p className="login-lede">Access the Trade execution desk.</p>
 
@@ -77,7 +76,7 @@ function LoginView() {
 
           <label className="login-field">
             <span>Email</span>
-            <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@example.com" />
+            <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </label>
           <label className="login-field">
             <span>Password</span>
