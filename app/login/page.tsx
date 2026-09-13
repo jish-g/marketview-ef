@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { BarChart3, Moon, Sun } from 'lucide-react'
 import { createAuthClient } from '@/lib/supabase/auth-client'
+import { GoogleAuthButton } from '@/components/google-auth-button'
 
 // Only the credential/existence signal is genericized — naming it would
 // confirm whether the admin email is registered. Errors the user can act on
@@ -70,6 +71,9 @@ function LoginView() {
           <p className="eyebrow">Admin sign in</p>
           <h1>Sign in to MarketCue</h1>
           <p className="login-lede">Access the Trade execution desk.</p>
+
+          <GoogleAuthButton label="Continue with Google" onError={setError} />
+          <div className="oauth-divider"><span>or use your email</span></div>
 
           <label className="login-field">
             <span>Email</span>

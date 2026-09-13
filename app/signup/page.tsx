@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { BarChart3, Moon, Sun } from 'lucide-react'
 import { createAuthClient } from '@/lib/supabase/auth-client'
+import { GoogleAuthButton } from '@/components/google-auth-button'
 
 // Only the credential/existence signal is genericized — naming it would
 // confirm whether an email is already registered. Errors the user can act
@@ -78,6 +79,9 @@ export default function SignupPage() {
             <p className="eyebrow">Create an account</p>
             <h1>Sign up for MarketCue</h1>
             <p className="login-lede">Get access to the dashboard.</p>
+
+            <GoogleAuthButton label="Sign up with Google" onError={setError} />
+            <div className="oauth-divider"><span>or use your email</span></div>
 
             <label className="login-field">
               <span>Email</span>
