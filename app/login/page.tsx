@@ -1,8 +1,8 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { BarChart3, Moon, Sun } from 'lucide-react'
 import { createAuthClient } from '@/lib/supabase/auth-client'
 import { GoogleAuthButton } from '@/components/google-auth-button'
@@ -19,21 +19,12 @@ function loginErrorMessage(error: unknown): string {
 }
 
 export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginView />
-    </Suspense>
-  )
-}
-
-function LoginView() {
   const [dark, setDark] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const confirmed = useSearchParams().get('confirmed') === '1'
 
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
 
@@ -82,8 +73,6 @@ function LoginView() {
             <span>Password</span>
             <input type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
           </label>
-
-          {confirmed && !error && <p className="login-lede">Email confirmed. Sign in with your email and password to continue.</p>}
 
           {error && <p className="login-error">{error}</p>}
 
