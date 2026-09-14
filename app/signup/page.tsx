@@ -56,10 +56,10 @@ export default function SignupPage() {
   return (
     <main className="landing-shell">
       <header className="landing-topbar">
-        <div className="brand-mark">
+        <Link href="/" className="brand-mark brand-mark-link" aria-label="MarketCue home">
           <BrandSymbol size={32} />
           <div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div>
-        </div>
+        </Link>
         <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">
           {dark ? <Sun size={16} /> : <Moon size={16} />}
         </button>

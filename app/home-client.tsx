@@ -23,6 +23,10 @@ const howItWorks = [
   { step: '03', title: 'You get one clear read', description: 'Published pre-market and post-market, every session.' },
 ]
 
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('')
+}
+
 const testimonials = [
   {
     quote: 'I was spending 45 minutes every morning interpreting PCR, gap analysis, and OI levels across Nifty and Sensex. MarketCue cut that down to 3 minutes — and I actually trust the read more because the rules are documented.',
@@ -288,6 +292,10 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
               <article className="landing-testimonial-card" key={author}>
                 <p className="landing-testimonial-quote">{quote}</p>
                 <div className="landing-testimonial-author">
+                  {/* An initials monogram, deliberately not a photograph. A stock or generated
+                      face would assert that a specific person sat for it, which is a claim the
+                      quote itself cannot support. */}
+                  <span className="landing-testimonial-avatar" aria-hidden="true">{initials(author)}</span>
                   <div>
                     <strong>{author}</strong>
                     <span>{role} · {location}</span>
@@ -361,6 +369,23 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           <span>&copy; {new Date().getFullYear()} MarketCue. Not investment advice.</span>
           <span>Built on a rules-based market read engine</span>
         </div>
+
+        {/* A single descriptive sentence, not a keyword strip. Every one of these pages is
+            already linked above, so a second list of the same links would add nothing a
+            crawler values; what this adds is prose that names what each read actually is,
+            in a sentence a person would also read. Keep it one sentence -- the moment it
+            becomes a list of terms it is keyword stuffing, which is penalised, not rewarded. */}
+        <p className="landing-footer-summary">
+          MarketCue publishes daily option-chain reads for the Indian market — the{' '}
+          <Link href="/nifty-pcr-today">Nifty put-call ratio</Link>,{' '}
+          <Link href="/nifty-max-pain-today">max pain</Link> and{' '}
+          <Link href="/nifty-support-resistance-today">support and resistance levels</Link>,
+          alongside <Link href="/india-vix-today">India VIX</Link>,{' '}
+          <Link href="/gift-nifty-today">GIFT Nifty</Link> and{' '}
+          <Link href="/fii-dii-data-today">FII/DII flows</Link> — published before the open
+          and again after the close, with the{' '}
+          <Link href="/rules">rules behind every read</Link> documented.
+        </p>
       </footer>
     </main>
   )
