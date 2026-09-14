@@ -9,7 +9,7 @@ import { TradeView } from '@/components/trade-view'
 import { JournalView } from '@/components/journal-view'
 import { useSession } from '@/hooks/use-session'
 import { fmt, freshness } from '@/lib/format'
-import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, BiasAxis, CheckpointTimeline, Progress, Label, type Checkpoint } from '@/components/ui/ds'
+import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, BiasAxis, CheckpointTimeline, Progress, PhaseAside, Label, type Checkpoint } from '@/components/ui/ds'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sun } from 'lucide-react'
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
@@ -932,16 +932,6 @@ function MidInstrumentColumn({ instrument, byId, nowMin }: { instrument: Instrum
   </div>
 }
 
-// Rule 6: every screen carries the same furniture -- when the reading was captured and
-// whether it is system-derived. Several screens still showed a static caption instead.
-function PhaseAside({ capturedAt, source = 'system' }: { capturedAt?: string | null; source?: 'system' | 'manual' }) {
-  const stamp = freshness(capturedAt ?? null, false)
-  return <div className="phase-head-aside">
-    <FreshnessStamp state={stamp.state} label={stamp.label} capturedAt={capturedAt ?? null} />
-    <ProvenanceBadge source={source} />
-  </div>
-}
-
 function MidMarketView({ row, midCheckpoints }: { row: Row; midCheckpoints: Row[] | null | undefined }) {
   // Re-render every minute so a slot flips from "pending" to actually landed (or from
   // not-yet-due to overdue-looking) without needing a manual refresh.
@@ -1134,7 +1124,12 @@ export default function Dashboard() {
     return () => { document.body.style.overflow = previous }
   }, [isMobile, navOpen])
   const { session, loading: sessionLoading, signOut } = useSession()
-  const isAdmin = session?.user?.email === 'jishnu@ziovy.com'
+  // Trade and Journal are admin-only, so they never render on a local dev session and could
+  // not be reviewed against the design. The same NODE_ENV-gated flag that lets the dashboard
+  // render signed-out also grants admin locally. Both halves are build-time constants, so
+  // `next build` folds this to false and drops it -- see components/auth-guard.tsx.
+  const DEV_BYPASS = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true'
+  const isAdmin = DEV_BYPASS || session?.user?.email === 'jishnu@ziovy.com'
   const visiblePhases = isAdmin ? phases : phases.filter((p) => p.id !== 'trade' && p.id !== 'journal')
   useEffect(() => { if (!sessionLoading && !isAdmin && phase === 'trade') setPhase('premarket') }, [sessionLoading, isAdmin, phase])
   const supabase = useMemo(() => createClient(), [])

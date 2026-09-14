@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { PhaseAside } from '@/components/ui/ds'
 import { Progress } from '@/components/ui/ds'
 import useSWR from 'swr'
 import { CheckCircle2, ArrowDown, RotateCcw } from 'lucide-react'
@@ -244,7 +245,7 @@ export function TradeView() {
   const rows = [...trades].filter(matchesFilter).sort((a, b) => `${b.trade_date}-${b.instrument}`.localeCompare(`${a.trade_date}-${a.instrument}`))
 
   return <section className="phase-view trade-page">
-    <div className="review-section-head"><div><p className="eyebrow">Execution desk</p><h2>Trade</h2></div><span>{tradeDate}</span></div>
+    <div className="review-section-head"><div><p className="eyebrow">Execution desk</p><h2>Trade</h2></div><PhaseAside capturedAt={tradeDate} source="manual" /></div>
     {error && <p className="history-empty">Unable to load trade data right now.</p>}
     <div className="source-toggle" role="group" aria-label="Filter by trade source">
       <button type="button" className={sourceFilter === 'all' ? 'is-active' : ''} aria-pressed={sourceFilter === 'all'} onClick={() => setSourceFilter('all')}>All trades</button>

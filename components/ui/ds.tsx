@@ -12,7 +12,7 @@
 //   - Empty states state a reason. There is no bare em dash (criterion 8).
 
 import type { ReactNode } from 'react'
-import { fmt } from '@/lib/format'
+import { fmt, freshness } from '@/lib/format'
 
 /* ---------------------------------------------------------------- Card */
 
@@ -337,6 +337,19 @@ export function PhaseHeader({ eyebrow, title, aside }: { eyebrow: ReactNode; tit
         <h2 className="ds-phase-head__title">{title}</h2>
       </div>
       {aside != null && <div className="ds-phase-head__aside">{aside}</div>}
+    </div>
+  )
+}
+
+
+// Rule 6: every screen carries the same furniture -- when the reading was captured and
+// whether it is system-derived. Several screens showed a static caption or a bare date.
+export function PhaseAside({ capturedAt, source = 'system' }: { capturedAt?: string | null; source?: 'system' | 'manual' }) {
+  const stamp = freshness(capturedAt ?? null, false)
+  return (
+    <div className="phase-head-aside">
+      <FreshnessStamp state={stamp.state} label={stamp.label} capturedAt={capturedAt ?? null} />
+      <ProvenanceBadge source={source} />
     </div>
   )
 }
