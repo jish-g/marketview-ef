@@ -174,7 +174,11 @@ button, input { font: inherit; }
 .mid-row-overdue-note { margin: 4px 2px 0; font-size: var(--text-label); color: var(--muted); font-style: italic; }
 @media (max-width: 640px) { .mid-instrument-grid { grid-template-columns: 1fr; } }
 
-.history-list.history-days { gap: 14px; } .history-day-card { display: grid; gap: 14px; padding: 18px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); } .history-day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; } .history-day-head > div { display: flex; align-items: baseline; gap: 10px; } .history-day-head strong { font: 600 var(--text-meta) var(--font-sans); } .history-day-head span { color: var(--muted); font-size: var(--text-label); } .history-close-pill { padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--surface-2); font: 700 var(--text-label) var(--font-sans); } .history-beats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; } .history-beat { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 55%, var(--ground)); border-radius: var(--radius-sm); } .history-beat-label { color: var(--muted); font: var(--text-label) var(--font-sans); letter-spacing: .08em; text-transform: uppercase; } .history-beat p { margin: 0; font-size: var(--text-label); line-height: 1.6; } .history-beat-empty { margin: 0; color: var(--muted); font-size: var(--text-label); font-style: italic; } .history-beat-note { display: inline-block; margin-top: 2px; color: var(--muted); font-size: var(--text-label); } .history-beat .is-shifted { color: var(--caution); } 
+.history-list.history-days { gap: 14px; } .history-day-card { display: grid; gap: 14px; padding: 18px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); } .history-day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; } .history-day-head > div { display: flex; align-items: baseline; gap: 10px; } .history-day-head strong { font: 600 var(--text-meta) var(--font-sans); } .history-day-head span { color: var(--muted); font-size: var(--text-label); } .history-close-pill { padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--surface-2); font: 700 var(--text-label) var(--font-sans); } .history-beats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; } /* Reference #s-history renders each beat as a plain stack -- <div class="stack"> with a
+   label and a value, no border, no background, no padding. Boxing them put a second card
+   inside a card, which is what read as "sharp corners" when the design has no corners here
+   at all. The day card is the only surface; the beats are columns within it. */
+.history-beat { display: flex; flex-direction: column; gap: 4px; } .history-beat-label { color: var(--muted); font: var(--text-label) var(--font-sans); letter-spacing: .08em; text-transform: uppercase; } .history-beat p { margin: 0; font-size: var(--text-label); line-height: 1.6; } .history-beat-empty { margin: 0; color: var(--muted); font-size: var(--text-label); font-style: italic; } .history-beat-note { display: inline-block; margin-top: 2px; color: var(--muted); font-size: var(--text-label); } .history-beat .is-shifted { color: var(--caution); } 
 @media (max-width: 900px) { .history-beats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .history-beats { grid-template-columns: 1fr; } .history-day-head { flex-direction: column; align-items: flex-start; } }
 .landing-shell { min-height: 100vh; background: var(--ground); color: var(--ink); font-family: var(--font-sans); }
@@ -711,6 +715,15 @@ button, input { font: inherit; }
    row to fill the width -- so those three rendered much wider than the eight evidence tiles
    beside them. auto-fill keeps the track size, so every tile on the screen matches. */
 .app-shell .common-group .field-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+
+/* auto-fill above is deliberate and stays: it keeps the track size so these three tiles
+   match the evidence tiles below. But it also reserves empty tracks, so on a wide row the
+   three sat in five columns with two empty on the right while the GIFT Nifty tile -- much
+   the longest label and the only one with three lines of value -- wrapped at 239px beside
+   that free space. Letting it take two tracks spends the spare column on the tile that
+   needs it, without stretching the other two out of step with the rest of the screen. */
+.app-shell .common-group .field-card-wide { grid-column: span 2; }
+@media (max-width: 760px) { .app-shell .common-group .field-card-wide { grid-column: auto; } }
 
 /* Rule 10 / spec §7: visible focus via box-shadow on --ring, never a browser outline, on
    EVERY interactive element. There was no such rule anywhere in the app -- keyboard focus

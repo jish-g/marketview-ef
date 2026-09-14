@@ -213,7 +213,7 @@ export function JournalView() {
   }
 
   return <section className="phase-view journal-view">
-    <div className="review-section-head"><div><p className="eyebrow">Daily trade notes</p><h2>Journal</h2></div><div className="phase-head-aside"><span className="journal-count">{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</span><PhaseAside capturedAt={tradeDate} source="manual" /></div></div>
+    <div className="review-section-head"><div><p className="eyebrow">Daily trade notes</p><h2>Journal</h2></div><div className="phase-head-aside"><span className="journal-count">{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</span></div></div>
     {error && <p className="history-empty">Unable to load journal data right now.</p>}
 
     <p className="eyebrow">Today&apos;s trades</p>
@@ -223,7 +223,6 @@ export function JournalView() {
       <div className="position-head">
         <div>
           <p className="eyebrow">{editingDate === tradeDate ? "Today's note" : `Editing ${formatDateLabel(editingDate)}`}</p>
-          <strong>{editingDate === tradeDate ? 'What happened today, and what to remember next time' : 'Update this day\'s note'}</strong>
         </div>
       </div>
       <textarea
@@ -270,7 +269,7 @@ export function JournalView() {
     </div>
 
     <section className="trade-log journal-log">
-      <div className="review-section-head"><div><p className="eyebrow">All saved notes</p><h2>Journal log</h2></div></div>
+      <p className="eyebrow journal-log-label">All saved notes</p>
       {entries.length === 0 ? <p className="history-empty">No journal entries yet — write your first note above.</p> : <div className="history-list journal-log-list">
         {entries.map((entry) => {
           const isExpanded = expandedDates.has(entry.trade_date)
