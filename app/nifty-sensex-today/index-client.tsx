@@ -70,6 +70,8 @@ export default function NiftySensexTodayIndexClient({ initialPosts, initialMarke
   const currentTradeDate = todayIST()
   const todayGroup = dayGroups.find((g) => g.tradeDate === currentTradeDate) ?? { tradeDate: currentTradeDate, pre: null, post: null }
   const olderGroups = dayGroups.filter((g) => g.tradeDate !== currentTradeDate)
+  const [biasFilter, setBiasFilter] = useState<'All' | 'Bullish' | 'Neutral' | 'Bearish'>('All')
+  const [page, setPage] = useState(1)
   const dates = dayGroups.map((g) => g.tradeDate)
 
   const { data: marketRows } = useSWR(
@@ -92,6 +94,28 @@ export default function NiftySensexTodayIndexClient({ initialPosts, initialMarke
   function rowFor(tradeDate: string) {
     return marketRows?.[tradeDate] ?? null
   }
+
+
+  // The archive is a flat list today and reaches ~500 rows within a year. Group by month,
+  // filter by bias, and page it -- ARCHIVE_PAGE_SIZE counts sessions, not months, so a page
+  // is a predictable amount of reading regardless of how the days fall.
+  const ARCHIVE_PAGE_SIZE = 40
+  const filteredGroups = olderGroups.filter((g) => {
+    if (biasFilter === 'All') return true
+    const row = rowFor(g.tradeDate)
+    return biasFrom(row?.day_change_pct_nifty, row?.day_change_pct_sensex, row?.market_bias_nifty) === biasFilter
+  })
+  const totalPages = Math.max(1, Math.ceil(filteredGroups.length / ARCHIVE_PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pageGroups = filteredGroups.slice((safePage - 1) * ARCHIVE_PAGE_SIZE, safePage * ARCHIVE_PAGE_SIZE)
+  const visibleMonths = Array.from(
+    pageGroups.reduce((acc, g) => {
+      const label = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' }).format(new Date(`${g.tradeDate}T00:00:00`))
+      if (!acc.has(label)) acc.set(label, [])
+      acc.get(label)!.push(g)
+      return acc
+    }, new Map<string, DayGroup[]>()),
+  )
 
   return (
     <main className="blog-index-shell">
@@ -159,29 +183,72 @@ export default function NiftySensexTodayIndexClient({ initialPosts, initialMarke
 
         {olderGroups.length > 0 && (
           <div className="archive-table-block">
-            <h2 className="archive-table-eyebrow">Archive</h2>
-            <div className="archive-table">
-              <div className="archive-table-head">
-                <span>Date</span><span>Nifty</span><span>Sensex</span><span>Bias</span><span>Read</span>
+            <div className="archive-table-toolbar">
+              <h2 className="archive-table-eyebrow">Archive</h2>
+              <div className="archive-filter" role="group" aria-label="Filter by bias">
+                {(['All', 'Bullish', 'Neutral', 'Bearish'] as const).map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    aria-pressed={biasFilter === b}
+                    onClick={() => { setBiasFilter(b); setPage(1) }}
+                  >{b}</button>
+                ))}
               </div>
-              {olderGroups.map((g) => {
-                const row = rowFor(g.tradeDate)
-                const bias = biasFrom(row?.day_change_pct_nifty, row?.day_change_pct_sensex, row?.market_bias_nifty)
-                return (
-                  <div className="archive-table-row" key={g.tradeDate}>
-                    <span className="archive-table-cell-date">{formatDateLabel(g.tradeDate)}</span>
-                    <span className={`archive-table-cell-num ${tone(row?.day_change_pct_nifty)}`}>{fmtPct(row?.day_change_pct_nifty)}</span>
-                    <span className={`archive-table-cell-num ${tone(row?.day_change_pct_sensex)}`}>{fmtPct(row?.day_change_pct_sensex)}</span>
-                    <span className="archive-table-cell-bias">{bias}</span>
-                    <span className="archive-table-links">
-                      {g.pre && <Link href={`/nifty-sensex-today/${g.pre.slug}`}>Pre</Link>}
-                      {g.pre && g.post && <em> · </em>}
-                      {g.post && <Link href={`/nifty-sensex-today/${g.post.slug}`}>Post</Link>}
-                    </span>
-                  </div>
-                )
-              })}
             </div>
+
+            {visibleMonths.length === 0 ? (
+              <p className="archive-empty">No sessions match this filter yet.</p>
+            ) : visibleMonths.map(([month, groups]) => (
+              <section className="archive-month" key={month}>
+                <h3 className="archive-month-heading">{month}</h3>
+                <table className="archive-table">
+                  <caption className="archive-table-caption">
+                    Daily Nifty and Sensex closing moves and bias for {month}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Date</th>
+                      <th scope="col" className="archive-col-num">Nifty</th>
+                      <th scope="col" className="archive-col-num">Sensex</th>
+                      <th scope="col">Bias</th>
+                      <th scope="col">Read</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groups.map((g) => {
+                      const row = rowFor(g.tradeDate)
+                      const bias = biasFrom(row?.day_change_pct_nifty, row?.day_change_pct_sensex, row?.market_bias_nifty)
+                      return (
+                        <tr key={g.tradeDate}>
+                          <th scope="row" className="archive-table-cell-date">
+                            <time dateTime={g.tradeDate}>{formatDateLabel(g.tradeDate)}</time>
+                          </th>
+                          <td className={`archive-col-num ${tone(row?.day_change_pct_nifty)}`} data-col="Nifty">{fmtPct(row?.day_change_pct_nifty)}</td>
+                          <td className={`archive-col-num ${tone(row?.day_change_pct_sensex)}`} data-col="Sensex">{fmtPct(row?.day_change_pct_sensex)}</td>
+                          <td className="archive-table-cell-bias" data-col="Bias">{bias}</td>
+                          <td className="archive-table-links" data-col="Read">
+                            <span className="archive-links-inner">
+                              {g.pre && <Link href={`/nifty-sensex-today/${g.pre.slug}`}>Pre</Link>}
+                              {g.pre && g.post && <em> · </em>}
+                              {g.post && <Link href={`/nifty-sensex-today/${g.post.slug}`}>Post</Link>}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </section>
+            ))}
+
+            {totalPages > 1 && (
+              <nav className="archive-pager" aria-label="Archive pages">
+                <button type="button" onClick={() => setPage((n) => Math.max(1, n - 1))} disabled={safePage === 1}>Newer</button>
+                <span>Page {safePage} of {totalPages}</span>
+                <button type="button" onClick={() => setPage((n) => Math.min(totalPages, n + 1))} disabled={safePage === totalPages}>Older</button>
+              </nav>
+            )}
           </div>
         )}
         {faqSlot}
