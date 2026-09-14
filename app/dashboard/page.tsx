@@ -442,13 +442,13 @@ function TargetStopCard({ instrument, calc, delta = 0.5 }: { instrument?: Instru
     <div className="track-columns">
       <div className="track-column">
         <div className="track-header"><i></i><span>Conservative</span></div>
-        <strong className="track-move">{calc.conservative.toFixed(1)} pts</strong>
+        <strong className="track-move">{fmt.ptsAbs(calc.conservative)}</strong>
         <div className="track-row"><span>↑ Target (est.)</span><b className="target-value">{calc.target.toFixed(1)} pts</b><em>₹{target.toFixed(1)}</em></div>
         <div className="track-row"><span>↓ Stop-loss (est.)</span><b className="stop-value">{calc.stop.toFixed(1)} pts</b><em>₹{stop.toFixed(1)}</em></div>
       </div>
       <div className="track-column">
         <div className="track-header"><i></i><span>Aggressive</span></div>
-        <strong className="track-move">{calc.aggressive.toFixed(1)} pts</strong>
+        <strong className="track-move">{fmt.ptsAbs(calc.aggressive)}</strong>
         <div className="track-row"><span>↑ Target (est.)</span><b className="target-value">{calc.aggressiveTarget.toFixed(1)} pts</b><em>₹{aggressiveTarget.toFixed(1)}</em></div>
         <div className="track-row"><span>↓ Stop-loss (est.)</span><b className="stop-value">{calc.aggressiveStop.toFixed(1)} pts</b><em>₹{aggressiveStop.toFixed(1)}</em></div>
       </div>
@@ -1005,8 +1005,8 @@ function CarryForward({ row, postSummary, calc }: { row: Row; postSummary: Row; 
   if (actual != null && predicted != null) {
     const miss = Math.abs(actual - predicted)
     lines.push(miss >= 50
-      ? `GIFT Nifty misled by ${miss.toFixed(1)} pts — treat the predicted open as a weak signal this week.`
-      : `GIFT Nifty was within ${miss.toFixed(1)} pts of the open — the predicted gap held up today.`)
+      ? `GIFT Nifty misled by ${fmt.ptsAbs(miss)} — treat the predicted open as a weak signal this week.`
+      : `GIFT Nifty was within ${fmt.ptsAbs(miss)} of the open — the predicted gap held up today.`)
   }
   const support = row.oi_support_nifty != null ? Number(row.oi_support_nifty) : null
   const supportAction = String(row.oi_change_support_nifty ?? '')
@@ -1057,7 +1057,7 @@ function PostMarketView({ row, postSummary }: { row: Row; postSummary: Row | nul
     : dayRange < calc.stop ? 'came nowhere near'
     : 'fell short of'
   // A target distance is a magnitude, not a signed change -- don't run it through fmt.pts.
-  const targetPts = `${calc.target.toFixed(1)} pts`
+  const targetPts = fmt.ptsAbs(calc.target)
   const closePct = postSummary.day_change_pct_nifty != null ? Number(postSummary.day_change_pct_nifty) : null
 
   return <section className="phase-view special-view post-market-view">
@@ -1085,6 +1085,8 @@ function PostMarketView({ row, postSummary }: { row: Row; postSummary: Row | nul
       {actual == null
         ? <EmptyState label="Actual open" headline="Not recorded" reason="The opening snapshot did not run for this session." />
         : <Metric label="Actual open" value={<span className={tone(row, 'gap_points_nifty')}>{fmt.pts(actual)}</span>} sub="vs previous close" />}
+      {/* Prediction miss and Day range split the number from its unit across Metric's
+          value and sub, per the reference, so fmt.ptsAbs would print "pts" twice. */}
       {miss == null
         ? <EmptyState label="Prediction miss" headline="Not available" reason="Needs both a predicted and an actual open." />
         : <Metric label="Prediction miss" className={miss >= 50 ? 'is-diverging' : undefined} value={miss.toFixed(1)} sub={<span className={miss >= 50 ? 'negative' : ''}>{miss >= 50 ? 'pts · diverging' : 'pts · in line'}</span>} />}
@@ -1166,6 +1168,7 @@ function MarketOpenView({ row, capturedAt }: { row: Row; capturedAt: string | nu
       : <Banner tone={diverged ? 'blocking' : 'info'} label={diverged ? 'Nifty diverged from the predicted open' : 'Nifty opened in line with the predicted open'}>
           Opened <strong className={`num ${tone(row, 'gap_points_nifty')}`}>{fmt.pct(gapPct)} ({fmt.pts(gapPts)})</strong> against a predicted{' '}
           <strong className="num">{fmt.pct(predictedPct)} ({fmt.pts(predictedPts)})</strong>
+          {/* "a 191.7 pt miss" -- attributive singular, so not fmt.ptsAbs's "pts". */}
           {missPts != null && <> — a <strong className="num">{missPts.toFixed(1)} pt</strong> {diverged ? 'miss' : 'difference'}</>}.
           {vix != null && <> VIX at {fmt.ratio(vix)} — {vixCondition(vix).toLowerCase()}.</>}
         </Banner>}
@@ -1180,9 +1183,9 @@ function MarketOpenView({ row, capturedAt }: { row: Row; capturedAt: string | nu
     <div className="market-open-move">
       <span className="section-title">Expected move</span>
       <div className="market-open-move-grid">
-        <TradeLevels variant="conservative" heading="Nifty · conservative" total={`${calc.conservative.toFixed(1)} pts`}
+        <TradeLevels variant="conservative" heading="Nifty · conservative" total={fmt.ptsAbs(calc.conservative)}
           targetPts={calc.target} stopPts={calc.stop} targetRupees={calc.target * 0.5} stopRupees={calc.stop * 0.5} />
-        <TradeLevels variant="aggressive" heading="Nifty · aggressive" total={`${calc.aggressive.toFixed(1)} pts`}
+        <TradeLevels variant="aggressive" heading="Nifty · aggressive" total={fmt.ptsAbs(calc.aggressive)}
           targetPts={calc.aggressiveTarget} stopPts={calc.aggressiveStop} targetRupees={calc.aggressiveTarget * 0.5} stopRupees={calc.aggressiveStop * 0.5} />
         {row.advance_decline_ratio == null
           ? <EmptyState label="Advance / decline" headline="Not published" reason="NSE releases breadth after 09:20 IST." />
