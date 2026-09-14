@@ -241,3 +241,11 @@
   .ds-doc .row, .ds-doc .spread { flex-wrap: wrap; }
   .ds-doc .card--flush { overflow-x: auto; }
 }
+
+/* The specimen shows the system's documented sizes, so .btn--sm stays 32px and the segmented
+   control stays 36px -- shrinking the gap between spec and render would defeat the page.
+   The 16px input floor is the exception: 14px is what the spec says, but iOS zooms the
+   viewport on focus below 16px, and that is a browser behaviour rather than a style choice. */
+@media (max-width: 760px) {
+  .ds .input, .ds .select { font-size: 16px; }
+}
