@@ -16,7 +16,7 @@ import { fmt, freshness } from '@/lib/format'
 
 /* ---------------------------------------------------------------- Card */
 
-export type CardTone = 'default' | 'caution' | 'up' | 'down' | 'empty'
+export type CardTone = 'default' | 'caution' | 'up' | 'down' | 'empty' | 'raised'
 
 export function Card({ tone = 'default', flush, className, children }: {
   tone?: CardTone; flush?: boolean; className?: string; children: ReactNode

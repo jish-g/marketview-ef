@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import useSWR from 'swr'
@@ -9,7 +9,7 @@ import { TradeView } from '@/components/trade-view'
 import { JournalView } from '@/components/journal-view'
 import { useSession } from '@/hooks/use-session'
 import { fmt, freshness } from '@/lib/format'
-import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, BiasAxis, CheckpointTimeline, Progress, PhaseAside, Label, Metric, Banner, TradeLevels, type Checkpoint } from '@/components/ui/ds'
+import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, BiasAxis, CheckpointTimeline, Progress, PhaseAside, Label, Metric, Banner, TradeLevels, Card, type Checkpoint } from '@/components/ui/ds'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sun } from 'lucide-react'
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
@@ -962,13 +962,128 @@ function PostInstrumentCard({ row, postSummary, instrument }: { row: Row; postSu
   const cls = label === 'Target likely hit' ? 'outcome-hit' : label === 'SL likely hit' ? 'outcome-stop' : 'outcome-neutral'
   return <article className="verdict-instrument"><div className="verdict-instrument-head"><h3>{instrument}</h3></div><div className="close-grid"><div className="close-card"><span>Close</span><strong>{value(postSummary, `close_${suffix}`)}</strong><b className={tone(postSummary, `day_change_pct_${suffix}`)}>{value(postSummary, `day_change_pct_${suffix}`, true)}</b></div><div className="close-card"><span>Day High / Low</span><strong>{value(postSummary, `day_high_${suffix}`)} / {value(postSummary, `day_low_${suffix}`)}</strong></div></div><div className={`outcome-badge ${cls}`}><span>Target / SL estimate</span><strong>{label}</strong><small>(range-based estimate)</small></div></article>
 }
+/* --------------------------------------------------------------- Post-market
+   Reference: marketcue-dashboard.html #s-post. The screen led with two instrument cards
+   and no answer; the design leads with the verdict-vs-outcome read, then the four figures
+   that justify it, then what carries into tomorrow.
+
+   The headline and the carry-forward lines are assembled from values this screen (and
+   Market open) already derived -- the verdict's recommendation, the range-vs-target
+   outcome PostInstrumentCard already computed, the prediction miss, the OI levels and the
+   DTE weighting. No new model, no new arithmetic; each line restates a number the app
+   already shows somewhere, in words. A line whose inputs are missing is dropped rather
+   than guessed, so the list is never padded.
+
+   Sensex keeps its close card below the Nifty block. The design shows Nifty only -- the
+   prediction tiles are meaningless for an index with no leading indicator -- but the
+   close, high and low are real data the screen already carried, so they stay rather than
+   being silently dropped. */
+function CarryForward({ row, postSummary, calc }: { row: Row; postSummary: Row; calc: ReturnType<typeof calculateVerdict> }) {
+  const lines: string[] = []
+  const actual = row.gap_points_nifty != null ? Number(row.gap_points_nifty) : null
+  const predicted = row.gift_nifty_gap_pts != null ? Number(row.gift_nifty_gap_pts)
+    : row.gift_nifty_gap_pct != null && row.prev_close_nifty != null ? (Number(row.gift_nifty_gap_pct) / 100) * Number(row.prev_close_nifty) : null
+  if (actual != null && predicted != null) {
+    const miss = Math.abs(actual - predicted)
+    lines.push(miss >= 50
+      ? `GIFT Nifty misled by ${miss.toFixed(1)} pts — treat the predicted open as a weak signal this week.`
+      : `GIFT Nifty was within ${miss.toFixed(1)} pts of the open — the predicted gap held up today.`)
+  }
+  const support = row.oi_support_nifty != null ? Number(row.oi_support_nifty) : null
+  const supportAction = String(row.oi_change_support_nifty ?? '')
+  if (support != null && supportAction) {
+    lines.push(`OI support at ${fmt.strike(support)} saw ${supportAction.toLowerCase()} through the session. Watch it on expiry.`)
+  }
+  const dte = calc.dte
+  if (Number.isFinite(dte)) {
+    lines.push(dte <= 3
+      ? `${dte} day${dte === 1 ? '' : 's'} to expiry moves OI to 45% weight — a single OI flip can move the band.`
+      : `${dte} days to expiry keeps gap at 45% weight — OI matters less until the final three sessions.`)
+  }
+  if (lines.length === 0) return null
+  return <div className="post-carry">
+    <span className="section-title">What to carry into tomorrow</span>
+    <Card className="post-carry-list">
+      {lines.map((line, i) => <div className="post-carry-row" key={line}>
+        <span className="post-carry-index">{String(i + 1).padStart(2, '0')}</span>
+        <span>{line}</span>
+      </div>)}
+    </Card>
+  </div>
+}
+
 function PostMarketView({ row, postSummary }: { row: Row; postSummary: Row | null | undefined }) {
-  if (postSummary === undefined) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Post market review · {syncLabel(null, '15:45')}</p><h2>Close the loop</h2></div><PhaseAside /></div><p className="history-empty">Loading post-market data…</p></section>
-  if (!postSummary) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Post market review · {syncLabel(null, '15:45')}</p><h2>Close the loop</h2></div><PhaseAside /></div><p className="history-empty">Post-market data not available yet — updates at 9:00 PM IST.</p></section>
+  const head = (aside: ReactNode) => <div className="review-section-head">
+    <div><p className="eyebrow">After the close · review &amp; learn</p><h2>How the session played out</h2></div>
+    {aside}
+  </div>
+  if (postSummary === undefined) return <section className="phase-view special-view">{head(<PhaseAside />)}<p className="history-empty">Loading post-market data…</p></section>
+  if (!postSummary) return <section className="phase-view special-view">{head(<PhaseAside />)}<p className="history-empty">Post-market data not available yet — updates at 9:00 PM IST.</p></section>
+
+  const calc = calculateVerdict(row, 'NIFTY')
   const fii = postSummary.fii_net_cash_cr
   const dii = postSummary.dii_net_cash_cr
   const asOf = postSummary.fii_dii_data_date
-  return <section className="phase-view special-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">Post market review · {syncLabel(postSummary, '15:45')}</p><h2>Close the loop</h2></div><PhaseAside capturedAt={(postSummary?.updated_at ?? row?.updated_at ?? null) as string | null} /></div><div className="verdict-instruments"><PostInstrumentCard row={row} postSummary={postSummary} instrument="NIFTY" /><PostInstrumentCard row={row} postSummary={postSummary} instrument="SENSEX" /></div><div className="flow-card"><span>FII / DII net cash flow</span><strong>{fii != null && dii != null ? `FII: ₹${fii} Cr, DII: ₹${dii} Cr (as of ${asOf ?? row.trade_date})` : 'Not available'}</strong></div></section>
+
+  const actual = row.gap_points_nifty != null ? Number(row.gap_points_nifty) : null
+  const predicted = row.gift_nifty_gap_pts != null ? Number(row.gift_nifty_gap_pts)
+    : row.gift_nifty_gap_pct != null && row.prev_close_nifty != null ? (Number(row.gift_nifty_gap_pct) / 100) * Number(row.prev_close_nifty) : null
+  const miss = actual != null && predicted != null ? Math.abs(actual - predicted) : null
+  const high = num(postSummary, 'day_high_nifty')
+  const low = num(postSummary, 'day_low_nifty')
+  const dayRange = Number.isFinite(high) && Number.isFinite(low) && high > 0 ? high - low : null
+  // Exactly the comparison PostInstrumentCard already makes, reused rather than re-derived.
+  const rangeOutcome = dayRange == null ? null
+    : dayRange >= calc.target ? 'travelled'
+    : dayRange < calc.stop ? 'came nowhere near'
+    : 'fell short of'
+  // A target distance is a magnitude, not a signed change -- don't run it through fmt.pts.
+  const targetPts = `${calc.target.toFixed(1)} pts`
+  const closePct = postSummary.day_change_pct_nifty != null ? Number(postSummary.day_change_pct_nifty) : null
+
+  return <section className="phase-view special-view post-market-view">
+    {head(<PhaseAside capturedAt={(postSummary?.updated_at ?? row?.updated_at ?? null) as string | null} />)}
+
+    <Card tone="raised" className="post-hero">
+      <Label>Verdict vs outcome</Label>
+      <strong className="post-hero-value">{
+        dayRange == null ? 'The session is not closed out yet'
+          : dayRange >= calc.target ? 'The day travelled its conservative target'
+          : dayRange < calc.stop ? 'The day never went anywhere'
+          : 'The day stayed inside the expected range'
+      }</strong>
+      <p className="post-hero-body">
+        {calc.bias} bias, {calc.strategy} recommended.
+        {closePct != null && <> Nifty closed <strong className={`num ${tone(postSummary, 'day_change_pct_nifty')}`}>{fmt.pct(closePct)}</strong></>}
+        {rangeOutcome != null && <> and {rangeOutcome} the <strong className="num">{targetPts}</strong> a conservative target needed</>}.
+      </p>
+    </Card>
+
+    <div className="market-open-tiles">
+      {predicted == null
+        ? <EmptyState label="Predicted open" headline="Not available" reason="GIFT Nifty did not publish a gap for this session." />
+        : <Metric label="Predicted open" value={<span className={predicted > 0 ? 'positive' : predicted < 0 ? 'negative' : ''}>{fmt.pts(predicted)}</span>} sub="from GIFT Nifty" />}
+      {actual == null
+        ? <EmptyState label="Actual open" headline="Not recorded" reason="The opening snapshot did not run for this session." />
+        : <Metric label="Actual open" value={<span className={tone(row, 'gap_points_nifty')}>{fmt.pts(actual)}</span>} sub="vs previous close" />}
+      {miss == null
+        ? <EmptyState label="Prediction miss" headline="Not available" reason="Needs both a predicted and an actual open." />
+        : <Metric label="Prediction miss" className={miss >= 50 ? 'is-diverging' : undefined} value={miss.toFixed(1)} sub={<span className={miss >= 50 ? 'negative' : ''}>{miss >= 50 ? 'pts · diverging' : 'pts · in line'}</span>} />}
+      {dayRange == null
+        ? <EmptyState label="Day range" headline="Not recorded" reason="Day high and low were not captured." />
+        : <Metric label="Day range" value={dayRange.toFixed(1)} sub={`pts · ${dayRange < calc.conservative ? 'under' : 'over'} ${calc.conservative.toFixed(2)} expected`} />}
+    </div>
+
+    <CarryForward row={row} postSummary={postSummary} calc={calc} />
+
+    <div className="post-secondary">
+      <span className="section-title">Closing levels</span>
+      <div className="verdict-instruments"><PostInstrumentCard row={row} postSummary={postSummary} instrument="NIFTY" /><PostInstrumentCard row={row} postSummary={postSummary} instrument="SENSEX" /></div>
+      <div className="flow-card"><span>FII / DII net cash flow</span><strong>{fii != null && dii != null ? `FII: ${fmt.rupees(Number(fii))} Cr, DII: ${fmt.rupees(Number(dii))} Cr (as of ${asOf ?? row.trade_date})` : 'Not available'}</strong></div>
+    </div>
+
+    <Disclaimer capturedAt={fmt.timeIST((postSummary?.updated_at ?? null) as string | null)} />
+  </section>
 }
 
 // The read, stated before its evidence. Derived from the same computeMarketBias object the

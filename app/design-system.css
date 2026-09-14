@@ -241,3 +241,20 @@
 @media (max-width: 560px) {
   .market-open-tiles { grid-template-columns: 1fr; }
 }
+
+.ds-card--raised { background: var(--surface-2); }
+
+/* --------------------------------------------------------------- Post-market
+   Reference: marketcue-dashboard.html #s-post. */
+.post-market-view { display: grid; gap: var(--s-5); align-content: start; }
+.post-hero { display: grid; gap: var(--s-2); }
+.post-hero-value { font-size: 28px; line-height: 1.2; letter-spacing: -.02em; }
+.post-hero-body { margin: 0; font-size: var(--text-body); color: var(--ink-2); line-height: 1.6; }
+.post-carry { display: grid; gap: 10px; }
+.post-carry-list { display: grid; gap: var(--s-3); }
+.post-carry-row { display: flex; align-items: flex-start; gap: var(--s-3); font-size: var(--text-body); color: var(--ink-2); line-height: 1.55; }
+.post-carry-row + .post-carry-row { padding-top: var(--s-3); border-top: 1px solid var(--border); }
+.post-carry-index { flex: 0 0 auto; color: var(--faint); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.post-secondary { display: grid; gap: 10px; }
+/* The design tints the prediction-miss tile's border when the open diverged. */
+.ds-metric.is-diverging { border-color: color-mix(in srgb, var(--down) 40%, transparent); }
