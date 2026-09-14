@@ -303,7 +303,7 @@ export function SpecimenClient() {
               </div>
             </div>
 
-            <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', alignItems: 'start' }}>
+            <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', alignItems: 'start' }}>
               <div className="card card--caution metric metric--hero">
                 <span className="label" style={{ color: 'var(--caution-ink)' }}>Recommendation</span>
                 <strong className="metric__value">No trade</strong>

@@ -212,8 +212,8 @@
 .ds-doc h3 { font-size: var(--text-h3); margin: var(--s-8) 0 var(--s-3); }
 .ds-doc .lede { color: var(--muted); max-width: var(--measure); }
 .ds .grid { display: grid; gap: var(--s-3); }
-.ds .grid--3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-.ds .grid--4 { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.ds .grid--3 { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+.ds .grid--4 { grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); }
 .ds .row { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: center; }
 .ds .spread { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: baseline; justify-content: space-between; }
 .ds .swatch { display: flex; flex-direction: column; gap: 6px; min-width: 96px; }
@@ -221,7 +221,7 @@
 .ds .swatch code { font-family: var(--font-mono); font-size: var(--text-label); color: var(--muted); }
 .ds .rule { display: flex; gap: var(--s-3); padding: var(--s-4) 0; border-top: 1px solid var(--border); }
 .ds .rule b { flex: 0 0 28px; font-family: var(--font-mono); color: var(--faint); }
-.ds .do-dont { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--s-3); }
+.ds .do-dont { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: var(--s-3); }
 .ds-topbar {
   position: sticky; top: 0; z-index: 5;
   display: flex; align-items: center; justify-content: space-between; gap: var(--s-4);
@@ -231,4 +231,19 @@
 @media (max-width: 760px) {
   .ds-doc { padding: var(--s-6) var(--s-4) var(--s-10); }
   .ds-table-scroll { overflow-x: auto; }
+}
+
+/* The composed Verdict card nests its own --s-6 padding inside the doc's gutters, which at
+   375px pushes its grid children a couple of px past the viewport. Tighten it on narrow
+   screens -- rule 3 forbids card-on-card, and this is the one place the specimen does it
+   deliberately to show a full screen. */
+@media (max-width: 560px) {
+  .ds-doc .card { padding: var(--s-4); }
+  /* Flex and grid items default to min-width:auto, so a long unbreakable value can push a
+     track wider than its container. Applied to every descendant because the specimen nests
+     cards inside cards, which production layouts do not. */
+  .ds-doc *, .ds-doc .grid, .ds-doc .spread, .ds-doc .row { min-width: 0; }
+  .ds-doc .grid, .ds-doc .grid--3, .ds-doc .grid--4 { grid-template-columns: 1fr; }
+  .ds-doc .row, .ds-doc .spread { flex-wrap: wrap; }
+  .ds-doc .card--flush { overflow-x: auto; }
 }

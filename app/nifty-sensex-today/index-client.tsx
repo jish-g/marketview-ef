@@ -24,7 +24,7 @@ function formatDateLabel(dateStr: string) {
   return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${dateStr}T00:00:00`))
 }
 function fmtPct(v: any) {
-  if (v === null || v === undefined || v === '') return '—'
+  if (v === null || v === undefined || v === '') return 'Not available'
   const n = Number(v)
   return `${n > 0 ? '+' : ''}${v}%`
 }
@@ -39,7 +39,7 @@ function biasFrom(pctNifty: any, pctSensex: any, openBiasNifty: any) {
     return n > 0 ? 'Bullish' : 'Bearish'
   }
   if (openBiasNifty) return String(openBiasNifty)
-  return '—'
+  return 'Not available'
 }
 
 export default function NiftySensexTodayIndexClient({ initialPosts, initialMarketRows, faqSlot }: IndexClientProps) {

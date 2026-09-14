@@ -70,7 +70,7 @@ function TradeChip({ trade }: { trade: Trade }) {
   const pnl = tradePnl(trade)
   const tone = pnl == null ? 'neutral' : pnl >= 0 ? 'positive' : 'negative'
   return <span className={`journal-trade-chip journal-chip-${tone}`}>
-    {trade.instrument} {String(trade.strategy ?? '—')} {outcomeLabel(trade)}
+    {trade.instrument} {String(trade.strategy ?? 'No strategy recorded')} {outcomeLabel(trade)}
     {pnl != null && ` ${pnl >= 0 ? '+' : '−'}₹${Math.abs(pnl).toFixed(0)}`}
     <span className={`source-badge source-${trade.source ?? 'system'}`}>{trade.source === 'manual' ? 'Manual' : 'System'}</span>
   </span>
@@ -84,7 +84,7 @@ function TradeDayCards({ trades }: { trades: Trade[] }) {
       const isOpen = trade.outcome === 'open'
       return <div className="field-card" key={String(trade.id)}>
         <span>{trade.instrument} <span className={`source-badge source-${trade.source ?? 'system'}`}>{trade.source === 'manual' ? 'Manual' : 'System'}</span></span>
-        <strong>{String(trade.strategy ?? '—')}<em className="breadth-flag">{outcomeLabel(trade)}</em>{pnl != null && <em className={`breadth-flag ${pnl >= 0 ? 'positive' : 'negative'}`}>{pnl >= 0 ? '+' : '−'}₹{Math.abs(pnl).toFixed(0)}</em>}{isOpen && <em className="breadth-flag">Still open — check the Trade page</em>}</strong>
+        <strong>{String(trade.strategy ?? 'No strategy recorded')}<em className="breadth-flag">{outcomeLabel(trade)}</em>{pnl != null && <em className={`breadth-flag ${pnl >= 0 ? 'positive' : 'negative'}`}>{pnl >= 0 ? '+' : '−'}₹{Math.abs(pnl).toFixed(0)}</em>}{isOpen && <em className="breadth-flag">Still open — check the Trade page</em>}</strong>
       </div>
     })}
   </div>

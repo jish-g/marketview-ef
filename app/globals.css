@@ -394,3 +394,13 @@ button, input { font: inherit; }
 .thesis-hero .action-button { justify-self: start; min-height: 44px; }
 .field-empty-headline { color: var(--ink-2); font-size: var(--text-value); font-weight: 600; }
 .field-empty-reason { display: block; margin-top: var(--s-1); color: var(--muted); font-size: var(--text-meta); line-height: 1.45; }
+
+/* The doc topbar packs a back-link and the lockup onto one row. Raising the type floor to
+   12px in the token migration pushed the brand text ~5px past the viewport at 375px, which
+   the old overflow-x mask hid. Let the flex children shrink and drop the sub-label. */
+@media (max-width: 560px) {
+  .rules-doc-topbar { gap: var(--s-2); }
+  .rules-doc-topbar .topbar-meta, .rules-doc-topbar .brand-mark, .rules-doc-topbar .brand-mark > div { min-width: 0; }
+  .rules-doc-topbar .brand-mark > div { display: none; }
+  .rules-doc-topbar .back-link { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

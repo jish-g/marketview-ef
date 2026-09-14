@@ -52,7 +52,7 @@ export default async function IndiaVixTodayPage() {
 
   const tableRows = [
     { metric: 'India VIX', value: fmtNum(vix), read: vixRead(vix) },
-    { metric: 'Change vs previous session', value: fmtPct(row?.india_vix_change_pct), read: row?.india_vix_change_pct != null ? (Number(row.india_vix_change_pct) >= 0 ? 'Volatility expectation rising' : 'Volatility expectation falling') : '—' },
+    { metric: 'Change vs previous session', value: fmtPct(row?.india_vix_change_pct), read: row?.india_vix_change_pct != null ? (Number(row.india_vix_change_pct) >= 0 ? 'Volatility expectation rising' : 'Volatility expectation falling') : 'Not available' },
   ]
 
   const paragraphs = [

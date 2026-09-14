@@ -62,7 +62,7 @@ export default async function NseOptionChainAnalysisPage() {
     { metric: 'Max Pain', value: fmtNum(maxPain), read: maxPainRead(row?.prev_close_nifty, maxPain) },
     { metric: 'OI Support', value: fmtNum(row?.oi_support_nifty), read: oiRead(row?.oi_change_support_nifty, true) },
     { metric: 'OI Resistance', value: fmtNum(row?.oi_resistance_nifty), read: oiRead(row?.oi_change_resistance_nifty, false) },
-    { metric: 'ATM IV', value: fmtNum(row?.atm_iv_nifty), read: '—' },
+    { metric: 'ATM IV', value: fmtNum(row?.atm_iv_nifty), read: 'Not available' },
     { metric: 'India VIX', value: fmtNum(row?.india_vix), read: vixRead(row?.india_vix) },
   ]
 

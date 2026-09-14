@@ -147,7 +147,7 @@
 
 /* --- layout helpers --- */
 .ds-grid { display: grid; gap: var(--s-3); }
-.ds-grid--3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.ds-grid--3 { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
 .ds-stack { display: grid; gap: var(--s-5); }
 
 /* ============================================================

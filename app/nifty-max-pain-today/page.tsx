@@ -55,7 +55,7 @@ export default async function NiftyMaxPainTodayPage() {
   const tableRows = [
     { metric: 'Nifty Max Pain', value: fmtNum(maxPain), read: maxPainRead(prevClose, maxPain) },
     { metric: 'Nifty Previous Close', value: fmtNum(prevClose), read: 'Reference spot' },
-    { metric: 'Distance (points)', value: diffPts ?? '—', read: diffPts != null ? (Number(diffPts) > 0 ? 'Spot above Max Pain' : Number(diffPts) < 0 ? 'Spot below Max Pain' : 'At Max Pain') : '—' },
+    { metric: 'Distance (points)', value: diffPts ?? 'Not available', read: diffPts != null ? (Number(diffPts) > 0 ? 'Spot above Max Pain' : Number(diffPts) < 0 ? 'Spot below Max Pain' : 'At Max Pain') : 'Not available' },
   ]
 
   const paragraphs = [

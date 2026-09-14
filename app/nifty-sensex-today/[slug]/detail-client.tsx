@@ -50,12 +50,12 @@ function bodySections(body: string): { heading: string; paragraphs: string[] }[]
 }
 
 function fmtPct(v: any) {
-  if (v === null || v === undefined || v === '') return '—'
+  if (v === null || v === undefined || v === '') return 'Not available'
   const n = Number(v)
   return `${n > 0 ? '+' : ''}${v}%`
 }
 function fmtNum(v: any, suffix = '') {
-  if (v === null || v === undefined || v === '') return '—'
+  if (v === null || v === undefined || v === '') return 'Not available'
   return `${v}${suffix}`
 }
 function tone(v: any) {
@@ -72,7 +72,7 @@ function ptsSuffix(v: any) {
 // /rules (VIX Score, Gap %, DTE Score) so the table's interpretation can
 // never drift from the documented methodology it's describing.
 function vixRead(v: any): string {
-  if (v == null || v === '') return '—'
+  if (v == null || v === '') return 'Not available'
   const n = Number(v)
   if (n < 11) return 'Thin, theta-heavy premium'
   if (n <= 14) return 'Ideal, low-risk premium'
@@ -81,7 +81,7 @@ function vixRead(v: any): string {
   return 'Blocks fresh option buying'
 }
 function gapRead(pct: any): string {
-  if (pct == null || pct === '') return '—'
+  if (pct == null || pct === '') return 'Not available'
   const n = Number(pct)
   if (n > 0.75) return 'Strong Gap Up'
   if (n >= 0.25) return 'Normal Gap Up'
@@ -90,14 +90,14 @@ function gapRead(pct: any): string {
   return 'Strong Gap Down'
 }
 function dteRead(d: any): string {
-  if (d == null || d === '') return '—'
+  if (d == null || d === '') return 'Not available'
   const n = Number(d)
   if (n <= 1) return 'High gamma risk'
   if (n <= 4) return 'Ideal window'
   return 'Lower gamma risk'
 }
 function closeRead(pct: any): string {
-  if (pct == null || pct === '') return '—'
+  if (pct == null || pct === '') return 'Not available'
   const n = Number(pct)
   if (n > 0) return 'Bullish close'
   if (n < 0) return 'Bearish close'

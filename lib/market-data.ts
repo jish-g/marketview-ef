@@ -86,13 +86,13 @@ export function bareHeadline(title: string): string {
 }
 
 export function fmtPct(v: any): string {
-  if (v === null || v === undefined || v === '') return '—'
+  if (v === null || v === undefined || v === '') return 'Not published'
   const n = Number(v)
   return `${n > 0 ? '+' : ''}${v}%`
 }
 
 export function fmtNum(v: any, suffix = ''): string {
-  if (v === null || v === undefined || v === '') return '—'
+  if (v === null || v === undefined || v === '') return 'Not published'
   return `${v}${suffix}`
 }
 
@@ -104,21 +104,21 @@ export function formatDateLabel(dateStr: string) {
 // published on /rules so every page's interpretation of a raw number stays
 // consistent with the one documented, auditable methodology.
 export function pcrRead(v: any): string {
-  if (v == null || v === '') return '—'
+  if (v == null || v === '') return 'Not published'
   const n = Number(v)
   if (n > 1.3) return 'Oversold / Bullish bias'
   if (n >= 0.8) return 'Neutral'
   return 'Overbought / Bearish bias'
 }
 export function maxPainRead(spot: any, maxPain: any): string {
-  if (spot == null || maxPain == null) return '—'
+  if (spot == null || maxPain == null) return 'Not published'
   const diffPct = ((Number(spot) - Number(maxPain)) / Number(maxPain)) * 100
   if (diffPct > 0.3) return 'Downward pull likely toward expiry'
   if (diffPct < -0.3) return 'Upward pull likely toward expiry'
   return 'Pinning likely'
 }
 export function vixRead(v: any): string {
-  if (v == null || v === '') return '—'
+  if (v == null || v === '') return 'Not published'
   const n = Number(v)
   if (n < 11) return 'Thin, theta-heavy premium'
   if (n <= 14) return 'Ideal, low-risk premium'
@@ -127,7 +127,7 @@ export function vixRead(v: any): string {
   return 'Blocks fresh option buying'
 }
 export function gapRead(pct: any): string {
-  if (pct == null || pct === '') return '—'
+  if (pct == null || pct === '') return 'Not published'
   const n = Number(pct)
   if (n > 0.75) return 'Strong Gap Up'
   if (n >= 0.25) return 'Normal Gap Up'
@@ -136,14 +136,14 @@ export function gapRead(pct: any): string {
   return 'Strong Gap Down'
 }
 export function dteRead(d: any): string {
-  if (d == null || d === '') return '—'
+  if (d == null || d === '') return 'Not published'
   const n = Number(d)
   if (n <= 1) return 'High gamma risk'
   if (n <= 4) return 'Ideal window'
   return 'Lower gamma risk'
 }
 export function oiRead(change: any, isSupport: boolean): string {
-  if (change == null || change === '') return '—'
+  if (change == null || change === '') return 'Not published'
   const addition = String(change).toLowerCase() === 'addition'
   if (isSupport) return addition ? 'Support strengthening' : 'Support weakening — breakdown risk'
   return addition ? 'Resistance strengthening' : 'Resistance weakening — breakout risk'

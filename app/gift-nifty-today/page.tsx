@@ -55,9 +55,9 @@ export default async function GiftNiftyTodayPage() {
 
   const tableRows = [
     { metric: 'GIFT Nifty Gap %', value: fmtPct(gapPct), read: gapRead(gapPct) },
-    { metric: 'GIFT Nifty Gap (points)', value: gapPts != null ? `${Number(gapPts) > 0 ? '+' : ''}${gapPts} pts` : '—', read: gapRead(gapPct) },
+    { metric: 'GIFT Nifty Gap (points)', value: gapPts != null ? `${Number(gapPts) > 0 ? '+' : ''}${gapPts} pts` : 'Not available', read: gapRead(gapPct) },
     { metric: 'Nifty Previous Close', value: fmtNum(prevClose), read: 'Reference level' },
-    { metric: 'Predicted Nifty Open', value: predictedOpen ?? '—', read: 'Nifty previous close + gap' },
+    { metric: 'Predicted Nifty Open', value: predictedOpen ?? 'Not available', read: 'Nifty previous close + gap' },
   ]
 
   const paragraphs = [
