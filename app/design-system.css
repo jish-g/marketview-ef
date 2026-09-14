@@ -275,3 +275,8 @@
 .history-day-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-3); }
 .history-day-date { font-size: var(--text-body); font-variant-numeric: tabular-nums; }
 .history-day-head .history-close-pill { margin-left: auto; font-size: var(--text-meta); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* The scoring table's score column is one of the four places the rules permit --up/--down:
+   each row's score IS a signed contribution to the bias. */
+.ds-score--up { color: var(--up); }
+.ds-score--down { color: var(--down); }
