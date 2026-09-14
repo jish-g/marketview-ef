@@ -60,6 +60,18 @@ export const fmt = {
     return `${v < 0 ? MINUS : ''}₹${Math.abs(v).toFixed(2)}`
   },
 
+  /** Points as a magnitude: 1 decimal, never signed. `151.9 pts`
+   *
+   *  Distinct from pts() because a distance is not a delta. An expected move, a target
+   *  distance, a prediction miss and a 5-day average range all have a size but no
+   *  direction, and running them through pts() prints a "+" that asserts one. The absence
+   *  of this formatter has been worked around by hand three times -- once here in value(),
+   *  twice in the Market open and Post-market views. */
+  ptsAbs(n: number | null | undefined) {
+    if (n == null || Number.isNaN(Number(n))) return 'Not available'
+    return `${Math.abs(Number(n)).toFixed(1)} pts`
+  },
+
   /** Signed rupee P&L: whole rupees, thousands separator, always signed. `+₹1,240` */
   pnl(n: number | null | undefined) {
     if (n == null || Number.isNaN(Number(n))) return 'Not available'
