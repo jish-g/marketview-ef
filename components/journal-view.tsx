@@ -213,7 +213,7 @@ export function JournalView() {
   }
 
   return <section className="phase-view journal-view">
-    <div className="review-section-head"><div><p className="eyebrow">End of day</p><h2>Journal</h2></div><PhaseAside capturedAt={tradeDate} source="manual" /></div>
+    <div className="review-section-head"><div><p className="eyebrow">Daily trade notes</p><h2>Journal</h2></div><div className="phase-head-aside"><span className="journal-count">{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</span><PhaseAside capturedAt={tradeDate} source="manual" /></div></div>
     {error && <p className="history-empty">Unable to load journal data right now.</p>}
 
     <p className="eyebrow">Today&apos;s trades</p>
@@ -222,7 +222,7 @@ export function JournalView() {
     <div className="position-calculator journal-notes-card">
       <div className="position-head">
         <div>
-          <p className="eyebrow">{editingDate === tradeDate ? 'Your notes' : `Editing ${formatDateLabel(editingDate)}`}</p>
+          <p className="eyebrow">{editingDate === tradeDate ? "Today's note" : `Editing ${formatDateLabel(editingDate)}`}</p>
           <strong>{editingDate === tradeDate ? 'What happened today, and what to remember next time' : 'Update this day\'s note'}</strong>
         </div>
       </div>
@@ -254,7 +254,7 @@ export function JournalView() {
           <CheckCircle2 size={14} /> {saving ? 'Saving...' : existingEntryForEditingDate ? 'Save changes' : 'Save entry'}
         </button>
         <button type="button" className="action-button" onClick={() => fileInputRef.current?.click()} disabled={uploadingCount > 0}>
-          <ImagePlus size={14} /> Add screenshot
+          <ImagePlus size={14} /> Attach screenshot
         </button>
         <input
           ref={fileInputRef}
@@ -265,6 +265,7 @@ export function JournalView() {
           onChange={(e) => { void handleFilesSelected(e.target.files); e.target.value = '' }}
         />
         {editingDate !== tradeDate && <button type="button" className="action-button" onClick={cancelEdit} disabled={saving}>Cancel</button>}
+        <span className="journal-privacy-note">Entries are private to your account.</span>
       </div>
     </div>
 

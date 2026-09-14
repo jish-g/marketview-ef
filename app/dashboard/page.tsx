@@ -137,7 +137,7 @@ function RulesView({ row }: { row: Row | null }) {
 
   return <section className="phase-view rules-view">
 
-    <div className="review-section-head rules-header"><div><p className="eyebrow">Interpretation guide</p><h2>Rules engine</h2></div><div className="phase-head-aside"><a className="detailed-read-link" href="/rules">Detailed read <ChevronRight size={15} /></a></div></div>
+    <div className="review-section-head rules-header"><div><p className="eyebrow">Interpretation guide</p><h2>Rules engine</h2></div><div className="phase-head-aside"><a className="action-button rules-reference-link" href="/rules">Open the full reference <ChevronRight size={15} /></a></div></div>
     {bias && readiness && strategyRec && <div className="scoring-path">
       <Label>Today&apos;s scoring path</Label>
       <div className="scoring-path-chips">
@@ -149,6 +149,12 @@ function RulesView({ row }: { row: Row | null }) {
       </div>
       <p className="scoring-path-note">Each step is a table lookup, not a judgement. Change any input and the path changes with it — that is the whole claim.</p>
     </div>}
+
+    <div className="rules-stage-summary">
+      <Card><strong>Stage 1 · Market bias</strong><span className="rules-stage-summary-note">Gap, OI structure, PCR and max pain, weighted by days to expiry, mapped to five bands.</span></Card>
+      <Card><strong>Stage 2 · Option readiness</strong><span className="rules-stage-summary-note">India VIX, IV versus VIX and days to expiry summed from −4 to +6, mapped to three bands.</span></Card>
+      <Card><strong>Stage 3 · Strategy</strong><span className="rules-stage-summary-note">Bias band against IV condition, VIX and DTE. An Avoid reading forces no trade regardless of bias.</span></Card>
+    </div>
 
     <p className="eyebrow rules-stage-label">Stage 1 · Market bias</p>
     <div className="rule-grid">{stage1.map((section) => <article className="rule-table" key={section.title}><div className="rule-table-head"><div><strong>{section.title}</strong><span>{section.subtitle}</span></div><BookOpen size={16} /></div><div className="rule-table-labels"><span>Condition</span><span>Reading</span><span>Score</span></div>{section.rows.map(([condition, reading, action]) => <div className="rule-table-row" key={`${condition}-${reading}`}><b>{condition}</b><span>{reading}</span><span>{action}</span></div>)}</article>)}</div>
@@ -187,6 +193,16 @@ function historyOutcomeRead(trade: Row | undefined) {
 // missing 2 of computeMarketBias's 4 inputs and pinning almost every midday reading to "Neutral" regardless
 // of the real intraday move (verified against real PCR/spot/max-pain swings on 2026-08-26, where the stored
 // value correctly moved Neutral -> Bearish -> Strong Bearish through the day).
+// Reference #s-history renders "Fri, 11 Sept", not an ISO date with the weekday beside it.
+function historyDateLabel(row: Row): string {
+  const raw = row.trade_date ? String(row.trade_date) : null
+  if (!raw) return 'Date not recorded'
+  const d = new Date(`${raw}T00:00:00+05:30`)
+  if (Number.isNaN(d.getTime())) return raw
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short' })
+    .format(d).replace(/^(\w+)\s/, '$1, ')
+}
+
 function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid: Row | undefined; post: Row | undefined; trade: Row | undefined }) {
   const instrument: Instrument = 'NIFTY'
   const suffix = 'nifty'
@@ -216,24 +232,27 @@ function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid:
 
   return <article className="history-day-card">
     <div className="history-day-head">
-      <div><strong>{row.trade_date}</strong><span>{row.day_name ?? 'Not available'}</span></div>
+      <strong className="history-day-date">{historyDateLabel(row)}</strong>
+      <span className={`ds-badge ds-badge--${morningBias.label === 'Bullish' || morningBias.label === 'Strong Bullish' ? 'up' : morningBias.label === 'Bearish' || morningBias.label === 'Strong Bearish' ? 'down' : 'neutral'}`}>
+        {morningBias.label === 'Bullish' || morningBias.label === 'Strong Bullish' ? '\u2191' : morningBias.label === 'Bearish' || morningBias.label === 'Strong Bearish' ? '\u2193' : '\u2192'} {morningBias.label}
+      </span>
       {post && <span className={`history-close-pill ${tone(post, 'day_change_pct_nifty')}`}>{value(post, 'day_change_pct_nifty', true)}</span>}
     </div>
     <div className="history-beats">
       <div className="history-beat">
-        <span className="history-beat-label">Opening</span>
-        {hasOpening ? <p><b className={openGapPct >= 0 ? 'positive' : 'negative'}>{openGapPct >= 0 ? '+' : ''}{openGapPct.toFixed(2)}%</b> gap ({gapPoints.toFixed(1)} pts) — {gapBandLabel(openGapPct)}</p> : <p className="history-beat-empty">No opening data recorded</p>}
+        <span className="history-beat-label">Pre-market</span>
+        {hasOpening ? <p><b className={openGapPct >= 0 ? 'positive' : 'negative'}>{fmt.pct(openGapPct)}</b> gap ({fmt.pts(gapPoints)}) — {gapBandLabel(openGapPct)}</p> : <p className="history-beat-empty">No opening data recorded</p>}
       </div>
       <div className="history-beat">
-        <span className="history-beat-label">Expected</span>
+        <span className="history-beat-label">Verdict</span>
         <p><b>{morningBias.label}</b> bias · {morningStrategy.recommendation}</p>
       </div>
       <div className="history-beat">
-        <span className="history-beat-label">Through the day</span>
+        <span className="history-beat-label">Checkpoints</span>
         {hasMidday ? <p><b className={shifted ? 'is-shifted' : ''}>{middayBiasLabel}</b> bias · {middayStrategy}<br /><span className="history-beat-note">{shifted ? 'Shifted since the morning call' : 'Unchanged since the morning call'}</span></p> : <p className="history-beat-empty">No midday snapshot recorded</p>}
       </div>
       <div className="history-beat">
-        <span className="history-beat-label">Close</span>
+        <span className="history-beat-label">Outcome</span>
         {post ? <p>Close <b className={tone(post, 'day_change_pct_nifty')}>{value(post, 'day_change_pct_nifty', true)}</b>, high/low {value(post, 'day_high_nifty')} / {value(post, 'day_low_nifty')}<br /><span className={outcome.cls}>{outcome.label}</span></p> : <p className="history-beat-empty">Post-market data not available</p>}
       </div>
     </div>

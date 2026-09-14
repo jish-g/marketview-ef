@@ -258,3 +258,20 @@
 .post-secondary { display: grid; gap: 10px; }
 /* The design tints the prediction-miss tile's border when the open diverged. */
 .ds-metric.is-diverging { border-color: color-mix(in srgb, var(--down) 40%, transparent); }
+
+/* ---------------------------------------------------------------- Rules engine
+   Reference #s-rules: three one-line stage cards between the scoring path and the tables. */
+.rules-stage-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-3); }
+.rules-stage-summary .ds-card { display: grid; gap: var(--s-2); align-content: start; }
+.rules-stage-summary-note { color: var(--muted); font-size: var(--text-meta); line-height: 1.55; }
+.rules-reference-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; text-decoration: none; }
+@media (max-width: 900px) { .rules-stage-summary { grid-template-columns: 1fr; } }
+
+/* Journal (reference #s-journal): entry count in the head, privacy note by the actions. */
+.journal-count { color: var(--muted); font-size: var(--text-meta); font-variant-numeric: tabular-nums; }
+.journal-privacy-note { color: var(--faint); font-size: var(--text-meta); }
+
+/* History (reference #s-history): one baseline head row, close % pushed right. */
+.history-day-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-3); }
+.history-day-date { font-size: 16px; font-variant-numeric: tabular-nums; }
+.history-day-head .history-close-pill { margin-left: auto; font-size: var(--text-meta); font-weight: 600; font-variant-numeric: tabular-nums; }
