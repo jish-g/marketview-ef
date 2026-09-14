@@ -82,7 +82,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
   // The header links do not fit beside the brand on a phone, so below the breakpoint they move into a drawer.
   useEffect(() => { if (!isMobile) setMenuOpen(false) }, [isMobile])
   const { session, loading, signOut } = useSession()
-  useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
+  useEffect(() => { document.documentElement.classList.toggle('light', !dark) }, [dark])
   const supabase = createClient()
 
   // Recomputed client-side too (not just trusting the server prop) so a tab left

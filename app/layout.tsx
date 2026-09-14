@@ -70,7 +70,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`light ${plexSans.variable} ${plexMono.variable}`}>
       <body className="antialiased">
         <script
           type="application/ld+json"

@@ -26,7 +26,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
+  useEffect(() => { document.documentElement.classList.toggle('light', !dark) }, [dark])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
