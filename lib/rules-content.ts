@@ -28,12 +28,13 @@ export const RULES_FORMULAS = [
   ['Book profit / book stop — seller strategies', 'Book Profit = Target × Qty', 'Book Stop = Stop × Qty — no extra split, since the 60/40–75/25 split already happened at the Target/Stop-loss level.'],
 ]
 
-// Plain-text rendering of the above, used by /llms-full.txt.
+// Markdown rendering of the above, used by /llms-full.txt.
 export function rulesAsPlainText(): string {
   const sectionText = RULES_SECTIONS.map((s) => {
-    const header = s.columns.join(' | ')
-    const rows = s.rows.map((r) => r.join(' | ')).join('\n')
-    return `## ${s.title}\n\n${s.intro}\n\n${header}\n${rows}`
+    const header = `| ${s.columns.join(' | ')} |`
+    const divider = `| ${s.columns.map(() => '---').join(' | ')} |`
+    const rows = s.rows.map((r) => `| ${r.join(' | ')} |`).join('\n')
+    return `## ${s.title}\n\n${s.intro}\n\n${header}\n${divider}\n${rows}`
   }).join('\n\n')
 
   const formulaText = RULES_FORMULAS.map(([title, formula, note]) => `### ${title}\n${formula}\n${note}`).join('\n\n')
