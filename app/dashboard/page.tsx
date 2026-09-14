@@ -1,12 +1,15 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import useSWR from 'swr'
 import { createClient } from '@/lib/supabase/client'
 import { TradeView } from '@/components/trade-view'
 import { JournalView } from '@/components/journal-view'
 import { useSession } from '@/hooks/use-session'
+import { fmt } from '@/lib/format'
+import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp } from '@/components/ui/ds'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sun } from 'lucide-react'
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
@@ -291,7 +294,15 @@ function computeMarketBias(row: Row, calc: ReturnType<typeof calculateVerdict>, 
   const weights = dte > 3 ? { gap: 0.45, oi: 0.25, pcr: 0.2, maxPain: 0.1 } : { gap: 0.25, oi: 0.45, pcr: 0.2, maxPain: 0.1 }
   const score = gapScore * weights.gap + oiScore * weights.oi + pcrScore * weights.pcr + maxPainScore * weights.maxPain
   const label: BiasLabel = score >= 1.25 ? 'Strong Bullish' : score >= 0.5 ? 'Bullish' : score > -0.5 ? 'Neutral' : score > -1.25 ? 'Bearish' : 'Strong Bearish'
-  return { score, label }
+  return {
+    score, label,
+    components: [
+      { name: 'Gap %', value: fmt.pct(gapPct), score: gapScore, weight: `${Math.round(weights.gap * 100)}%` },
+      { name: 'OI structure', value: `${calc.oiSupport ?? 'No change'} / ${calc.oiResistance ?? 'No change'}`, score: oiScore, weight: `${Math.round(weights.oi * 100)}%` },
+      { name: 'PCR', value: fmt.ratio(pcr), score: pcrScore, weight: `${Math.round(weights.pcr * 100)}%` },
+      { name: 'Max pain', value: calc.maxPain ? fmt.strike(calc.maxPain) : 'Not published', score: maxPainScore, weight: `${Math.round(weights.maxPain * 100)}%` },
+    ],
+  }
 }
 // STAGE 2 — Option Readiness: combines VIX level and ATM-IV-vs-VIX into one score (resolving the old
 // contradiction of two separate VIX/IV lines), plus a DTE component. Also derives IV Condition for Stage 3.
@@ -649,7 +660,9 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
     <div className="verdict-instrument-head">
       <h3>{instrument}<button type="button" className="semantic-info verdict-info" aria-label={`${instrument} verdict details`}><Info size={14} aria-hidden="true" /><span className="semantic-tooltip" role="tooltip">{summary}</span></button></h3>
     </div>
-    <div className="sync-strip"><span>Predicted <b>{calc.predicted.toFixed(1)}</b></span><span>Actual <b>{calc.open.toFixed(1)}</b></span><span>Difference <b>{calc.difference >= 0 ? '+' : ''}{calc.difference.toFixed(1)}</b></span><strong className={`sync-${sync[1]}`}>{sync[0]}</strong><small>{sync[2]}</small></div>
+    {instrument === 'NIFTY'
+      ? <div className="sync-strip"><span>Predicted <b>{calc.predicted.toFixed(1)}</b></span><span>Actual <b>{calc.open.toFixed(1)}</b></span><span>Difference <b>{calc.difference >= 0 ? '+' : ''}{calc.difference.toFixed(1)}</b></span><strong className={`sync-${sync[1]}`}>{sync[0]}</strong><small>{sync[2]}</small></div>
+      : <div className="sync-strip sync-strip-empty"><small>No predicted open for SENSEX — GIFT Nifty leads NIFTY only, so there is no overnight leading indicator to compare against.</small></div>}
     <div className="verdict-card verdict-strategy-summary">
       <div className="verdict-strategy-box">
         <span className="eyebrow">Your strategy</span>
@@ -737,7 +750,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
       </div>}
       {!hasAnyPremium && <p className="structure-line">Enter fill premiums above to compute actual target / stop-loss and book levels.</p>}
     </div>}
-    <div className="verdict-rationale"><span>Rationale</span><p>{calc.bias} bias from gap direction, PCR positioning, max pain pull, and OI level action; {calc.ivRead} conditions favor {calc.strategy.toLowerCase()}.</p></div>
+    <div className="verdict-rationale"><span>Rationale</span><p>{marketBias.label} bias (score {fmt.score(marketBias.score)}) with {optionReadiness.ivCondition.toLowerCase()} IV and {optionReadiness.label.toLowerCase()} readiness; the framework recommends {strategyRec.recommendation.toLowerCase()}.</p><div className="verdict-breakdown"><ScoreBreakdown inputs={marketBias.components} caption={`Market bias inputs · weights for ${calc.dte} day${calc.dte === 1 ? '' : 's'} to expiry`} /></div><Disclaimer capturedAt={fmt.timeIST(row.updated_at ?? row.trade_date)} /></div>
   </article>
 }
 function VerdictView({ row }: { row: Row }) {
@@ -1063,5 +1076,5 @@ export default function Dashboard() {
   const { data: postSummary } = useSWR<Row | null>(row.trade_date ? ['postmarket-summary', row.trade_date] : null, async () => { const { data, error } = await supabase.from('postmarket_summary').select('*').eq('trade_date', row.trade_date).order('trade_date', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data as Row | null }, { revalidateOnFocus: false })
   useEffect(() => { document.documentElement.classList.toggle('light', !dark) }, [dark])
   useEffect(() => { const updateClock = () => { const now = new Date(); const options = { timeZone: 'Asia/Kolkata' } as const; setLiveDate(new Intl.DateTimeFormat('en-IN', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)); setLiveDay(new Intl.DateTimeFormat('en-IN', { ...options, weekday: 'long' }).format(now)); setLiveTime(new Intl.DateTimeFormat('en-IN', { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(now)) }; updateClock(); const timer = window.setInterval(updateClock, 1000); return () => window.clearInterval(timer) }, [])
-  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation" aria-expanded={navOpen} aria-controls="session-map"><Menu size={18} /></button><div className="brand-mark"><div className="brand-symbol"><BarChart3 size={16} /></div><div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div></div><span className="topbar-date">{liveDate || row?.trade_date || 'No current row'} · {liveDay || row?.day_name || 'Session date'} · {liveTime || '—'} IST</span><div className="topbar-meta">{!sessionLoading && (session ? <button type="button" className="sign-in-link" onClick={() => signOut()}><LogOut size={13} /> Sign out</button> : <Link href="/login" className="sign-in-link"><LogIn size={13} /> Sign in</Link>)}<button className="icon-button" onClick={() => location.reload()} aria-label="Refresh dashboard"><RefreshCw size={16} /></button><button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button></div></header><div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle, icon: Icon }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)}><Icon size={17} /><span><strong>{label}</strong><small>{subtitle}</small></span><ChevronRight size={14} /></button>)}<div className="side-rule" /></aside>{isMobile && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
+  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation" aria-expanded={navOpen} aria-controls="session-map"><Menu size={18} /></button><div className="brand-mark"><BrandSymbol size={32} /><div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div></div><span className="topbar-date">{liveDate || row?.trade_date || 'No current row'} · {liveDay || row?.day_name || 'Session date'} · {liveTime || '—'} IST</span><div className="topbar-meta">{!sessionLoading && (session ? <button type="button" className="sign-in-link" onClick={() => signOut()}><LogOut size={13} /> Sign out</button> : <Link href="/login" className="sign-in-link"><LogIn size={13} /> Sign in</Link>)}<button className="icon-button" onClick={() => location.reload()} aria-label="Refresh dashboard"><RefreshCw size={16} /></button><button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button></div></header><div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle, icon: Icon }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)}><Icon size={17} /><span><strong>{label}</strong><small>{subtitle}</small></span><ChevronRight size={14} /></button>)}<div className="side-rule" /></aside>{isMobile && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
 }

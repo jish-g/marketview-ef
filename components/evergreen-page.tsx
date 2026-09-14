@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import { ArrowLeft, BarChart3, BookOpen, Send } from 'lucide-react'
 import { FaqBlock } from '@/components/faq-block'
@@ -28,7 +29,7 @@ export function EvergreenPage({ eyebrow, h1, updatedISO, updatedLabel, metricLab
         <Link href="/" className="back-link"><ArrowLeft size={16} /> Back to MarketCue</Link>
         <div className="topbar-meta">
           <a href="https://t.me/marketcue_in" target="_blank" rel="noopener noreferrer" className="sign-in-link"><Send size={13} /> Join Telegram</a>
-          <div className="brand-mark"><div className="brand-symbol"><BarChart3 size={16} /></div><div><strong>MarketCue</strong></div></div>
+          <div className="brand-mark"><BrandSymbol size={32} /><div><strong>MarketCue</strong></div></div>
         </div>
       </header>
       <div className="rules-doc-layout about-doc-layout">

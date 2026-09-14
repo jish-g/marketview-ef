@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { BrandSymbol } from '@/components/brand-mark'
 import { BarChart3 } from 'lucide-react'
 
 // `error` comes from the URL, so it is attacker-controlled. Only rendered
@@ -13,7 +14,7 @@ export default async function AuthErrorPage({ searchParams }: { searchParams: Pr
     <main className="landing-shell">
       <header className="landing-topbar">
         <div className="brand-mark">
-          <div className="brand-symbol"><BarChart3 size={16} /></div>
+          <BrandSymbol size={32} />
           <div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div>
         </div>
       </header>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import useSWR from 'swr'
 import { BarChart3, Moon, Send, Sun, ArrowRight } from 'lucide-react'
@@ -96,7 +97,7 @@ export default function NiftySensexTodayIndexClient({ initialPosts, initialMarke
     <main className="blog-index-shell">
       <header className="blog-index-topbar">
         <Link href="/" className="brand-mark blog-brand-mark">
-          <div className="brand-symbol"><BarChart3 size={16} /></div>
+          <BrandSymbol size={32} />
           <div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div>
         </Link>
         <div className="topbar-meta">

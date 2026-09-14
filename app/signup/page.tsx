@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import { BarChart3, Moon, Sun } from 'lucide-react'
 import { createAuthClient } from '@/lib/supabase/auth-client'
@@ -56,7 +57,7 @@ export default function SignupPage() {
     <main className="landing-shell">
       <header className="landing-topbar">
         <div className="brand-mark">
-          <div className="brand-symbol"><BarChart3 size={16} /></div>
+          <BrandSymbol size={32} />
           <div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div>
         </div>
         <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">

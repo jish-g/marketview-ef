@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import useSWR from 'swr'
 import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Menu, Moon, Newspaper, Send, Sun, X } from 'lucide-react'
@@ -152,7 +153,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
     <main className="landing-shell">
       <header className="landing-topbar">
         <div className="brand-mark">
-          <div className="brand-symbol"><BarChart3 size={16} /></div>
+          <BrandSymbol size={32} />
           <div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div>
         </div>
         <div className="topbar-meta">
@@ -328,7 +329,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
         <div className="landing-footer-grid">
           <div className="landing-footer-brand">
             <div className="brand-mark">
-              <div className="brand-symbol brand-symbol-sm"><BarChart3 size={13} /></div>
+              <BrandSymbol size={24} />
               <strong>MarketCue</strong>
             </div>
             <p>Market intelligence for Nifty and Sensex, built on rules you can audit.</p>
@@ -347,8 +348,8 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           </div>
           <div className="landing-footer-col">
             <span>About</span>
-            <Link href="/nifty-sensex-today">How it works</Link>
-            <Link href="/nifty-sensex-today">Disclaimer</Link>
+            <Link href="/how-it-works">How it works</Link>
+            <Link href="/disclaimer">Disclaimer</Link>
           </div>
           <div className="landing-footer-col">
             <span>Community</span>
