@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
-import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Moon, Newspaper, Send, Sun } from 'lucide-react'
+import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Menu, Moon, Newspaper, Send, Sun, X } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
+import { useIsMobile } from '@/hooks/use-media-query'
 import { createClient } from '@/lib/supabase/client'
 
 const differentiators = [
@@ -76,6 +77,10 @@ function istHour() {
 
 export default function HomeClient({ tradeDate: initialTradeDate, initialPre, initialPost }: HomeClientProps) {
   const [dark, setDark] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const isMobile = useIsMobile()
+  // The header links do not fit beside the brand on a phone, so below the breakpoint they move into a drawer.
+  useEffect(() => { if (!isMobile) setMenuOpen(false) }, [isMobile])
   const { session, loading, signOut } = useSession()
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   const supabase = createClient()
@@ -151,19 +156,25 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           <div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div>
         </div>
         <div className="topbar-meta">
-          <Link href="/dashboard" className="topbar-link">Dashboard</Link>
-          <Link href="/nifty-sensex-today" className="topbar-link">Nifty and Sensex today</Link>
-          <a href="https://t.me/marketcue_in" target="_blank" rel="noopener noreferrer" className="sign-in-link"><Send size={13} /> Join Telegram</a>
-          {!loading && (session ? (
-            <button type="button" className="sign-in-link" onClick={() => signOut()}><LogOut size={13} /> Sign out</button>
-          ) : (
-            <Link href="/login" className="sign-in-link"><LogIn size={13} /> Sign in</Link>
-          ))}
+          <div className={`landing-nav-links ${menuOpen ? 'is-open' : ''}`}>
+            <Link href="/dashboard" className="topbar-link" onClick={() => setMenuOpen(false)}>Dashboard</Link>
+            <Link href="/nifty-sensex-today" className="topbar-link" onClick={() => setMenuOpen(false)}>Nifty and Sensex today</Link>
+            <a href="https://t.me/marketcue_in" target="_blank" rel="noopener noreferrer" className="sign-in-link" onClick={() => setMenuOpen(false)}><Send size={13} /> Join Telegram</a>
+            {!loading && (session ? (
+              <button type="button" className="sign-in-link" onClick={() => { setMenuOpen(false); signOut() }}><LogOut size={13} /> Sign out</button>
+            ) : (
+              <Link href="/login" className="sign-in-link" onClick={() => setMenuOpen(false)}><LogIn size={13} /> Sign in</Link>
+            ))}
+          </div>
           <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">
             {dark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
+          <button type="button" className="icon-button landing-menu-toggle" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen}>
+            {menuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </div>
       </header>
+      {isMobile && menuOpen && <button type="button" className="landing-nav-backdrop" aria-label="Close menu" onClick={() => setMenuOpen(false)} />}
 
       <section className="landing-hero">
         <div className="landing-hero-copy">
