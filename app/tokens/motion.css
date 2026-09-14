@@ -1,0 +1,16 @@
+/* ============================================================
+   Motion tokens. Copied verbatim from the handoff.
+
+   Rule 7: nothing moves that a trader might click. Values only
+   ever tint-flash; layout never animates. Nothing beyond these
+   two durations should exist.
+   ============================================================ */
+:root {
+  --dur-fast: 120ms; /* tint flash on value update */
+  --dur-base: 200ms; /* colour transitions */
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

@@ -1,0 +1,88 @@
+/* ============================================================
+   MarketCue colour tokens.
+   Source of truth: design_handoff_marketcue_design_system.
+   Copied verbatim from the handoff -- do not edit values here
+   without a corresponding change to the design system.
+
+   Eight semantic colours, two modes. There is no neutral ramp
+   beyond the five inks: if a shade is missing, use
+   color-mix(in srgb, var(--x) N%, var(--ground)).
+   Do not add a token, and do not add a hex.
+   ============================================================ */
+
+/* ---- dark: the app. default. ---- */
+:root, .dark {
+  --ground: #0b0e11;
+  --surface: #141920;
+  --surface-2: #1b2129;
+  --border: #263039;
+  --border-strong: #33404d;
+
+  --ink: #e8eef4;
+  --ink-2: #c3cdd7;
+  --muted: #8f9dab;
+  --faint: #5d6a78;
+
+  --up: #23b26a;
+  --down: #e05252;
+  --caution: #d9a343;
+  --caution-ink: #e2b660;
+  --info: #5b9bd8;
+
+  --brand: #e0821f;
+  --action: var(--ink);
+  --action-ink: var(--ground);
+  --ring: #5b9bd8;
+}
+
+/* ---- light: public reads, SEO pages, print ---- */
+.light {
+  --ground: #f7f6f3;
+  --surface: #ffffff;
+  --surface-2: #f2f0ec;
+  --border: #e4e1db;
+  --border-strong: #cfcac1;
+
+  --ink: #15181c;
+  --ink-2: #3b4048;
+  --muted: #5f6772;
+  --faint: #8a9099;
+
+  --up: #137a4b;
+  --down: #bb2b2b;
+  --caution: #8a6100;
+  --caution-ink: #8a6100;
+  --info: #1d5fb0;
+
+  --brand: #b5651a;
+  --action: var(--ink);
+  --action-ink: #ffffff;
+  --ring: #1d5fb0;
+}
+
+/* ============================================================
+   TEMPORARY -- delete in Phase 2 along with the legacy token
+   blocks in globals.css.
+
+   Three names collide with the legacy shadcn set: --border,
+   --muted and --ring. The legacy :root and .dark blocks are
+   declared after this file is imported, so they win, and
+   --muted in particular flips meaning (a surface colour there,
+   a text colour here).
+
+   Phase 1 deliberately lets the legacy values keep winning so
+   the app's appearance does not change. These aliases give the
+   design system a collision-free way to name its own three
+   values in the meantime, so /design can render truthfully.
+   Nothing outside app/design/ should use them.
+   ============================================================ */
+:root, .dark {
+  --ds-border: #263039;
+  --ds-muted: #8f9dab;
+  --ds-ring: #5b9bd8;
+}
+.light {
+  --ds-border: #e4e1db;
+  --ds-muted: #5f6772;
+  --ds-ring: #1d5fb0;
+}

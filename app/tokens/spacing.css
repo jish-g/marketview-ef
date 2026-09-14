@@ -1,0 +1,12 @@
+/* ============================================================
+   Space and layout tokens. Copied verbatim from the handoff.
+   4px grid, no exceptions -- no value off this grid.
+   ============================================================ */
+:root {
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px; --s-12: 48px;
+
+  --sidebar-w: 248px;
+  --topbar-h: 64px;
+  --measure: 74ch;
+}
