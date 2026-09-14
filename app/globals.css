@@ -691,3 +691,12 @@ button, input { font: inherit; }
    row to fill the width -- so those three rendered much wider than the eight evidence tiles
    beside them. auto-fill keeps the track size, so every tile on the screen matches. */
 .app-shell .common-group .field-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+
+/* Rule 10 / spec §7: visible focus via box-shadow on --ring, never a browser outline, on
+   EVERY interactive element. There was no such rule anywhere in the app -- keyboard focus
+   rendered as the UA default, and `focusRing` measured as "none" on the session map. */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring);
+  border-radius: var(--radius-sm);
+}
