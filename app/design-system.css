@@ -248,7 +248,10 @@
    Reference: marketcue-dashboard.html #s-post. */
 .post-market-view { display: grid; gap: var(--s-5); align-content: start; }
 .post-hero { display: grid; gap: var(--s-2); }
-.post-hero-value { font-size: var(--text-value-lg); line-height: 1.2; letter-spacing: -.02em; }
+/* Post-market's hero is an answer like any other screen's, so it takes --text-answer and
+   the same 600 as the rest of the ladder. It was --text-value-lg at the <strong> default
+   700, which left it smaller AND heavier than the answers on every other screen. */
+.post-hero-value { font-size: var(--text-answer); font-weight: 600; line-height: 1.2; letter-spacing: -.02em; }
 .post-hero-body { margin: 0; font-size: var(--text-body); color: var(--ink-2); line-height: 1.6; }
 .post-carry { display: grid; gap: 10px; }
 .post-carry-list { display: grid; gap: var(--s-3); }

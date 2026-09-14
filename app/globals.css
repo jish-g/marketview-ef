@@ -600,6 +600,13 @@ button, input { font: inherit; }
 .app-shell .phase-intro h2,
 .app-shell .content-head h2 { font-size: var(--text-h1); }
 
+/* Screen titles carry the same weight as everything else on the ladder. At 400 the title
+   was lighter than the 20px band beneath it, so the hierarchy read inverted and the answer
+   had to shout to stay on top of it. */
+.app-shell .review-section-head h2,
+.app-shell .phase-intro h2,
+.app-shell .content-head h2 { font-weight: 600; }
+
 .thesis-hero-value,
 .verdict-answer-value { font-size: var(--text-answer); }
 
