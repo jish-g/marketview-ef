@@ -8,8 +8,8 @@ import { createClient } from '@/lib/supabase/client'
 import { TradeView } from '@/components/trade-view'
 import { JournalView } from '@/components/journal-view'
 import { useSession } from '@/hooks/use-session'
-import { fmt } from '@/lib/format'
-import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp, ScoreMeter, Label } from '@/components/ui/ds'
+import { fmt, freshness } from '@/lib/format'
+import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, BiasAxis, CheckpointTimeline, Progress, PhaseAside, Label, type Checkpoint } from '@/components/ui/ds'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sun } from 'lucide-react'
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
@@ -69,13 +69,31 @@ const EMPTY_REASON: Record<string, [string, string]> = {
 function emptyRead(key: string): [string, string] {
   return EMPTY_REASON[key] ?? ['Not captured', 'This checkpoint has not reported a value yet.']
 }
-function value(row: Row | null, key: string, pct = false) { const v = row?.[key]; if (v === null || v === undefined || v === '') return 'Not available'; const numeric = Number(v); const display = String(v); if (pct) return `${numeric > 0 ? '+' : ''}${display}%`; if (/days_to_expiry/.test(key)) return `${display} day${numeric === 1 ? '' : 's'}`; if (/points|support|resistance|prev_close|opening|straddle|max_pain|avg_move|theta|close/.test(key)) return display; return display }
+// Spec §1: the OI interpretation carries colour, the level stays ink. Direction depends on
+// WHICH level moved -- addition at support strengthens it (+1), addition at resistance caps
+// the move (-1) -- which is what blanket-green got wrong before.
+function oiSide(key: string) { return /resistance/i.test(key) ? 'resistance' : 'support' }
+function oiReading(key: string, action: string) {
+  const a = action.toLowerCase()
+  const side = oiSide(key)
+  if (a === 'addition') return side === 'support' ? 'Addition · strengthening +1' : 'Addition · capping \u22121'
+  if (a.includes('unwinding')) return side === 'support' ? 'Unwinding · weakening \u22121' : 'Unwinding · releasing +1'
+  return action
+}
+function oiTone(key: string, action: string) {
+  const a = action.toLowerCase()
+  const side = oiSide(key)
+  const bullish = (a === 'addition' && side === 'support') || (a.includes('unwinding') && side === 'resistance')
+  const bearish = (a === 'addition' && side === 'resistance') || (a.includes('unwinding') && side === 'support')
+  return bullish ? 'is-strengthening' : bearish ? 'is-capping' : ''
+}
+function value(row: Row | null, key: string, pct = false) { const v = row?.[key]; if (v === null || v === undefined || v === '') return 'Not available'; const numeric = Number(v); const display = String(v); if (pct) return fmt.pct(numeric); if (/days_to_expiry/.test(key)) return `${display} day${numeric === 1 ? '' : 's'}`; if (/avg_move/.test(key)) return `${Math.abs(numeric).toFixed(1)} pts`; if (/_pts_|gap_points|opening_points/.test(key)) return fmt.pts(numeric); if (/prev_close|max_pain|oi_support|oi_resistance|chart_support|chart_resistance|post_close/.test(key) && Number.isFinite(numeric)) return fmt.level(numeric); if (/^pcr_|^mid_pcr_|atm_iv|india_vix/.test(key) && Number.isFinite(numeric)) return fmt.ratio(numeric); if (/points|support|resistance|prev_close|opening|straddle|max_pain|avg_move|theta|close/.test(key)) return display; return display }
 function fmtTimeIST(v: any) { if (!v) return null; return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(v)) }
 function tone(row: Row | null, key: string) { const n = Number(row?.[key]); return Number.isNaN(n) || n === 0 ? '' : n > 0 ? 'positive' : 'negative' }
 function gapBandLabel(gapPct: number) { if (gapPct > 0.75) return 'Strong Gap Up'; if (gapPct >= 0.25) return 'Normal Gap Up'; if (gapPct >= -0.25) return 'Flat'; if (gapPct >= -0.75) return 'Normal Gap Down'; return 'Strong Gap Down' }
 function highImpactEvent(eventToday: string | null | undefined) { const text = String(eventToday ?? ''); if (!text.includes('(High')) return null; const match = text.match(/^(.*?)\s*\(High,\s*([^)]+)\)/); if (!match) return null; return { name: match[1].trim(), time: match[2].trim() } }
 
-function RulesView() {
+function RulesView({ row }: { row: Row | null }) {
   // Stage 1 — Market Bias: weighted Gap/OI/PCR/Max Pain signal, replacing the old flat gap/VIX/PCR/max-pain/OI/DTE
   // rule cards and the 5-signal majority-vote bias (which included advance/decline ratio) with the framework
   // actually implemented in computeMarketBias/computeOptionReadiness/computeStrategyRecommendation.
@@ -112,8 +130,25 @@ function RulesView() {
     ['Target / stop-loss', 'Buyer strategies (Naked Call/Put, Debit Spread): Target/Stop = expected move (points) × strike\u2019s effective delta', 'Net premium plays no role for buyers. Seller strategies (Credit Spread, Iron Condor): Conservative Target = Net Premium × 60%, Conservative Stop = Net Premium × 40%; Aggressive Target = Net Premium × 75%, Aggressive Stop = Net Premium × 25%.'],
     ['Book profit / book stop', 'Buyer strategies: Book Profit = Target (points) × Qty × 60%; Book Stop = Stop (points) × Qty × 40%', 'Seller strategies: Book Profit = Target × Qty; Book Stop = Stop × Qty — no extra split, since the 60/40–75/25 split already happened at the Target/Stop-loss level.'],
   ]
+  const calc = row ? calculateVerdict(row, 'NIFTY') : null
+  const bias = row && calc ? computeMarketBias(row, calc, 'NIFTY') : null
+  const readiness = calc ? computeOptionReadiness(calc) : null
+  const strategyRec = bias && readiness && calc ? computeStrategyRecommendation(bias.label, readiness.ivCondition, calc.vix, calc.dte) : null
+
   return <section className="phase-view rules-view">
-    <div className="phase-intro rules-header"><div><p className="eyebrow">Quick reference · bias score → readiness score → strategy</p><h2>Rules engine</h2></div><a className="detailed-read-link" href="/rules">Detailed read <ChevronRight size={15} /></a></div>
+
+    <div className="review-section-head rules-header"><div><p className="eyebrow">Interpretation guide</p><h2>Rules engine</h2></div><div className="phase-head-aside"><a className="detailed-read-link" href="/rules">Detailed read <ChevronRight size={15} /></a></div></div>
+    {bias && readiness && strategyRec && <div className="scoring-path">
+      <Label>Today&apos;s scoring path</Label>
+      <div className="scoring-path-chips">
+        <span className="ds-badge ds-badge--neutral">Bias {fmt.score(bias.score)} · {bias.label}</span>
+        <span className="scoring-path-arrow" aria-hidden="true">→</span>
+        <span className="ds-badge ds-badge--caution">Readiness {readiness.score} · {readiness.label}</span>
+        <span className="scoring-path-arrow" aria-hidden="true">→</span>
+        <span className="ds-badge ds-badge--outline">{strategyRec.recommendation}</span>
+      </div>
+      <p className="scoring-path-note">Each step is a table lookup, not a judgement. Change any input and the path changes with it — that is the whole claim.</p>
+    </div>}
 
     <p className="eyebrow rules-stage-label">Stage 1 · Market bias</p>
     <div className="rule-grid">{stage1.map((section) => <article className="rule-table" key={section.title}><div className="rule-table-head"><div><strong>{section.title}</strong><span>{section.subtitle}</span></div><BookOpen size={16} /></div><div className="rule-table-labels"><span>Condition</span><span>Reading</span><span>Score</span></div>{section.rows.map(([condition, reading, action]) => <div className="rule-table-row" key={`${condition}-${reading}`}><b>{condition}</b><span>{reading}</span><span>{action}</span></div>)}</article>)}</div>
@@ -207,7 +242,7 @@ function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid:
 
 function HistoryView({ data }: { data: HistoryExtras | null | undefined }) {
   const rows = data?.rows
-  return <section className="phase-view"><div className="phase-intro"><div><p className="eyebrow">Prior sessions</p><h2>History</h2></div></div><div className="history-list history-days">{!rows ? <p className="history-empty">Loading history…</p> : rows.length === 0 ? <p className="history-empty">No history rows available yet.</p> : rows.map((row) => <HistoryDayCard key={String(row.trade_date)} row={row} mid={data?.mid[String(row.trade_date)]} post={data?.post[String(row.trade_date)]} trade={data?.trade[String(row.trade_date)]} />)}</div></section>
+  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">Prior snapshots</p><h2>History</h2></div><PhaseAside /></div><div className="history-list history-days">{!rows ? <p className="history-empty">Loading history…</p> : rows.length === 0 ? <p className="history-empty">No history rows available yet.</p> : rows.map((row) => <HistoryDayCard key={String(row.trade_date)} row={row} mid={data?.mid[String(row.trade_date)]} post={data?.post[String(row.trade_date)]} trade={data?.trade[String(row.trade_date)]} />)}</div></section>
 }
 
 type Instrument = 'NIFTY' | 'SENSEX'
@@ -674,10 +709,29 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
     {instrument === 'NIFTY'
       ? <div className="sync-strip"><span>Predicted <b>{calc.predicted.toFixed(1)}</b></span><span>Actual <b>{calc.open.toFixed(1)}</b></span><span>Difference <b>{calc.difference >= 0 ? '+' : ''}{calc.difference.toFixed(1)}</b></span><strong className={`sync-${sync[1]}`}>{sync[0]}</strong><small>{sync[2]}</small></div>
       : <div className="sync-strip sync-strip-empty"><small>No predicted open for SENSEX — GIFT Nifty leads NIFTY only, so there is no overnight leading indicator to compare against.</small></div>}
+    <div className="verdict-answer">
+      <div className="verdict-answer-main">
+        <Label tone="caution">Recommendation</Label>
+        <strong className="verdict-answer-value">{strategyRec.recommendation}</strong>
+        <p className="verdict-answer-note">{strategyRec.reason}.{isNoTrade ? ' You can still build a position manually below.' : ''}</p>
+      </div>
+      <div className="verdict-answer-scores">
+        <div className="verdict-score-card">
+          <div className="verdict-score-head"><Label>Market bias</Label><span className="ds-num verdict-score-num">{fmt.score(marketBias.score)}</span></div>
+          <strong className="verdict-score-band">{marketBias.label}</strong>
+          <BiasAxis value={marketBias.score} />
+        </div>
+        <div className="verdict-score-card">
+          <div className="verdict-score-head"><Label>Option readiness</Label><span className="ds-num verdict-score-num">{optionReadiness.score} / 6</span></div>
+          <strong className={`verdict-score-band ${optionReadiness.label.toLowerCase() === 'caution' ? 'is-caution' : ''}`}>{optionReadiness.label}</strong>
+          <small className="verdict-score-note">{optionReadiness.ivCondition} IV · VIX {calc.vix} · DTE {calc.dte}</small>
+        </div>
+      </div>
+    </div>
     <div className="verdict-card verdict-strategy-summary">
       <div className="verdict-strategy-box">
-        <span className="eyebrow">Your strategy</span>
-        {isNoTrade && <p className="no-trade-banner" role="status">No Trade recommended today — {strategyRec.reason}. You can still select a strategy manually below.</p>}
+        <span className="eyebrow">Strategy override</span>
+        
         <div className="verdict-controls verdict-controls-wide">
           <select value={strategy} onChange={(e) => setStrategy(e.target.value as StrategyChoice)} aria-label={`${instrument} strategy override`}>
             {strategyChoices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
@@ -689,7 +743,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
         </div>
         {autoStrategy !== strategy && <small className="strategy-suggestion">System suggested: {autoStrategy}</small>}
       </div>
-      <div className="day-summary"><span className="eyebrow">Day summary</span><p>{summary}</p><div className="bias-reasoning"><p className="reasoning-line"><strong>Market Bias:</strong> {marketBias.label} (score {marketBias.score.toFixed(2)})</p><p className="reasoning-line"><strong>Option Readiness:</strong> {optionReadiness.label} (score {optionReadiness.score})</p><p className="reasoning-line"><strong>Strategy Recommendation:</strong> {strategyRec.recommendation}, because {strategyRec.reason}.</p></div></div>
+      <div className="day-summary"><span className="eyebrow">Day summary</span><p>{summary}</p></div>
     </div>
     {strategy === 'No Trade' ? <div className="verdict-card no-trade-leg-builder"><p className="structure-line">No Trade is selected — there&apos;s no position to size. Switch the dropdown above to a real strategy if you want to build a trade manually.</p></div> : <>
     <PayoffChart legRows={legRows} atmNumber={atmNumber} strikeStep={strikeStep} isNetSeller={isNetSeller} spotEstTarget={calc.target} spotEstStop={calc.stop} spotAggressiveTarget={calc.aggressiveTarget} spotAggressiveStop={calc.aggressiveStop} actualConservativeTarget={actualConservativeTarget} actualConservativeStop={actualConservativeStop} actualAggressiveTarget={actualAggressiveTarget} actualAggressiveStop={actualAggressiveStop} qty={qty} />
@@ -771,8 +825,8 @@ function VerdictView({ row }: { row: Row }) {
   // clear not-yet-available message instead of the instrument cards (which would otherwise
   // render off of leftover/undefined values).
   const hasOpenData = row.market_bias_nifty != null && row.market_bias_sensex != null
-  if (!hasOpenData) return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open · {syncLabel(row, '09:30')}</p><h2>Verdict</h2></div><span>Calculated strategy</span></div><p className="history-empty">Verdict data not available yet — updates at 9:30 AM IST once the market opens.</p></section>
-  return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open · {syncLabel(row, '09:30')}</p><h2>Verdict</h2></div><span>Calculated strategy</span></div>{eventFlag && <div className="event-caution"><AlertTriangle size={16} /><span><strong>{eventFlag.name}</strong> — high impact event at {eventFlag.time}. Trade with caution.</span></div>}<div className="verdict-instruments"><VerdictInstrument row={row} instrument="NIFTY" /><VerdictInstrument row={row} instrument="SENSEX" /></div></section>
+  if (!hasOpenData) return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open · {syncLabel(row, '09:30')}</p><h2>Verdict</h2></div><PhaseAside capturedAt={(row?.updated_at ?? null) as string | null} /></div><p className="history-empty">Verdict data not available yet — updates at 9:30 AM IST once the market opens.</p></section>
+  return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open · {syncLabel(row, '09:30')}</p><h2>Verdict</h2></div><PhaseAside capturedAt={(row?.updated_at ?? null) as string | null} /></div>{eventFlag && <div className="event-caution"><AlertTriangle size={16} /><span><strong>{eventFlag.name}</strong> — high impact event at {eventFlag.time}. Trade with caution.</span></div>}<div className="verdict-instruments"><VerdictInstrument row={row} instrument="NIFTY" /><VerdictInstrument row={row} instrument="SENSEX" /></div></section>
 }
 function OutcomeBadge({ label, target, sl }: { label: string; target?: boolean; sl?: boolean }) { const text = target === true ? 'Target hit' : sl === true ? 'SL hit' : target === false && sl === false ? 'Neither' : 'Not yet available'; const cls = target === true ? 'outcome-hit' : sl === true ? 'outcome-stop' : 'outcome-neutral'; return <div className={`outcome-badge ${cls}`}><span>{label}</span><strong>{text}</strong></div> }
 // Fixed daily checkpoint slots in order, with display label and 24h IST minute-of-day (used to
@@ -781,8 +835,8 @@ const CHECKPOINT_SLOTS: { id: string; label: string; minuteOfDay: number }[] = [
   { id: '1030', label: '10:30', minuteOfDay: 10 * 60 + 30 },
   { id: '1130', label: '11:30', minuteOfDay: 11 * 60 + 30 },
   { id: '1230', label: '12:30', minuteOfDay: 12 * 60 + 30 },
-  { id: '1330', label: '1:30', minuteOfDay: 13 * 60 + 30 },
-  { id: '1430', label: '2:30', minuteOfDay: 14 * 60 + 30 },
+  { id: '1330', label: '13:30', minuteOfDay: 13 * 60 + 30 },
+  { id: '1430', label: '14:30', minuteOfDay: 14 * 60 + 30 },
 ]
 // Ordering used to pick "the latest landed checkpoint" for a given day (History recap, etc.) --
 // derived from CHECKPOINT_SLOTS so there's one source of truth for the daily schedule, plus the
@@ -835,18 +889,46 @@ function MidCheckpointRowPending({ label }: { label: string }) {
 // tap-to-expand) so the whole session is visible in one compact column.
 function MidInstrumentColumn({ instrument, byId, nowMin }: { instrument: Instrument; byId: Map<string, Row>; nowMin: number }) {
   const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
+  // Spec §3: five checkpoint rows through CheckpointTimeline. A checkpoint whose bias moved
+  // gets the caution tone and a one-line explanation; unchanged ones stay neutral, so the eye
+  // lands on the one that actually did something. Two columns because MarketCue tracks two
+  // instruments -- the reference shows one, but the row design is the part that transfers.
+  const rows: Checkpoint[] = CHECKPOINT_SLOTS.map((slot) => {
+    const cp = byId.get(slot.id)
+    if (!cp) {
+      const overdue = nowMin >= slot.minuteOfDay
+      return {
+        time: slot.label,
+        headline: overdue ? 'Running a little late' : 'Not captured yet',
+        badge: overdue ? 'overdue' : 'scheduled',
+        detail: overdue
+          ? 'The checkpoint is past due and has not reported.'
+          : `Captures at ${slot.label} IST.`,
+      }
+    }
+    const biasLabel = String(cp[`market_bias_${suffix}_mid`] ?? 'Not available')
+    const strategy = String(cp[`suggested_strategy_${suffix}_mid`] ?? 'Not available')
+    const changePct = cp[`intraday_change_pct_${suffix}`]
+    const shifted = Boolean(cp[`bias_shifted_${suffix}`]) || Boolean(cp[`strategy_shifted_${suffix}`])
+    const shiftNote = String(cp[`shift_note_${suffix}`] ?? '')
+    const parts = [
+      changePct != null ? `${instrument === 'NIFTY' ? 'Nifty' : 'Sensex'} ${fmt.pct(Number(changePct))}` : null,
+      cp[`pcr_${suffix}_mid`] != null ? `PCR ${fmt.ratio(Number(cp[`pcr_${suffix}_mid`]))}` : null,
+      cp[`india_vix_mid`] != null ? `VIX ${fmt.ratio(Number(cp['india_vix_mid']))}` : null,
+    ].filter(Boolean)
+    return {
+      time: slot.label,
+      headline: shifted ? `Bias shifted to ${biasLabel.toLowerCase()}` : `Bias held ${biasLabel.toLowerCase()}`,
+      badge: shifted ? `${biasLabel} · shifted` : `${biasLabel} · unchanged`,
+      detail: parts.length ? parts.join(' · ') : strategy,
+      shifted,
+      note: shifted ? (shiftNote || 'Bias moved since the previous checkpoint.') : undefined,
+    }
+  })
+
   return <div className="mid-instrument-col">
     <p className="mid-instrument-col-label">{instrument === 'NIFTY' ? 'Nifty' : 'Sensex'}</p>
-    <div className="mid-instrument-col-rows">
-      {CHECKPOINT_SLOTS.map((slot) => {
-        const cp = byId.get(slot.id)
-        const isDue = nowMin >= slot.minuteOfDay
-        return <div key={slot.id}>
-          {cp ? <MidCheckpointRow cp={cp} suffix={suffix} label={slot.label} /> : <MidCheckpointRowPending label={slot.label} />}
-          {!cp && isDue && <p className="mid-row-overdue-note">Running a little late</p>}
-        </div>
-      })}
-    </div>
+    <CheckpointTimeline rows={rows} />
   </div>
 }
 
@@ -856,13 +938,13 @@ function MidMarketView({ row, midCheckpoints }: { row: Row; midCheckpoints: Row[
   const [, forceTick] = useState(0)
   useEffect(() => { const t = window.setInterval(() => forceTick((n) => n + 1), 60000); return () => window.clearInterval(t) }, [])
 
-  if (midCheckpoints === undefined) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div><p className="history-empty">Loading mid-market data…</p></section>
+  if (midCheckpoints === undefined) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><PhaseAside /></div><p className="history-empty">Loading mid-market data…</p></section>
 
   const byId = new Map((midCheckpoints ?? []).map((cp) => [String(cp.checkpoint), cp]))
   const nowMin = nowMinuteOfDayIST()
 
   return <section className="phase-view special-view mid-checkpoint-view">
-    <div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><span>Compared to morning call</span></div>
+    <div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><PhaseAside capturedAt={(midCheckpoints?.[midCheckpoints.length - 1]?.created_at ?? row?.updated_at ?? null) as string | null} /></div>
     <div className="mid-instrument-grid">
       <MidInstrumentColumn instrument="NIFTY" byId={byId} nowMin={nowMin} />
       <MidInstrumentColumn instrument="SENSEX" byId={byId} nowMin={nowMin} />
@@ -881,12 +963,12 @@ function PostInstrumentCard({ row, postSummary, instrument }: { row: Row; postSu
   return <article className="verdict-instrument"><div className="verdict-instrument-head"><h3>{instrument}</h3></div><div className="close-grid"><div className="close-card"><span>Close</span><strong>{value(postSummary, `close_${suffix}`)}</strong><b className={tone(postSummary, `day_change_pct_${suffix}`)}>{value(postSummary, `day_change_pct_${suffix}`, true)}</b></div><div className="close-card"><span>Day High / Low</span><strong>{value(postSummary, `day_high_${suffix}`)} / {value(postSummary, `day_low_${suffix}`)}</strong></div></div><div className={`outcome-badge ${cls}`}><span>Target / SL estimate</span><strong>{label}</strong><small>(range-based estimate)</small></div></article>
 }
 function PostMarketView({ row, postSummary }: { row: Row; postSummary: Row | null | undefined }) {
-  if (postSummary === undefined) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Post market review · {syncLabel(null, '15:45')}</p><h2>Close the loop</h2></div><span>Instrument outcomes</span></div><p className="history-empty">Loading post-market data…</p></section>
-  if (!postSummary) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Post market review · {syncLabel(null, '15:45')}</p><h2>Close the loop</h2></div><span>Instrument outcomes</span></div><p className="history-empty">Post-market data not available yet — updates at 9:00 PM IST.</p></section>
+  if (postSummary === undefined) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Post market review · {syncLabel(null, '15:45')}</p><h2>Close the loop</h2></div><PhaseAside /></div><p className="history-empty">Loading post-market data…</p></section>
+  if (!postSummary) return <section className="phase-view special-view"><div className="review-section-head"><div><p className="eyebrow">Post market review · {syncLabel(null, '15:45')}</p><h2>Close the loop</h2></div><PhaseAside /></div><p className="history-empty">Post-market data not available yet — updates at 9:00 PM IST.</p></section>
   const fii = postSummary.fii_net_cash_cr
   const dii = postSummary.dii_net_cash_cr
   const asOf = postSummary.fii_dii_data_date
-  return <section className="phase-view special-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">Post market review · {syncLabel(postSummary, '15:45')}</p><h2>Close the loop</h2></div><span>Instrument outcomes</span></div><div className="verdict-instruments"><PostInstrumentCard row={row} postSummary={postSummary} instrument="NIFTY" /><PostInstrumentCard row={row} postSummary={postSummary} instrument="SENSEX" /></div><div className="flow-card"><span>FII / DII net cash flow</span><strong>{fii != null && dii != null ? `FII: ₹${fii} Cr, DII: ₹${dii} Cr (as of ${asOf ?? row.trade_date})` : 'Not available'}</strong></div></section>
+  return <section className="phase-view special-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">Post market review · {syncLabel(postSummary, '15:45')}</p><h2>Close the loop</h2></div><PhaseAside capturedAt={(postSummary?.updated_at ?? row?.updated_at ?? null) as string | null} /></div><div className="verdict-instruments"><PostInstrumentCard row={row} postSummary={postSummary} instrument="NIFTY" /><PostInstrumentCard row={row} postSummary={postSummary} instrument="SENSEX" /></div><div className="flow-card"><span>FII / DII net cash flow</span><strong>{fii != null && dii != null ? `FII: ₹${fii} Cr, DII: ₹${dii} Cr (as of ${asOf ?? row.trade_date})` : 'Not available'}</strong></div></section>
 }
 
 // The read, stated before its evidence. Derived from the same computeMarketBias object the
@@ -896,14 +978,11 @@ function ThesisHero({ row, onSeeVerdict }: { row: Row; onSeeVerdict: () => void 
   const bias = useMemo(() => computeMarketBias(row, calc, 'NIFTY'), [row, calc])
   const readiness = useMemo(() => computeOptionReadiness(calc), [calc])
   const band = String(bias.label).toLowerCase()
-  const tone = band.includes('bullish') ? 'up' : band.includes('bearish') ? 'down' : 'neutral'
-  // Five bias bands, strong bearish through strong bullish: the meter fills to the band's slot.
-  const slot = band === 'strong bearish' ? 1 : band === 'bearish' ? 2 : band === 'neutral' ? 3 : band === 'bullish' ? 4 : 5
   return <div className="thesis-hero">
     <div className="thesis-hero-main">
       <Label>Thesis for the open</Label>
       <strong className="thesis-hero-value">{bias.label}</strong>
-      <ScoreMeter steps={5} filled={slot} tone={tone === 'neutral' ? 'neutral' : tone} />
+      <BiasAxis value={bias.score} />
       <p className="thesis-hero-note">
         Bias {fmt.score(bias.score)} · {readiness.label.toLowerCase()} readiness · {calc.dte} day{calc.dte === 1 ? '' : 's'} to expiry.
       </p>
@@ -921,6 +1000,7 @@ function PhaseView({ phase, row, historyData, onSeeVerdict }: { phase: Phase; ro
       return data as Row | null
     }
   )
+  const headStamp = freshness((row?.updated_at ?? null) as string | null, false)
   const fields = phaseFields[phase] ?? []
   const phaseHeadings: Record<'premarket' | 'open', [string, string]> = { premarket: ['Overnight → Open setup', 'Build the market thesis'], open: ['Market Open snapshot', 'Read the opening auction'] }
   const phaseSyncTimes: Record<'premarket' | 'open', string> = { premarket: '08:58', open: '09:30' }
@@ -949,7 +1029,7 @@ function PhaseView({ phase, row, historyData, onSeeVerdict }: { phase: Phase; ro
     const gapText = `Opened ${gapPct >= 0 ? '+' : ''}${gapPct.toFixed(2)}% (${Number(gapPts).toFixed(1)} pts)${predictedText ? ` — ${predictedText}` : ''}`
     return [gapText, vixText, oiText].filter(Boolean).join('. ') + '.'
   }
-  const renderGroup = (title: string, group: typeof fields) => { const isIndex = title === 'Nifty' || title === 'Sensex'; const bias = title === 'Nifty' ? marketOpenBias('gap_points_nifty') : marketOpenBias('gap_points_sensex'); const summary = isIndex ? openSummary(title) : null; return <section className={`metric-group ${title === 'Common market data' ? 'common-group' : ''}`}><div className="group-heading">{title !== 'Common market data' && <h3>{title}{phase === 'open' && isIndex && <em className={`market-open-bias ${bias.toLowerCase()}`}> ({bias})</em>} {isIndex && <button type="button" className="semantic-info" aria-label={`${title} market color and OI action guidance`}><Info size={14} aria-hidden="true" /><span className="semantic-tooltip" role="tooltip"><b className="key-positive">Green</b> bullish / positive · <b className="key-negative">Red</b> bearish / negative · OI Addition = building interest · OI Unwinding = reducing interest</span></button>}</h3>}</div>{summary && <div className="verdict-banner prior-sessions-banner open-summary-banner"><p className="eyebrow">{title} at open</p><p className="prior-session-line">{summary}</p></div>}<div className="field-grid">{group.map((f) => { const isVix = f.key === 'india_vix'; const isOiAction = f.key.startsWith('oi_change_'); const actionTone = isOiAction ? (String(row?.[f.key] ?? '').toLowerCase() === 'addition' ? 'positive' : String(row?.[f.key] ?? '').toLowerCase().includes('unwinding') ? 'negative' : '') : ''; const relatedAction = f.key === 'oi_support_nifty' ? row?.oi_change_support_nifty : f.key === 'oi_support_sensex' ? row?.oi_change_support_sensex : f.key === 'oi_resistance_nifty' ? row?.oi_change_resistance_nifty : f.key === 'oi_resistance_sensex' ? row?.oi_change_resistance_sensex : null; const breadth = f.key === 'advance_decline_ratio' ? breadthDirection(row?.[f.key]) : null; const isNiftyGap = f.key === 'gap_points_nifty'; const predictedGap = isNiftyGap ? (row?.gift_nifty_gap_pts != null ? Number(row.gift_nifty_gap_pts) : row?.gift_nifty_gap_pct != null && row?.prev_close_nifty != null ? (num(row, 'gift_nifty_gap_pct') / 100) * num(row, 'prev_close_nifty') : null) : null; const gapDiff = isNiftyGap && predictedGap != null && row?.[f.key] != null ? Number(row[f.key]) - predictedGap : null; const fmtSigned = (n: number) => `${n > 0 ? '+' : ''}${n.toFixed(2)}`; const isGiftGap = f.key === 'gift_nifty_gap_pct'; const isEmpty = row?.[f.key] == null; if (isEmpty && gapDiff == null) { const [headline, reason] = emptyRead(f.key); return <div className="field-card is-empty" key={f.key}><span>{f.label}</span><strong className="field-empty-headline">{headline}</strong><small className="field-empty-reason">{reason}</small></div> } return <div className={`field-card ${isEmpty ? 'is-empty' : ''}`} key={f.key}><span>{gapDiff != null ? 'Difference from Predicted' : f.label}</span><strong className={gapDiff != null ? (gapDiff > 0 ? 'positive' : gapDiff < 0 ? 'negative' : '') : tone(row, f.key)}>{gapDiff != null ? fmtSigned(gapDiff) : value(row, f.key, f.pct)}{isVix && row?.india_vix_change_pct != null && <em className={`vix-change ${tone(row, 'india_vix_change_pct')}`}> ({value(row, 'india_vix_change_pct', true)})</em>}{f.key.startsWith('prev_day_change_pct_') && row?.[f.key.replace('_pct_', '_pts_')] != null && <em className="prior-day-pts"> ({Number(row[f.key.replace('_pct_', '_pts_')]) > 0 ? '+' : ''}{row[f.key.replace('_pct_', '_pts_')]} pts)</em>}{isGiftGap && row?.gift_nifty_gap_pts != null && <em className="prior-day-pts"> ({Number(row.gift_nifty_gap_pts) > 0 ? '+' : ''}{row.gift_nifty_gap_pts} pts) expected open</em>}{relatedAction != null && <em className={`oi-action`}> ({String(relatedAction)})</em>}{breadth && <em className={`breadth-flag ${breadth.tone}`}> {breadth.arrow} {breadth.label}</em>}{gapDiff != null && predictedGap != null && <em className="predicted-gap">(Prediction from GIFT Nifty: {fmtSigned(predictedGap)} pts, Actual Open Nifty: {fmtSigned(Number(row[f.key]))} pts)</em>}</strong>{isOiAction && <small className={`oi-action ${actionTone}`}>{String(row?.[f.key] ?? 'Not available')}</small>}{isGiftGap && giftRow?.last_price != null && row?.prev_close_nifty != null && <small className="gift-raw-compare">GIFT Nifty {giftRow.last_price} ({fmtTimeIST(giftRow.fetched_at)}) vs Nifty {row.prev_close_nifty} (Prev Close)</small>}</div> })}</div></section> }
+  const renderGroup = (title: string, group: typeof fields) => { const isIndex = title === 'Nifty' || title === 'Sensex'; const bias = title === 'Nifty' ? marketOpenBias('gap_points_nifty') : marketOpenBias('gap_points_sensex'); const summary = isIndex ? openSummary(title) : null; return <section className={`metric-group ${title === 'Common market data' ? 'common-group' : ''}`}><div className="group-heading">{title !== 'Common market data' && <h3>{isIndex ? `${title === 'Nifty' ? 'Nifty 50' : 'Sensex'} — evidence` : title}{phase === 'open' && isIndex && <em className={`market-open-bias ${bias.toLowerCase()}`}> ({bias})</em>} {isIndex && <button type="button" className="semantic-info" aria-label={`${title} market color and OI action guidance`}><Info size={14} aria-hidden="true" /><span className="semantic-tooltip" role="tooltip"><b className="key-positive">Green</b> bullish / positive · <b className="key-negative">Red</b> bearish / negative · OI Addition = building interest · OI Unwinding = reducing interest</span></button>}</h3>}</div>{summary && <div className="verdict-banner prior-sessions-banner open-summary-banner"><p className="eyebrow">{title} at open</p><p className="prior-session-line">{summary}</p></div>}<div className="field-grid">{group.map((f) => { const isVix = f.key === 'india_vix'; const isOiAction = f.key.startsWith('oi_change_'); const actionTone = isOiAction ? (String(row?.[f.key] ?? '').toLowerCase() === 'addition' ? 'positive' : String(row?.[f.key] ?? '').toLowerCase().includes('unwinding') ? 'negative' : '') : ''; const relatedAction = f.key === 'oi_support_nifty' ? row?.oi_change_support_nifty : f.key === 'oi_support_sensex' ? row?.oi_change_support_sensex : f.key === 'oi_resistance_nifty' ? row?.oi_change_resistance_nifty : f.key === 'oi_resistance_sensex' ? row?.oi_change_resistance_sensex : null; const breadth = f.key === 'advance_decline_ratio' ? breadthDirection(row?.[f.key]) : null; const isNiftyGap = f.key === 'gap_points_nifty'; const predictedGap = isNiftyGap ? (row?.gift_nifty_gap_pts != null ? Number(row.gift_nifty_gap_pts) : row?.gift_nifty_gap_pct != null && row?.prev_close_nifty != null ? (num(row, 'gift_nifty_gap_pct') / 100) * num(row, 'prev_close_nifty') : null) : null; const gapDiff = isNiftyGap && predictedGap != null && row?.[f.key] != null ? Number(row[f.key]) - predictedGap : null; const fmtSigned = (n: number) => `${n > 0 ? '+' : ''}${n.toFixed(2)}`; const isGiftGap = f.key === 'gift_nifty_gap_pct'; const isEmpty = row?.[f.key] == null; if (isEmpty && gapDiff == null) { const [headline, reason] = emptyRead(f.key); return <div className="field-card is-empty" key={f.key}><span>{f.label}</span><strong className="field-empty-headline">{headline}</strong><small className="field-empty-reason">{reason}</small></div> } return <div className={`field-card ${isEmpty ? 'is-empty' : ''}`} key={f.key}><span>{gapDiff != null ? 'Difference from Predicted' : f.label}</span><strong className={gapDiff != null ? (gapDiff > 0 ? 'positive' : gapDiff < 0 ? 'negative' : '') : tone(row, f.key)}>{gapDiff != null ? fmtSigned(gapDiff) : value(row, f.key, f.pct)}{isVix && row?.india_vix_change_pct != null && <em className={`vix-change ${tone(row, 'india_vix_change_pct')}`}> ({value(row, 'india_vix_change_pct', true)})</em>}{f.key.startsWith('prev_day_change_pct_') && row?.[f.key.replace('_pct_', '_pts_')] != null && <em className="prior-day-pts"> ({fmt.pts(Number(row[f.key.replace('_pct_', '_pts_')]))})</em>}{isGiftGap && row?.gift_nifty_gap_pts != null && <em className="prior-day-pts"> ({Number(row.gift_nifty_gap_pts) > 0 ? '+' : ''}{row.gift_nifty_gap_pts} pts) expected open</em>}{relatedAction != null && <em className={`oi-action ${oiTone(f.key, String(relatedAction))}`}> {oiReading(f.key, String(relatedAction))}</em>}{breadth && <em className={`breadth-flag ${breadth.tone}`}> {breadth.arrow} {breadth.label}</em>}{gapDiff != null && predictedGap != null && <em className="predicted-gap">(Prediction from GIFT Nifty: {fmtSigned(predictedGap)} pts, Actual Open Nifty: {fmtSigned(Number(row[f.key]))} pts)</em>}</strong>{isOiAction && <small className={`oi-action ${actionTone}`}>{String(row?.[f.key] ?? 'Not available')}</small>}{isGiftGap && giftRow?.last_price != null && row?.prev_close_nifty != null && <small className="gift-raw-compare">GIFT Nifty {giftRow.last_price} ({fmtTimeIST(giftRow.fetched_at)}) vs Nifty {row.prev_close_nifty} (Prev Close)</small>}</div> })}</div></section> }
   const [eyebrow, heading] = phaseHeadings[phase as 'premarket' | 'open']
   const scheduledTime = phaseSyncTimes[phase as 'premarket' | 'open']
   // D-1 recap for Pre-market only: the single most recent trading day strictly before
@@ -1021,12 +1101,12 @@ function PhaseView({ phase, row, historyData, onSeeVerdict }: { phase: Phase; ro
   // before that, gap_points_nifty/sensex are null on today's row and there's nothing genuine
   // to show, so this shows an explicit not-yet message instead of a mostly-empty field grid.
   const openDataMissing = phase === 'open' && row?.gap_points_nifty == null && row?.gap_points_sensex == null
-  if (openDataMissing) return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><span>Session snapshot</span></div><p className="history-empty">Market Open data not available yet — updates at 9:30 AM IST once the market opens.</p></section>
+  if (openDataMissing) return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><div className="phase-head-aside"><FreshnessStamp state={headStamp.state} label={headStamp.label} capturedAt={(row?.updated_at ?? null) as string | null} /><ProvenanceBadge source="system" /></div></div><p className="history-empty">Market Open data not available yet — updates at 9:30 AM IST once the market opens.</p></section>
   const openTargetCards = phase === 'open' && row ? <div className="market-open-target-row">
     <TargetStopCard instrument="NIFTY" calc={calculateVerdict(row, 'NIFTY')} />
     <TargetStopCard instrument="SENSEX" calc={calculateVerdict(row, 'SENSEX')} />
   </div> : null
-  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><span>Session snapshot</span></div>{phase === 'premarket' && row && onSeeVerdict && <ThesisHero row={row} onSeeVerdict={onSeeVerdict} />}{phase === 'premarket' && priorDayLines && priorDayLines.story && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p><p className="prior-session-line prior-session-story">{priorDayLines.story}</p></div>}<div className="metric-groups">{renderGroup('Common market data', common)}{openTargetCards}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div></section>
+  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><div className="phase-head-aside"><FreshnessStamp state={headStamp.state} label={headStamp.label} capturedAt={(row?.updated_at ?? null) as string | null} /><ProvenanceBadge source="system" /></div></div>{phase === 'premarket' && row && onSeeVerdict && <div className="thesis-row"><ThesisHero row={row} onSeeVerdict={onSeeVerdict} />{priorDayLines && priorDayLines.story && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p><p className="prior-session-line prior-session-story">{priorDayLines.story}</p></div>}</div>}<div className="metric-groups">{renderGroup('Common market data', common)}{openTargetCards}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div><Disclaimer capturedAt={fmt.timeIST((row?.updated_at ?? null) as string | null)} /></section>
 }
 export default function Dashboard() {
   const [phase, setPhase] = useState<Phase>('premarket'); const [dark, setDark] = useState(true); const [navOpen, setNavOpen] = useState(false); const [liveDate, setLiveDate] = useState(''); const [liveDay, setLiveDay] = useState(''); const [liveTime, setLiveTime] = useState('')
@@ -1044,7 +1124,12 @@ export default function Dashboard() {
     return () => { document.body.style.overflow = previous }
   }, [isMobile, navOpen])
   const { session, loading: sessionLoading, signOut } = useSession()
-  const isAdmin = session?.user?.email === 'jishnu@ziovy.com'
+  // Trade and Journal are admin-only, so they never render on a local dev session and could
+  // not be reviewed against the design. The same NODE_ENV-gated flag that lets the dashboard
+  // render signed-out also grants admin locally. Both halves are build-time constants, so
+  // `next build` folds this to false and drops it -- see components/auth-guard.tsx.
+  const DEV_BYPASS = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true'
+  const isAdmin = DEV_BYPASS || session?.user?.email === 'jishnu@ziovy.com'
   const visiblePhases = isAdmin ? phases : phases.filter((p) => p.id !== 'trade' && p.id !== 'journal')
   useEffect(() => { if (!sessionLoading && !isAdmin && phase === 'trade') setPhase('premarket') }, [sessionLoading, isAdmin, phase])
   const supabase = useMemo(() => createClient(), [])
@@ -1096,6 +1181,20 @@ export default function Dashboard() {
   // if it were real data). The demo row is only used as a whole when there's no live row at
   // all (e.g. very first load before Supabase has ever written anything).
   const row = liveRow ?? visualRow
+  // Rule 6: time and provenance are permanent furniture, and the reading visibly ages past
+  // its checkpoint. The audit found a header clock reading 15:26 while every phase was
+  // stamped "UPDATED 08:45 IST" in identical styling -- stale presented as live.
+  const capturedISO = (row?.updated_at ?? null) as string | null
+  const capturedLabel = fmt.timeIST(capturedISO) ? `Captured ${fmt.timeIST(capturedISO)}` : 'Capture time unknown'
+  // Indian equities trade 09:15-15:30 IST; outside that the stamp says closed rather than aging.
+  const marketOpen = (() => {
+    const now = new Date()
+    const hhmm = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).format(now)
+    const day = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short' }).format(now)
+    if (day === 'Sat' || day === 'Sun') return false
+    return hhmm >= '09:15' && hhmm <= '15:30'
+  })()
+  const sessionState = freshness(capturedISO, marketOpen)
   // All of today's mid-market checkpoints (10:30/11:30/12:30/1:30/2:30 IST, or the legacy
   // single '1245' row for historical days before the 5-checkpoint schedule started), ordered
   // earliest-first so the timeline UI can just .map() them left-to-right / top-to-bottom.
@@ -1109,5 +1208,5 @@ export default function Dashboard() {
   const { data: postSummary } = useSWR<Row | null>(row.trade_date ? ['postmarket-summary', row.trade_date] : null, async () => { const { data, error } = await supabase.from('postmarket_summary').select('*').eq('trade_date', row.trade_date).order('trade_date', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data as Row | null }, { revalidateOnFocus: false })
   useEffect(() => { document.documentElement.classList.toggle('light', !dark) }, [dark])
   useEffect(() => { const updateClock = () => { const now = new Date(); const options = { timeZone: 'Asia/Kolkata' } as const; setLiveDate(new Intl.DateTimeFormat('en-IN', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)); setLiveDay(new Intl.DateTimeFormat('en-IN', { ...options, weekday: 'long' }).format(now)); setLiveTime(new Intl.DateTimeFormat('en-IN', { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(now)) }; updateClock(); const timer = window.setInterval(updateClock, 1000); return () => window.clearInterval(timer) }, [])
-  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation" aria-expanded={navOpen} aria-controls="session-map"><Menu size={18} /></button><div className="brand-mark"><BrandSymbol size={32} /><div><strong>MarketCue</strong><span>TRADE ANALYSIS PLATFORM</span></div></div><span className="topbar-date">{liveDate || row?.trade_date || 'No current row'} · {liveDay || row?.day_name || 'Session date'} · {liveTime || 'Not available'} IST</span><div className="topbar-meta">{!sessionLoading && (session ? <button type="button" className="sign-in-link" onClick={() => signOut()}><LogOut size={13} /> Sign out</button> : <Link href="/login" className="sign-in-link"><LogIn size={13} /> Sign in</Link>)}<button className="icon-button" onClick={() => location.reload()} aria-label="Refresh dashboard"><RefreshCw size={16} /></button><button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button></div></header><div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle, icon: Icon }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)}><Icon size={17} /><span><strong>{label}</strong><small>{subtitle}</small></span><ChevronRight size={14} /></button>)}<div className="side-rule" /></aside>{isMobile && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} onSeeVerdict={() => setPhase('verdict')} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
+  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation" aria-expanded={navOpen} aria-controls="session-map"><Menu size={18} /></button><div className="brand-mark"><BrandSymbol size={30} /><div><strong>MarketCue</strong></div></div><span className="topbar-date">{liveDay || row?.day_name || ''} {liveDate || row?.trade_date || ''} · {liveTime || '—'} IST</span><div className="topbar-meta"><FreshnessStamp state={sessionState.state} label={sessionState.label} capturedAt={capturedISO} /><div className="topbar-segmented" role="group" aria-label="Theme"><button type="button" aria-pressed={dark} onClick={() => setDark(true)}>Dark</button><button type="button" aria-pressed={!dark} onClick={() => setDark(false)}>Light</button></div>{!sessionLoading && (session ? <button type="button" className="topbar-toggle" onClick={() => signOut()}>Sign out</button> : <Link href="/login" className="topbar-toggle">Sign in</Link>)}</div></header><div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)} aria-current={phase === id ? 'page' : undefined}><span><strong>{label}</strong><small>{subtitle}</small></span></button>)}<div className="side-rule" /><div className="side-source"><span className="side-label">Data source</span><strong>NSE option chain</strong><small>{capturedLabel}</small></div></aside>{isMobile && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView row={row} /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} onSeeVerdict={() => setPhase('verdict')} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
 }

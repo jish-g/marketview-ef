@@ -177,3 +177,46 @@
   .ds-table tbody tr, .ds-badge, .ds-stamp { min-height: 44px; }
   .ds-badge, .ds-stamp { align-items: center; }
 }
+
+/* --- bias axis: a POSITION on a signed scale, not a progress bar ---
+   A filled bar implies completion and reads as "60% done", which is meaningless for a bias
+   score. Marker left % = ((value - min) / (max - min)) * 100 -- +0.25 on -2..+2 lands at
+   56.25%. `.ds-progress` stays reserved for genuine progress toward a target. */
+.ds-axis { display: flex; flex-direction: column; gap: var(--s-2); }
+.ds-axis__track { position: relative; height: 16px; }
+.ds-axis__rail {
+  position: absolute; top: 6px; left: 0; right: 0; height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--down) 45%, var(--border)) 0%,
+    var(--border) 42%, var(--border) 58%,
+    color-mix(in srgb, var(--up) 45%, var(--border)) 100%);
+}
+.ds-axis__zero { position: absolute; top: 1px; left: 50%; width: 1px; height: 14px; background: var(--border-strong); }
+.ds-axis__marker { position: absolute; top: 2px; transform: translateX(-50%); width: 12px; height: 12px; border-radius: 50%; background: var(--ink); }
+.ds-axis__scale { display: flex; justify-content: space-between; font-size: var(--text-label); color: var(--muted); font-weight: 400; letter-spacing: 0; text-transform: none; }
+
+/* Progress is ONLY for genuine progress toward a target (spec §2). */
+.ds-progress { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.ds-progress span { display: block; height: 100%; background: var(--up); }
+
+/* --- checkpoint timeline (spec §2, §3) --- */
+.ds-timeline { display: grid; gap: 10px; }
+.ds-timeline__row { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: var(--s-4); align-items: start; }
+.ds-timeline__time { text-align: right; padding-top: var(--s-4); }
+.ds-timeline__time strong { display: block; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+.ds-timeline__time small { display: block; font-size: var(--text-label); color: var(--muted); }
+.ds-timeline__card { display: grid; gap: var(--s-2); }
+.ds-timeline__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ds-timeline__head strong { font-size: var(--text-body); font-weight: 600; color: var(--ink); }
+.ds-timeline__detail { font-size: var(--text-meta); color: var(--ink-2); }
+.ds-timeline__note { font-size: var(--text-meta); color: var(--caution-ink); }
+@media (max-width: 560px) {
+  .ds-timeline__row { grid-template-columns: 1fr; gap: var(--s-2); }
+  .ds-timeline__time { text-align: left; padding-top: 0; display: flex; gap: var(--s-2); align-items: baseline; }
+}
+
+/* --- progress: genuine progress toward a target only --- */
+.ds-progress-wrap { display: grid; gap: 6px; }
+.ds-progress-head { display: flex; align-items: baseline; justify-content: space-between; font-size: var(--text-meta); color: var(--muted); }
+.ds-progress { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.ds-progress span { display: block; height: 100%; background: var(--up); }

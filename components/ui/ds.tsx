@@ -12,7 +12,7 @@
 //   - Empty states state a reason. There is no bare em dash (criterion 8).
 
 import type { ReactNode } from 'react'
-import { fmt } from '@/lib/format'
+import { fmt, freshness } from '@/lib/format'
 
 /* ---------------------------------------------------------------- Card */
 
@@ -141,6 +141,29 @@ export function ScoreMeter({ steps, filled, tone = 'neutral' }: {
   )
 }
 
+/* ------------------------------------------------------------ BiasAxis */
+
+// Market Bias is a POSITION on a signed -2.00 -> +2.00 scale, not progress toward a target.
+// A filled bar implies completion and reads as "60% done", which is meaningless for a bias
+// score -- which is why the spec calls this out specifically. The rail is a gradient with a
+// zero tick; the marker is a dot; the value is always also shown as text (rule 8).
+export function BiasAxis({ value, min = -2, max = 2, lowLabel = '\u22122.00 bearish', highLabel = '+2.00 bullish' }: {
+  value: number; min?: number; max?: number; lowLabel?: string; highLabel?: string
+}) {
+  const clamped = Math.max(min, Math.min(max, Number(value) || 0))
+  const pct = ((clamped - min) / (max - min)) * 100
+  return (
+    <div className="ds-axis">
+      <div className="ds-axis__track" role="img" aria-label={`Bias ${fmt.score(value)} on a scale from ${min} to ${max}`}>
+        <div className="ds-axis__rail" />
+        <div className="ds-axis__zero" />
+        <div className="ds-axis__marker" style={{ left: `${pct}%` }} />
+      </div>
+      <div className="ds-axis__scale"><span>{lowLabel}</span><span>0</span><span>{highLabel}</span></div>
+    </div>
+  )
+}
+
 /* ----------------------------------------------------- ScoreBreakdown */
 
 export type ScoreInput = { name: string; value: ReactNode; score: number; weight?: string }
@@ -246,6 +269,64 @@ export function TradeLevels({ variant, targetPts, stopPts, targetRupees, stopRup
   )
 }
 
+/* -------------------------------------------------- CheckpointTimeline */
+
+export type Checkpoint = {
+  time: string            // "10:30"
+  headline: string        // "Bias held neutral"
+  badge: string           // "+0.25 · unchanged"
+  detail: string          // "Nifty −0.41% · PCR 1.02 · VIX 12.4"
+  shifted?: boolean       // a checkpoint whose bias moved
+  note?: string           // one-line explanation, shown only when shifted
+}
+
+// Spec §3: five checkpoint rows. A checkpoint whose bias moved gets card--caution and a
+// one-line explanation; unchanged checkpoints stay neutral, so the eye lands on the one
+// that actually did something.
+export function CheckpointTimeline({ rows }: { rows: Checkpoint[] }) {
+  return (
+    <div className="ds-timeline">
+      {rows.map((r) => (
+        <div className="ds-timeline__row" key={r.time}>
+          <div className="ds-timeline__time">
+            <strong>{r.time}</strong>
+            <small>IST</small>
+          </div>
+          <Card tone={r.shifted ? 'caution' : 'default'} className="ds-timeline__card">
+            <div className="ds-timeline__head">
+              <strong>{r.headline}</strong>
+              <span className={`ds-badge ${r.shifted ? 'ds-badge--caution' : 'ds-badge--neutral'} ds-num`}>{r.badge}</span>
+            </div>
+            <span className="ds-timeline__detail ds-num">{r.detail}</span>
+            {r.shifted && r.note && <span className="ds-timeline__note">{r.note}</span>}
+          </Card>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------- Progress */
+
+// Spec §2: `.progress` is ONLY for genuine progress toward a target. Anything on a signed
+// scale uses BiasAxis instead.
+export function Progress({ value, max = 100, label }: { value: number; max?: number; label?: string }) {
+  const pct = Math.max(0, Math.min(100, (value / max) * 100))
+  return (
+    <div className="ds-progress-wrap">
+      {label && (
+        <div className="ds-progress-head">
+          <span>{label}</span>
+          <span className="ds-num">{Math.round(pct)}%</span>
+        </div>
+      )}
+      <div className="ds-progress" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+        <span style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
 /* ----------------------------------------------------------- Chrome */
 
 export function PhaseHeader({ eyebrow, title, aside }: { eyebrow: ReactNode; title: ReactNode; aside?: ReactNode }) {
@@ -256,6 +337,19 @@ export function PhaseHeader({ eyebrow, title, aside }: { eyebrow: ReactNode; tit
         <h2 className="ds-phase-head__title">{title}</h2>
       </div>
       {aside != null && <div className="ds-phase-head__aside">{aside}</div>}
+    </div>
+  )
+}
+
+
+// Rule 6: every screen carries the same furniture -- when the reading was captured and
+// whether it is system-derived. Several screens showed a static caption or a bare date.
+export function PhaseAside({ capturedAt, source = 'system' }: { capturedAt?: string | null; source?: 'system' | 'manual' }) {
+  const stamp = freshness(capturedAt ?? null, false)
+  return (
+    <div className="phase-head-aside">
+      <FreshnessStamp state={stamp.state} label={stamp.label} capturedAt={capturedAt ?? null} />
+      <ProvenanceBadge source={source} />
     </div>
   )
 }
