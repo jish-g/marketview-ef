@@ -125,6 +125,11 @@
 .ds-levels__key { color: var(--ink-2); font-size: var(--text-meta); }
 .ds-levels__val { display: inline-flex; align-items: baseline; gap: var(--s-2); }
 .ds-levels__rupees { color: var(--muted); font-size: var(--text-meta); font-style: normal; font-variant-numeric: tabular-nums; }
+/* Market open's variant: instrument + expected move on one spread row, with the target and
+   stop rows separated by a rule beneath it (reference: #s-open "Expected move"). */
+.ds-levels__head { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: baseline; justify-content: space-between; }
+.ds-levels__total { font-size: var(--text-value-sm); font-variant-numeric: tabular-nums; }
+.ds-levels--headed .ds-levels__row:first-of-type { padding-top: 10px; border-top: 1px solid var(--border); }
 
 /* --- phase header --- */
 .ds-phase-head {
@@ -220,3 +225,19 @@
 .ds-progress-head { display: flex; align-items: baseline; justify-content: space-between; font-size: var(--text-meta); color: var(--muted); }
 .ds-progress { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
 .ds-progress span { display: block; height: 100%; background: var(--up); }
+
+/* ---------------------------------------------------------------- Market open
+   Reference: marketcue-dashboard.html #s-open. Four tiles, then the expected-move row.
+   auto-fit would stretch a short last row; these counts are fixed by the design. */
+.section-title { font: 600 15px/1.3 var(--font-sans); letter-spacing: -.01em; color: var(--ink); }
+.market-open-view { display: grid; gap: var(--s-5); align-content: start; }
+.market-open-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-3); }
+.market-open-move { display: grid; gap: 10px; }
+.market-open-move-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-3); align-items: stretch; }
+@media (max-width: 1100px) {
+  .market-open-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .market-open-move-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .market-open-tiles { grid-template-columns: 1fr; }
+}

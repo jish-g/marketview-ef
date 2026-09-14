@@ -9,7 +9,7 @@ import { TradeView } from '@/components/trade-view'
 import { JournalView } from '@/components/journal-view'
 import { useSession } from '@/hooks/use-session'
 import { fmt, freshness } from '@/lib/format'
-import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, BiasAxis, CheckpointTimeline, Progress, PhaseAside, Label, type Checkpoint } from '@/components/ui/ds'
+import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, BiasAxis, CheckpointTimeline, Progress, PhaseAside, Label, Metric, Banner, TradeLevels, type Checkpoint } from '@/components/ui/ds'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sun } from 'lucide-react'
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
@@ -31,8 +31,8 @@ const phaseFields: Partial<Record<Phase, { label: string; key: string; pct?: boo
     ['Event today', 'event_today'], ['India VIX', 'india_vix'], ['GIFT Nifty gap (Nifty expected to open)', 'gift_nifty_gap_pct', true], ['Expiry', 'days_to_expiry_nifty'], ['Expiry', 'days_to_expiry_sensex'], ['5D average move', 'avg_move_5d_nifty'], ['5D average move', 'avg_move_5d_sensex'], ['Prior Day Closed', 'prev_day_change_pct_nifty', true], ['Prior Day Closed', 'prev_day_change_pct_sensex', true], ['Chart Support (1D Pivot)', 'chart_support_nifty'], ['Chart Resistance (1D Pivot)', 'chart_resistance_nifty'], ['Chart Support (1D Pivot)', 'chart_support_sensex'], ['Chart Resistance (1D Pivot)', 'chart_resistance_sensex'], ['OI support', 'oi_support_nifty'], ['OI resistance', 'oi_resistance_nifty'], ['OI support', 'oi_support_sensex'], ['OI resistance', 'oi_resistance_sensex'],
   ] as const).map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
   open: ([
-    ['Opening points', 'nifty_opening_points'], ['Advance / decline', 'advance_decline_ratio'], ['Previous close', 'prev_close_nifty'], ['Previous close', 'prev_close_sensex'], ['Gap points', 'gap_points_nifty'], ['Gap points', 'gap_points_sensex'], ['ATM IV', 'atm_iv_nifty', true], ['ATM IV', 'atm_iv_sensex', true], ['Straddle', 'atm_straddle_price_nifty'], ['Straddle', 'atm_straddle_price_sensex'], ['Delta', 'atm_straddle_delta_nifty'], ['Delta', 'atm_straddle_delta_sensex'], ['Theta', 'atm_straddle_theta_nifty'], ['Theta', 'atm_straddle_theta_sensex'], ['PCR', 'pcr_nifty'], ['PCR', 'pcr_sensex'], ['Max pain', 'max_pain_nifty'], ['Max pain', 'max_pain_sensex'],
-  ] as const).map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
+    ['Opening points', 'nifty_opening_points'], ['Advance / decline', 'advance_decline_ratio'], ['Previous close', 'prev_close_nifty'], ['Previous close', 'prev_close_sensex'], ['Gap points', 'gap_points_nifty'], ['Gap points', 'gap_points_sensex'], ['ATM IV', 'atm_iv_nifty'], ['ATM IV', 'atm_iv_sensex'], ['Straddle', 'atm_straddle_price_nifty'], ['Straddle', 'atm_straddle_price_sensex'], ['Delta', 'atm_straddle_delta_nifty'], ['Delta', 'atm_straddle_delta_sensex'], ['Theta', 'atm_straddle_theta_nifty'], ['Theta', 'atm_straddle_theta_sensex'], ['PCR', 'pcr_nifty'], ['PCR', 'pcr_sensex'], ['Max pain', 'max_pain_nifty'], ['Max pain', 'max_pain_sensex'],
+  ] as const).map(([label, key]) => ({ label, key, pct: false })),
   mid: ([
     ['Mid-market status', 'mid_market_status'], ['Nifty intraday change', 'mid_nifty_change_pct', true], ['Sensex intraday change', 'mid_sensex_change_pct', true], ['Mid-market breadth', 'mid_advance_decline_ratio'], ['Mid-market PCR', 'mid_pcr_nifty'], ['Mid-market VIX', 'mid_india_vix'], ['Mid-market note', 'mid_market_notes'],
   ] as const).map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
@@ -990,6 +990,76 @@ function ThesisHero({ row, onSeeVerdict }: { row: Row; onSeeVerdict: () => void 
     </div>
   </div>
 }
+/* ---------------------------------------------------------------- Market open
+   Reference: marketcue-dashboard.html #s-open. The generic PhaseView renderer produced a
+   nine-tile wall for this phase with the narrative buried in fifth position; the design
+   leads with the answer (did the open match the prediction?) and keeps four tiles.
+
+   Nifty only, deliberately: Sensex has no leading indicator, so "diverged from the
+   predicted open" has no meaning for it -- the same reason the Pre-market screen suppresses
+   the Sensex prediction row. Sensex evidence stays on Pre-market and Verdict.
+
+   Every figure here already existed on the row or came out of calculateVerdict. Nothing is
+   computed that was not computed before -- this is presentation only. */
+function MarketOpenView({ row, capturedAt }: { row: Row; capturedAt: string | null }) {
+  const calc = calculateVerdict(row, 'NIFTY')
+  const gapPts = row.gap_points_nifty != null ? Number(row.gap_points_nifty) : null
+  const prevClose = row.prev_close_nifty != null ? Number(row.prev_close_nifty) : null
+  const gapPct = gapPts != null && prevClose ? (gapPts / prevClose) * 100 : null
+  const predictedPct = row.gift_nifty_gap_pct != null ? Number(row.gift_nifty_gap_pct) : null
+  const predictedPts = row.gift_nifty_gap_pts != null ? Number(row.gift_nifty_gap_pts)
+    : predictedPct != null && prevClose != null ? (predictedPct / 100) * prevClose : null
+  const missPts = gapPts != null && predictedPts != null ? Math.abs(gapPts - predictedPts) : null
+  // The design's own threshold for "in line" vs "diverged", matching the existing openSummary.
+  const diverged = gapPct != null && predictedPct != null && Math.abs(predictedPct - gapPct) >= 0.15
+  const vix = row.india_vix != null ? Number(row.india_vix) : null
+  const stamp = freshness(capturedAt, false)
+
+  return <section className="phase-view market-open-view">
+    <div className="review-section-head">
+      <div><p className="eyebrow">Market open snapshot</p><h2>Read the opening auction</h2></div>
+      <div className="phase-head-aside">
+        <FreshnessStamp state={stamp.state} label={stamp.label} capturedAt={capturedAt} />
+        <ProvenanceBadge source="system" />
+      </div>
+    </div>
+
+    {predictedPts == null
+      ? <Banner tone="info" label="No predicted open to compare against">
+          GIFT Nifty did not publish a gap for this session, so the open is reported on its own.
+          {gapPct != null && <> Nifty opened <strong className="num">{fmt.pct(gapPct)} ({fmt.pts(gapPts)})</strong>.</>}
+        </Banner>
+      : <Banner tone={diverged ? 'blocking' : 'info'} label={diverged ? 'Nifty diverged from the predicted open' : 'Nifty opened in line with the predicted open'}>
+          Opened <strong className={`num ${tone(row, 'gap_points_nifty')}`}>{fmt.pct(gapPct)} ({fmt.pts(gapPts)})</strong> against a predicted{' '}
+          <strong className="num">{fmt.pct(predictedPct)} ({fmt.pts(predictedPts)})</strong>
+          {missPts != null && <> — a <strong className="num">{missPts.toFixed(1)} pt</strong> {diverged ? 'miss' : 'difference'}</>}.
+          {vix != null && <> VIX at {fmt.ratio(vix)} — {vixCondition(vix).toLowerCase()}.</>}
+        </Banner>}
+
+    <div className="market-open-tiles">
+      <Metric label="Opening points" value={<span className={tone(row, 'gap_points_nifty')}>{value(row, 'gap_points_nifty')}</span>} sub={gapPct != null ? `${fmt.pct(gapPct)} vs prev close` : 'Previous close not recorded'} />
+      <Metric label="Previous close" value={value(row, 'prev_close_nifty')} sub="Prior session" />
+      <Metric label="ATM IV" value={value(row, 'atm_iv_nifty')} sub={vix != null ? `vs VIX ${fmt.ratio(vix)}` : 'India VIX not recorded'} />
+      <Metric label="Straddle" value={value(row, 'atm_straddle_price_nifty')} sub="pts, ATM straddle" />
+    </div>
+
+    <div className="market-open-move">
+      <span className="section-title">Expected move</span>
+      <div className="market-open-move-grid">
+        <TradeLevels variant="conservative" heading="Nifty · conservative" total={`${calc.conservative.toFixed(1)} pts`}
+          targetPts={calc.target} stopPts={calc.stop} targetRupees={calc.target * 0.5} stopRupees={calc.stop * 0.5} />
+        <TradeLevels variant="aggressive" heading="Nifty · aggressive" total={`${calc.aggressive.toFixed(1)} pts`}
+          targetPts={calc.aggressiveTarget} stopPts={calc.aggressiveStop} targetRupees={calc.aggressiveTarget * 0.5} stopRupees={calc.aggressiveStop * 0.5} />
+        {row.advance_decline_ratio == null
+          ? <EmptyState label="Advance / decline" headline="Not published" reason="NSE releases breadth after 09:20 IST." />
+          : <Metric label="Advance / decline" value={value(row, 'advance_decline_ratio')} sub="advances per decline" />}
+      </div>
+    </div>
+
+    <Disclaimer capturedAt={fmt.timeIST(capturedAt)} />
+  </section>
+}
+
 function PhaseView({ phase, row, historyData, onSeeVerdict }: { phase: Phase; row: Row | null; historyData?: HistoryExtras | null; onSeeVerdict?: () => void }) {
   const supabase = useMemo(() => createClient(), [])
   const { data: giftRow } = useSWR(
@@ -1208,5 +1278,5 @@ export default function Dashboard() {
   const { data: postSummary } = useSWR<Row | null>(row.trade_date ? ['postmarket-summary', row.trade_date] : null, async () => { const { data, error } = await supabase.from('postmarket_summary').select('*').eq('trade_date', row.trade_date).order('trade_date', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data as Row | null }, { revalidateOnFocus: false })
   useEffect(() => { document.documentElement.classList.toggle('light', !dark) }, [dark])
   useEffect(() => { const updateClock = () => { const now = new Date(); const options = { timeZone: 'Asia/Kolkata' } as const; setLiveDate(new Intl.DateTimeFormat('en-IN', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)); setLiveDay(new Intl.DateTimeFormat('en-IN', { ...options, weekday: 'long' }).format(now)); setLiveTime(new Intl.DateTimeFormat('en-IN', { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(now)) }; updateClock(); const timer = window.setInterval(updateClock, 1000); return () => window.clearInterval(timer) }, [])
-  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation" aria-expanded={navOpen} aria-controls="session-map"><Menu size={18} /></button><div className="brand-mark"><BrandSymbol size={30} /><div><strong>MarketCue</strong></div></div><span className="topbar-date">{liveDay || row?.day_name || ''} {liveDate || row?.trade_date || ''} · {liveTime || '—'} IST</span><div className="topbar-meta"><FreshnessStamp state={sessionState.state} label={sessionState.label} capturedAt={capturedISO} /><div className="topbar-segmented" role="group" aria-label="Theme"><button type="button" aria-pressed={dark} onClick={() => setDark(true)}>Dark</button><button type="button" aria-pressed={!dark} onClick={() => setDark(false)}>Light</button></div>{!sessionLoading && (session ? <button type="button" className="topbar-toggle" onClick={() => signOut()}>Sign out</button> : <Link href="/login" className="topbar-toggle">Sign in</Link>)}</div></header><div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)} aria-current={phase === id ? 'page' : undefined}><span><strong>{label}</strong><small>{subtitle}</small></span></button>)}<div className="side-rule" /><div className="side-source"><span className="side-label">Data source</span><strong>NSE option chain</strong><small>{capturedLabel}</small></div></aside>{isMobile && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView row={row} /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} onSeeVerdict={() => setPhase('verdict')} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
+  return <main className="app-shell"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setNavOpen(!navOpen)} aria-label="Toggle navigation" aria-expanded={navOpen} aria-controls="session-map"><Menu size={18} /></button><div className="brand-mark"><BrandSymbol size={30} /><div><strong>MarketCue</strong></div></div><span className="topbar-date">{liveDay || row?.day_name || ''} {liveDate || row?.trade_date || ''} · {liveTime || '—'} IST</span><div className="topbar-meta"><FreshnessStamp state={sessionState.state} label={sessionState.label} capturedAt={capturedISO} /><div className="topbar-segmented" role="group" aria-label="Theme"><button type="button" aria-pressed={dark} onClick={() => setDark(true)}>Dark</button><button type="button" aria-pressed={!dark} onClick={() => setDark(false)}>Light</button></div>{!sessionLoading && (session ? <button type="button" className="topbar-toggle" onClick={() => signOut()}>Sign out</button> : <Link href="/login" className="topbar-toggle">Sign in</Link>)}</div></header><div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)} aria-current={phase === id ? 'page' : undefined}><span><strong>{label}</strong><small>{subtitle}</small></span></button>)}<div className="side-rule" /><div className="side-source"><span className="side-label">Data source</span><strong>NSE option chain</strong><small>{capturedLabel}</small></div></aside>{isMobile && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView row={row} /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} /> : phase === 'open' && row && row.gap_points_nifty != null ? <MarketOpenView row={row} capturedAt={(row.updated_at ?? null) as string | null} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} onSeeVerdict={() => setPhase('verdict')} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
 }
