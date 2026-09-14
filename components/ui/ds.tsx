@@ -141,6 +141,29 @@ export function ScoreMeter({ steps, filled, tone = 'neutral' }: {
   )
 }
 
+/* ------------------------------------------------------------ BiasAxis */
+
+// Market Bias is a POSITION on a signed -2.00 -> +2.00 scale, not progress toward a target.
+// A filled bar implies completion and reads as "60% done", which is meaningless for a bias
+// score -- which is why the spec calls this out specifically. The rail is a gradient with a
+// zero tick; the marker is a dot; the value is always also shown as text (rule 8).
+export function BiasAxis({ value, min = -2, max = 2, lowLabel = '\u22122.00 bearish', highLabel = '+2.00 bullish' }: {
+  value: number; min?: number; max?: number; lowLabel?: string; highLabel?: string
+}) {
+  const clamped = Math.max(min, Math.min(max, Number(value) || 0))
+  const pct = ((clamped - min) / (max - min)) * 100
+  return (
+    <div className="ds-axis">
+      <div className="ds-axis__track" role="img" aria-label={`Bias ${fmt.score(value)} on a scale from ${min} to ${max}`}>
+        <div className="ds-axis__rail" />
+        <div className="ds-axis__zero" />
+        <div className="ds-axis__marker" style={{ left: `${pct}%` }} />
+      </div>
+      <div className="ds-axis__scale"><span>{lowLabel}</span><span>0</span><span>{highLabel}</span></div>
+    </div>
+  )
+}
+
 /* ----------------------------------------------------- ScoreBreakdown */
 
 export type ScoreInput = { name: string; value: ReactNode; score: number; weight?: string }
