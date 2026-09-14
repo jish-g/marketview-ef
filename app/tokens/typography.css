@@ -23,7 +23,7 @@
   --text-h3: 20px;
   --text-h2: 26px;
   --text-h1: 24px;       /* screen title -- deliberately smaller than the answer */
-  --text-answer: 34px;   /* THE answer. Largest thing on any screen. */
+  --text-answer: 30px;   /* THE answer. Largest thing on any screen. */
   --text-display: 40px;  /* marketing only */
 
   --leading-tight: 1.15;
