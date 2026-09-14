@@ -325,7 +325,7 @@ button, input { font: inherit; }
 .archive-table-links a { color: var(--ink); text-decoration: none; font-weight: 600; }
 .archive-table-links a:hover { color: var(--action); text-decoration: underline; }
 .archive-table-links em { color: var(--muted); font-style: normal; }
-@media (max-width: 640px) { .archive-hero-tiles { grid-template-columns: 1fr; } .archive-table-head { display: none; } .archive-table-row { grid-template-columns: 1fr 1fr; row-gap: 6px; } }
+
 
 .blog-post-card { display: block; padding: 16px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-sm); text-decoration: none; transition: .15s; }
 .blog-post-card:hover { border-color: var(--ink); }
@@ -404,3 +404,44 @@ button, input { font: inherit; }
   .rules-doc-topbar .brand-mark > div { display: none; }
   .rules-doc-topbar .back-link { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
+
+/* ---- Archive: real table semantics, month grouping, bias filter, pagination ---- */
+.archive-table-toolbar { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: baseline; justify-content: space-between; }
+.archive-filter { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.archive-filter button { min-height: 36px; padding: 0 var(--s-4); border: 0; background: var(--surface); color: var(--muted); font: inherit; font-size: var(--text-meta); font-weight: 600; cursor: pointer; }
+.archive-filter button + button { border-left: 1px solid var(--border); }
+.archive-filter button[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
+.archive-month { margin-top: var(--s-6); }
+.archive-month-heading { margin: 0 0 var(--s-2); color: var(--muted); font-size: var(--text-label); font-weight: 600; letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.archive-table { width: 100%; border-collapse: collapse; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; font-size: var(--text-meta); background: var(--surface); }
+/* The caption names the table for screen readers and for rich results; it is not decorative,
+   so it is clipped rather than display:none, which would remove it from the a11y tree. */
+.archive-table-caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.archive-table th, .archive-table td { padding: var(--s-3) var(--s-4); text-align: left; }
+.archive-table thead th { background: var(--surface-2); color: var(--muted); font-size: var(--text-label); font-weight: 600; letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.archive-table tbody tr { border-top: 1px solid var(--border); }
+.archive-table tbody th { font-weight: 500; color: var(--ink); }
+.archive-table .archive-col-num { text-align: right; font-variant-numeric: tabular-nums; }
+.archive-table-links a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
+.archive-table-links a:hover { color: var(--ink); }
+.archive-table-links em { color: var(--faint); font-style: normal; }
+.archive-empty { margin: var(--s-5) 0; color: var(--muted); font-size: var(--text-meta); }
+.archive-pager { display: flex; gap: var(--s-3); align-items: center; justify-content: center; margin-top: var(--s-6); color: var(--muted); font-size: var(--text-meta); }
+.archive-pager button { min-height: 44px; padding: 0 var(--s-5); border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--surface); color: var(--ink-2); font: inherit; font-size: var(--text-meta); font-weight: 600; cursor: pointer; }
+.archive-pager button:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+.archive-pager button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Below the narrow breakpoint the table reflows to label-above-value cards and KEEPS its
+   column names via data-col -- dropping the headers is exactly what the old
+   `.rule-table-labels { display: none }` got wrong. */
+@media (max-width: 560px) {
+  .archive-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .archive-table tbody tr { display: grid; gap: var(--s-1); padding: var(--s-3) var(--s-4); }
+  .archive-table th, .archive-table td { padding: 0; }
+  .archive-table tbody td { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-4); align-items: baseline; }
+  .archive-table tbody td::before { content: attr(data-col); color: var(--muted); font-size: var(--text-label); font-weight: 600; letter-spacing: var(--tracking-label); text-transform: uppercase; }
+  .archive-table tbody th { padding-bottom: var(--s-1); }
+  .archive-filter { width: 100%; }
+  .archive-filter button { flex: 1 1 0; padding: 0 var(--s-2); }
+}
+.archive-links-inner { display: inline-flex; gap: var(--s-1); align-items: baseline; white-space: nowrap; }
