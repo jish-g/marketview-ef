@@ -76,6 +76,21 @@ ${readSection('Pre-market', pre)}
 
 ${readSection('Post-market', post)}
 
+## Single-metric pages
+
+Each page states the current reading, what the reading means, and which part of the scoring framework consumes it.
+
+| Metric | Page | What it feeds |
+| --- | --- | --- |
+| India VIX | ${SITE_URL}/india-vix-today | Stage 2 Option Readiness -- VIX score |
+| GIFT Nifty gap | ${SITE_URL}/gift-nifty-today | Stage 1 Market Bias -- Gap %, and the predicted Nifty open |
+| Nifty PCR | ${SITE_URL}/nifty-pcr-today | Stage 1 Market Bias -- PCR, fixed 20% weight |
+| Nifty max pain | ${SITE_URL}/nifty-max-pain-today | Stage 1 Market Bias -- Max Pain, fixed 10% weight |
+| Nifty support and resistance | ${SITE_URL}/nifty-support-resistance-today | Stage 1 Market Bias -- OI structure |
+| Nifty option chain analysis | ${SITE_URL}/nse-option-chain-analysis | Stage 1 Market Bias -- OI structure |
+| Sensex option chain | ${SITE_URL}/sensex-option-chain | Sensex Stage 1 inputs |
+| FII and DII flow | ${SITE_URL}/fii-dii-data-today | Context only; not a scored input |
+
 ## Rules engine methodology
 
 ${rulesAsPlainText()}
