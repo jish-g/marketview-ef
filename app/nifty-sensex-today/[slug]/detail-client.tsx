@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, type ReactNode } from 'react'
+import { fmt } from '@/lib/format'
 import { BrandSymbol } from '@/components/brand-mark'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -51,8 +52,7 @@ function bodySections(body: string): { heading: string; paragraphs: string[] }[]
 
 function fmtPct(v: any) {
   if (v === null || v === undefined || v === '') return 'Not available'
-  const n = Number(v)
-  return `${n > 0 ? '+' : ''}${v}%`
+  return fmt.pct(Number(v))
 }
 function fmtNum(v: any, suffix = '') {
   if (v === null || v === undefined || v === '') return 'Not available'

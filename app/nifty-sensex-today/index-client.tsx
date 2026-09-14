@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { fmt } from '@/lib/format'
+import { Band } from '@/components/ui/ds'
 import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import useSWR from 'swr'
@@ -25,8 +27,7 @@ function formatDateLabel(dateStr: string) {
 }
 function fmtPct(v: any) {
   if (v === null || v === undefined || v === '') return 'Not available'
-  const n = Number(v)
-  return `${n > 0 ? '+' : ''}${v}%`
+  return fmt.pct(Number(v))
 }
 function tone(v: any) {
   const n = Number(v)
@@ -226,7 +227,7 @@ export default function NiftySensexTodayIndexClient({ initialPosts, initialMarke
                           </th>
                           <td className={`archive-col-num ${tone(row?.day_change_pct_nifty)}`} data-col="Nifty">{fmtPct(row?.day_change_pct_nifty)}</td>
                           <td className={`archive-col-num ${tone(row?.day_change_pct_sensex)}`} data-col="Sensex">{fmtPct(row?.day_change_pct_sensex)}</td>
-                          <td className="archive-table-cell-bias" data-col="Bias">{bias}</td>
+                          <td className="archive-table-cell-bias" data-col="Bias"><Band scale="bias" value={bias.toLowerCase()} /></td>
                           <td className="archive-table-links" data-col="Read">
                             <span className="archive-links-inner">
                               {g.pre && <Link href={`/nifty-sensex-today/${g.pre.slug}`}>Pre</Link>}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { fmt } from '@/lib/format'
 import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import useSWR from 'swr'
@@ -59,8 +60,7 @@ type HomeClientProps = {
 
 function fmtPct(v: any) {
   if (v === null || v === undefined || v === '') return null
-  const n = Number(v)
-  return `${n > 0 ? '+' : ''}${v}%`
+  return fmt.pct(Number(v))
 }
 function tone(v: any) {
   const n = Number(v)
@@ -133,7 +133,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
   // exist until the market opens at 9:15 AM. What IS genuinely known pre-market is how the
   // prior session closed, so the card shows "Prev close" (% and points) instead of a "Gap" that
   // would otherwise always read null/misleading before the open phase has run.
-  const fmtPrevClose = (pct: any, pts: any) => pct != null ? `${fmtPct(pct)}${pts != null ? ` (${Number(pts) > 0 ? '+' : ''}${Number(pts).toFixed(1)} pts)` : ''}` : null
+  const fmtPrevClose = (pct: any, pts: any) => pct != null ? `${fmtPct(pct)}${pts != null ? ` (${fmt.pts(Number(pts))})` : ''}` : null
   const prevCloseNifty = fmtPrevClose(pre?.prev_day_change_pct_nifty, pre?.prev_day_change_pts_nifty)
   const prevCloseSensex = fmtPrevClose(pre?.prev_day_change_pct_sensex, pre?.prev_day_change_pts_sensex)
 
@@ -142,7 +142,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
   // own close-to-close % move, so it stays honest about what's actually known rather than
   // guessing at bias language.
   const priorDayFallback = priorDay?.day_change_pct_nifty != null
-    ? `Nifty closed ${Number(priorDay.day_change_pct_nifty) >= 0 ? '+' : ''}${priorDay.day_change_pct_nifty}%${priorDay.day_change_pct_sensex != null ? `, Sensex ${Number(priorDay.day_change_pct_sensex) >= 0 ? '+' : ''}${priorDay.day_change_pct_sensex}%` : ''} in the prior session.`
+    ? `Nifty closed ${fmt.pct(Number(priorDay.day_change_pct_nifty))}${priorDay.day_change_pct_sensex != null ? `, Sensex ${fmt.pct(Number(priorDay.day_change_pct_sensex))}` : ''} in the prior session.`
     : null
 
   const readLine = showPost

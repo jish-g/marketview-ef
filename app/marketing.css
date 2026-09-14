@@ -134,3 +134,15 @@
   color: var(--ink-2);
 }
 .landing-shell .landing-cta-secondary:hover { background: var(--surface-2); color: var(--ink); }
+
+/* ---- Daily reads hub, matched to the prototype ----
+   Bias renders as a band badge with its arrow rather than plain text: rule 8, colour is
+   never the only signal. The filter becomes the segmented control the design system uses
+   everywhere else instead of a bespoke button group. */
+.blog-index-shell .archive-table-cell-bias { white-space: nowrap; }
+.blog-index-shell .archive-filter { border-radius: var(--radius-sm); overflow: hidden; }
+.blog-index-shell .archive-filter button { font-size: var(--text-meta); }
+.blog-index-shell .archive-filter button[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
+.blog-index-shell .archive-table-eyebrow,
+.blog-index-shell .archive-month-heading { letter-spacing: var(--tracking-label); }
+.blog-index-shell .archive-table thead th { letter-spacing: var(--tracking-label); }
