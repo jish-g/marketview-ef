@@ -77,6 +77,8 @@ export default async function SensexOptionChainPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(FAQ)) }} />
       <EvergreenPage
+      path="/sensex-option-chain"
+      sourceLabel="NSE option chain"
         eyebrow="Sensex Option Chain"
         h1="Sensex Option Chain Analysis Today"
         updatedISO={updated.iso}

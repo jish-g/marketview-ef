@@ -71,6 +71,8 @@ export default async function NiftySupportResistanceTodayPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(FAQ)) }} />
       <EvergreenPage
+      path="/nifty-support-resistance-today"
+      sourceLabel="NSE option chain"
         eyebrow="Nifty Support & Resistance"
         h1="Nifty Support & Resistance Today"
         updatedISO={updated.iso}

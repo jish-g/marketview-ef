@@ -71,6 +71,8 @@ export default async function GiftNiftyTodayPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(FAQ)) }} />
       <EvergreenPage
+      path="/gift-nifty-today"
+      sourceLabel="NSE option chain"
         eyebrow="GIFT Nifty"
         h1="GIFT Nifty Today"
         updatedISO={updated.iso}

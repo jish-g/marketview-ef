@@ -66,6 +66,8 @@ export default async function NiftyPcrTodayPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(FAQ)) }} />
       <EvergreenPage
+      path="/nifty-pcr-today"
+      sourceLabel="NSE option chain"
         eyebrow="Nifty PCR"
         h1="Nifty PCR Today"
         updatedISO={updated.iso}

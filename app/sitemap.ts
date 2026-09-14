@@ -56,6 +56,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/nifty-sensex-today`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${SITE_URL}/rules`, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${SITE_URL}/about`, changeFrequency: 'monthly', priority: 0.3 },
+    { url: `${SITE_URL}/how-it-works`, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${SITE_URL}/disclaimer`, changeFrequency: 'yearly', priority: 0.2 },
     ...PREMARKET_BACKED_EVERGREEN_PATHS.map((path) => ({
       url: `${SITE_URL}/${path}`,
       lastModified: premarketLastModified,
