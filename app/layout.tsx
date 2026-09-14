@@ -24,7 +24,10 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL('https://marketcue.in'),
   title: 'MarketCue — Trading Dashboard',
-  description: 'A read-only premarket dashboard for Indian equity markets.',
+  // Kept in step with app/page.tsx's META_DESCRIPTION and the Organization schema below.
+  // This is the fallback for routes that declare no metadata of their own -- /dashboard,
+  // /login and /signup -- which previously described the product as something else.
+  description: 'AI-Agentic Option Intelligence for Nifty and Sensex. Rules-based gap, OI, PCR and max-pain reads published before the open and after the close.',
   icons: {
     icon: [
       {

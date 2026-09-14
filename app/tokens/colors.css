@@ -64,7 +64,12 @@
   --ink: #15181c;
   --ink-2: #3b4048;
   --muted: #5f6772;
-  --faint: #8a9099;
+  /* #8a9099 measured 2.98:1 on --ground at 13px -- below the 4.5:1 floor, and this token
+     carries the disclaimer and the data-source attribution on every public page. Darkened
+     along the same hue axis (216deg) to 4.69:1. It now sits close to --muted (5.30:1):
+     the light ramp has no room below 4.5:1, so faint and muted necessarily compress.
+     Dark mode is unaffected -- #9b9a8c already measures 6.43:1 on its ground. */
+  --faint: #696f78;
 
   --up: #137a4b;
   --down: #bb2b2b;
