@@ -12,7 +12,7 @@
 //   - Empty states state a reason. There is no bare em dash (criterion 8).
 
 import type { ReactNode } from 'react'
-import { fmt } from '@/lib/format'
+import { fmt, freshness } from '@/lib/format'
 
 /* ---------------------------------------------------------------- Card */
 
@@ -269,6 +269,64 @@ export function TradeLevels({ variant, targetPts, stopPts, targetRupees, stopRup
   )
 }
 
+/* -------------------------------------------------- CheckpointTimeline */
+
+export type Checkpoint = {
+  time: string            // "10:30"
+  headline: string        // "Bias held neutral"
+  badge: string           // "+0.25 · unchanged"
+  detail: string          // "Nifty −0.41% · PCR 1.02 · VIX 12.4"
+  shifted?: boolean       // a checkpoint whose bias moved
+  note?: string           // one-line explanation, shown only when shifted
+}
+
+// Spec §3: five checkpoint rows. A checkpoint whose bias moved gets card--caution and a
+// one-line explanation; unchanged checkpoints stay neutral, so the eye lands on the one
+// that actually did something.
+export function CheckpointTimeline({ rows }: { rows: Checkpoint[] }) {
+  return (
+    <div className="ds-timeline">
+      {rows.map((r) => (
+        <div className="ds-timeline__row" key={r.time}>
+          <div className="ds-timeline__time">
+            <strong>{r.time}</strong>
+            <small>IST</small>
+          </div>
+          <Card tone={r.shifted ? 'caution' : 'default'} className="ds-timeline__card">
+            <div className="ds-timeline__head">
+              <strong>{r.headline}</strong>
+              <span className={`ds-badge ${r.shifted ? 'ds-badge--caution' : 'ds-badge--neutral'} ds-num`}>{r.badge}</span>
+            </div>
+            <span className="ds-timeline__detail ds-num">{r.detail}</span>
+            {r.shifted && r.note && <span className="ds-timeline__note">{r.note}</span>}
+          </Card>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------- Progress */
+
+// Spec §2: `.progress` is ONLY for genuine progress toward a target. Anything on a signed
+// scale uses BiasAxis instead.
+export function Progress({ value, max = 100, label }: { value: number; max?: number; label?: string }) {
+  const pct = Math.max(0, Math.min(100, (value / max) * 100))
+  return (
+    <div className="ds-progress-wrap">
+      {label && (
+        <div className="ds-progress-head">
+          <span>{label}</span>
+          <span className="ds-num">{Math.round(pct)}%</span>
+        </div>
+      )}
+      <div className="ds-progress" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+        <span style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
 /* ----------------------------------------------------------- Chrome */
 
 export function PhaseHeader({ eyebrow, title, aside }: { eyebrow: ReactNode; title: ReactNode; aside?: ReactNode }) {
@@ -279,6 +337,19 @@ export function PhaseHeader({ eyebrow, title, aside }: { eyebrow: ReactNode; tit
         <h2 className="ds-phase-head__title">{title}</h2>
       </div>
       {aside != null && <div className="ds-phase-head__aside">{aside}</div>}
+    </div>
+  )
+}
+
+
+// Rule 6: every screen carries the same furniture -- when the reading was captured and
+// whether it is system-derived. Several screens showed a static caption or a bare date.
+export function PhaseAside({ capturedAt, source = 'system' }: { capturedAt?: string | null; source?: 'system' | 'manual' }) {
+  const stamp = freshness(capturedAt ?? null, false)
+  return (
+    <div className="phase-head-aside">
+      <FreshnessStamp state={stamp.state} label={stamp.label} capturedAt={capturedAt ?? null} />
+      <ProvenanceBadge source={source} />
     </div>
   )
 }

@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { PhaseAside } from '@/components/ui/ds'
+import { Progress } from '@/components/ui/ds'
 import useSWR from 'swr'
 import { CheckCircle2, ArrowDown, RotateCcw } from 'lucide-react'
 import { calculateVerdict } from '@/app/dashboard/page'
@@ -243,7 +245,7 @@ export function TradeView() {
   const rows = [...trades].filter(matchesFilter).sort((a, b) => `${b.trade_date}-${b.instrument}`.localeCompare(`${a.trade_date}-${a.instrument}`))
 
   return <section className="phase-view trade-page">
-    <div className="review-section-head"><div><p className="eyebrow">Execution desk</p><h2>Trade</h2></div><span>{tradeDate}</span></div>
+    <div className="review-section-head"><div><p className="eyebrow">Execution desk</p><h2>Trade</h2></div><PhaseAside capturedAt={tradeDate} source="manual" /></div>
     {error && <p className="history-empty">Unable to load trade data right now.</p>}
     <div className="source-toggle" role="group" aria-label="Filter by trade source">
       <button type="button" className={sourceFilter === 'all' ? 'is-active' : ''} aria-pressed={sourceFilter === 'all'} onClick={() => setSourceFilter('all')}>All trades</button>
@@ -297,7 +299,7 @@ export function TradeView() {
                 <div><span>Current premium</span><b>{`₹${current.toFixed(2)}`}</b></div>
                 {distance != null && <div><span>Distance to target</span><b>{`₹${distance.toFixed(2)} away`}</b></div>}
               </div>
-              <div className="trade-open-bar"><div className="trade-open-bar-fill" style={{ width: `${progressPct}%` }} /></div>
+              <Progress value={progressPct} label="Progress to target" />
               <div className="trade-open-levels"><span>Stop {stopCons != null ? stopCons.toFixed(2) : 'Not available'}</span><span>Target (cons.) {targetCons != null ? targetCons.toFixed(2) : 'Not available'}</span></div>
               <p className="trade-open-checked">Last checked {trade.last_checked_at ? formatTime(trade.last_checked_at) : 'Not available'} — rechecks every 5 min</p>
             </div>

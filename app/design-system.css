@@ -198,3 +198,25 @@
 /* Progress is ONLY for genuine progress toward a target (spec §2). */
 .ds-progress { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
 .ds-progress span { display: block; height: 100%; background: var(--up); }
+
+/* --- checkpoint timeline (spec §2, §3) --- */
+.ds-timeline { display: grid; gap: 10px; }
+.ds-timeline__row { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: var(--s-4); align-items: start; }
+.ds-timeline__time { text-align: right; padding-top: var(--s-4); }
+.ds-timeline__time strong { display: block; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+.ds-timeline__time small { display: block; font-size: var(--text-label); color: var(--muted); }
+.ds-timeline__card { display: grid; gap: var(--s-2); }
+.ds-timeline__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ds-timeline__head strong { font-size: var(--text-body); font-weight: 600; color: var(--ink); }
+.ds-timeline__detail { font-size: var(--text-meta); color: var(--ink-2); }
+.ds-timeline__note { font-size: var(--text-meta); color: var(--caution-ink); }
+@media (max-width: 560px) {
+  .ds-timeline__row { grid-template-columns: 1fr; gap: var(--s-2); }
+  .ds-timeline__time { text-align: left; padding-top: 0; display: flex; gap: var(--s-2); align-items: baseline; }
+}
+
+/* --- progress: genuine progress toward a target only --- */
+.ds-progress-wrap { display: grid; gap: 6px; }
+.ds-progress-head { display: flex; align-items: baseline; justify-content: space-between; font-size: var(--text-meta); color: var(--muted); }
+.ds-progress { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.ds-progress span { display: block; height: 100%; background: var(--up); }

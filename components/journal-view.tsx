@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
+import { PhaseAside } from '@/components/ui/ds'
 import useSWR from 'swr'
 import { CheckCircle2, ImagePlus, RotateCcw, Eye, EyeOff, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -211,7 +212,7 @@ export function JournalView() {
   }
 
   return <section className="phase-view journal-view">
-    <div className="review-section-head"><div><p className="eyebrow">End of day</p><h2>Journal</h2></div><span>{tradeDate}</span></div>
+    <div className="review-section-head"><div><p className="eyebrow">End of day</p><h2>Journal</h2></div><PhaseAside capturedAt={tradeDate} source="manual" /></div>
     {error && <p className="history-empty">Unable to load journal data right now.</p>}
 
     <p className="eyebrow">Today&apos;s trades</p>
@@ -248,7 +249,7 @@ export function JournalView() {
       {uploadError && <p className="history-empty">Could not upload: {uploadError}</p>}
       {saveError && <p className="history-empty">Could not save: {saveError}</p>}
       <div className="trade-confirmation">
-        <button type="button" className="action-button action-button-success" onClick={submitEntry} disabled={saving || !noteText.trim()}>
+        <button type="button" className="action-button action-button-primary" onClick={submitEntry} disabled={saving || !noteText.trim()}>
           <CheckCircle2 size={14} /> {saving ? 'Saving...' : existingEntryForEditingDate ? 'Save changes' : 'Save entry'}
         </button>
         <button type="button" className="action-button" onClick={() => fileInputRef.current?.click()} disabled={uploadingCount > 0}>
