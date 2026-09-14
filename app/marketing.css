@@ -146,3 +146,13 @@
 .blog-index-shell .archive-table-eyebrow,
 .blog-index-shell .archive-month-heading { letter-spacing: var(--tracking-label); }
 .blog-index-shell .archive-table thead th { letter-spacing: var(--tracking-label); }
+
+/* With the trailing clause removed the headline is eleven words, but it still sits in a
+   ~520px column, and at the inherited 54px that ran to five lines and 302px of height --
+   which is the "heavy first fold". --text-display (40px) is the design system's marketing
+   step, so the size comes from the scale rather than a number picked to fit. */
+.landing-shell .landing-headline {
+  font-size: clamp(28px, 3.4vw, var(--text-display));
+  line-height: 1.12;
+  letter-spacing: var(--tracking-display);
+}
