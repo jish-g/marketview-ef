@@ -514,3 +514,72 @@ button, input { font: inherit; }
 .evergreen-source { margin-top: var(--s-3); color: var(--faint); font-size: var(--text-meta); }
 .evergreen-related ul { margin: var(--s-3) 0 0; padding-left: 1.1em; color: var(--ink-2); font-size: var(--text-body); line-height: var(--leading-body); }
 .evergreen-related li { margin-bottom: var(--s-2); }
+
+/* ---- Dashboard shell, matched to the prototype ---- */
+
+/* Worded toggles rather than icon buttons: the prototype labels them, which removes the
+   guess about what a sun or a circular arrow does. */
+.topbar-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 34px; padding: 0 var(--s-3);
+  border: 1px solid var(--border); border-radius: var(--radius-full);
+  background: var(--surface); color: var(--ink-2);
+  font: inherit; font-size: var(--text-meta); font-weight: 600;
+  text-decoration: none; cursor: pointer;
+  transition: background var(--dur-base) var(--ease), color var(--dur-base) var(--ease);
+}
+.topbar-toggle:hover { background: var(--surface-2); color: var(--ink); }
+
+/* The session map drops its per-item icon and chevron: beside a title and a subtitle they
+   carried no information, and removing them lets the label breathe. */
+.phase-nav {
+  width: 100%; gap: 0; min-height: 44px;
+  padding: var(--s-3); border: 0; border-radius: var(--radius-sm);
+  background: none; color: var(--muted); text-align: left; cursor: pointer;
+}
+.phase-nav span { display: grid; gap: 2px; }
+.phase-nav strong { display: block; font-size: 14px; font-weight: 600; color: inherit; }
+.phase-nav small { display: block; font-size: var(--text-meta); color: var(--muted); }
+.phase-nav:hover { background: var(--surface-2); color: var(--ink); }
+.phase-nav.active { background: var(--surface-2); color: var(--ink); }
+.phase-nav.active strong { color: var(--ink); }
+
+/* Rule 6 again: where the numbers came from, pinned to the shell rather than buried. */
+.side-source { display: grid; gap: var(--s-1); padding: 0 var(--s-3); }
+.side-source strong { color: var(--ink-2); font-size: var(--text-meta); font-weight: 600; }
+.side-source small { color: var(--faint); font-size: var(--text-label); font-variant-numeric: tabular-nums; }
+
+.phase-head-aside { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
+
+@media (max-width: 760px) {
+  .topbar-toggle { min-height: 44px; }
+  .phase-head-aside { width: 100%; }
+}
+
+/* The recap is context for the thesis, so it sits beside it rather than below -- the
+   prototype's layout. Collapses to one column before the tiles get too narrow to read. */
+.thesis-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--s-4); align-items: start; margin-bottom: var(--s-5); }
+.thesis-row .thesis-hero { margin-bottom: 0; height: 100%; }
+.thesis-row .prior-sessions-banner { margin: 0; height: 100%; }
+@media (max-width: 900px) { .thesis-row { grid-template-columns: 1fr; } }
+
+/* Verdict, answer-first: the recommendation at hero weight with its two scores beside it,
+   before any control. Previously the answer was a sentence inside a "Your strategy" box and
+   the scores were prose lines under "Day summary" -- the reader had to assemble it. */
+.verdict-answer { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: var(--s-4); align-items: start; margin-bottom: var(--s-4); }
+.verdict-answer-main {
+  display: grid; gap: var(--s-3); align-content: start;
+  padding: var(--s-6); border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--caution) 9%, var(--ground));
+  border: 1px solid color-mix(in srgb, var(--caution) 45%, transparent);
+}
+.verdict-answer-value { font-size: var(--text-h1); font-weight: 600; line-height: var(--leading-tight); letter-spacing: var(--tracking-display); color: var(--ink); }
+.verdict-answer-note { margin: 0; color: var(--ink-2); font-size: var(--text-body); line-height: var(--leading-body); }
+.verdict-answer-scores { display: grid; gap: var(--s-3); }
+.verdict-score-card { display: grid; gap: var(--s-2); padding: var(--s-5); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.verdict-score-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); }
+.verdict-score-num { font-weight: 600; color: var(--ink); }
+.verdict-score-band { font-size: var(--text-h3); font-weight: 600; color: var(--ink); }
+.verdict-score-band.is-caution { color: var(--caution-ink); }
+.verdict-score-note { color: var(--muted); font-size: var(--text-meta); }
+@media (max-width: 900px) { .verdict-answer { grid-template-columns: 1fr; } .verdict-answer-main { padding: var(--s-4); } }
