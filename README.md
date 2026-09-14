@@ -22,6 +22,20 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+### Previewing protected routes locally
+
+`/dashboard` and `/rules` sit behind `AuthGuard` and redirect to `/login` without a session.
+For layout work (responsive QA in particular) you can render them signed-out by adding this to
+`.env.local` and restarting `pnpm dev`:
+
+```
+NEXT_PUBLIC_DEV_BYPASS_AUTH=true
+```
+
+This only works under `next dev`. `components/auth-guard.tsx` also requires `NODE_ENV === 'development'`,
+which the bundler folds to `false` during `next build`, so the flag cannot weaken the guard in a deployed
+build regardless of how the hosting environment is configured.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 ## Learn More
