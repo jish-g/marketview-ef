@@ -600,3 +600,94 @@ button, input { font: inherit; }
 /* Spec §5: every figure gets tabular-nums so decimals line up vertically. Plex Sans provides
    them, which is why monospace is no longer needed for alignment. */
 .app-shell, .rules-doc-shell, .landing-shell, .blog-index-shell, .blog-post-shell { font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   Visual parity with design/marketcue-dashboard.html (spec §8.1).
+   Values copied from the reference's own rules, not eyeballed:
+     .metric   { gap: 6px; padding: var(--s-4) }
+     .metric__value { font-size: var(--text-value-sm); font-weight: 600 }
+     .metric__sub   { font-size: var(--text-meta); color: var(--ink-2) }
+     .grid--4  { repeat(auto-fit, minmax(200px, 1fr)); gap: 10px }
+     .label    { 12px/600/.08em uppercase, --muted }
+     .section-title { 15px/600/-.01em, --ink, sentence case }
+   ============================================================ */
+
+/* Evidence grid: 4-up and compact, not 3-up and tall. */
+.app-shell .field-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+.app-shell .field-card {
+  min-height: 0;
+  gap: 6px;
+  padding: var(--s-4);
+  border-radius: var(--radius-md);
+  justify-content: flex-start;
+}
+/* Tile label: uppercase muted, per .label. It was sentence-case ink-2. */
+.app-shell .field-card > span {
+  color: var(--muted);
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+/* Tile value: the reference sets no negative tracking here; -.04em was making
+   the figures look condensed against the design. */
+.app-shell .field-card strong {
+  margin-top: 0;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+/* Sub-line: a real colour step, not an opacity fade. Opacity dimmed the coloured
+   OI readings too, which the reference keeps at full strength. */
+.app-shell .field-card small,
+.app-shell .field-card em {
+  opacity: 1;
+  color: var(--ink-2);
+  font-size: var(--text-meta);
+}
+
+/* Section title: 15px sentence-case ink. It was rendering as another 12px
+   uppercase label, so the groups read as tile labels rather than headings. */
+.app-shell .group-heading {
+  border-bottom: 0;
+  padding-bottom: 0;
+  align-items: baseline;
+}
+.app-shell .group-heading h3 {
+  font-size: var(--text-body);
+  font-weight: 600;
+  letter-spacing: -.01em;
+  text-transform: none;
+  color: var(--ink);
+}
+
+/* The thesis card is card--raised in the reference: --surface-2, not --surface. */
+.thesis-hero { background: var(--surface-2); }
+
+/* Rule 1 allows the OI *interpretation* to carry colour on the sub-line while the
+   level itself stays ink — "Addition · strengthening +1" green, "capping −1" red.
+   Removing the colour entirely went a step further than the spec asks. */
+.app-shell .oi-action.is-strengthening { color: var(--up); }
+.app-shell .oi-action.is-capping { color: var(--down); }
+
+/* Topbar theme control, per the reference: a segmented Dark|Light pair showing which mode is
+   active, rather than one button labelled with the mode you would switch to. */
+.topbar-segmented { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.topbar-segmented button {
+  min-height: 36px; padding: 0 14px; border: 0; background: var(--surface);
+  color: var(--muted); font: inherit; font-size: var(--text-meta); font-weight: 600; cursor: pointer;
+}
+.topbar-segmented button + button { border-left: 1px solid var(--border); }
+.topbar-segmented button[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
+@media (max-width: 760px) { .topbar-segmented button { min-height: 44px; } }
+
+/* App lockup is mark + name only; the reference topbar carries no sub-label. */
+.app-shell .brand-mark span { display: none; }
+
+/* The shared row (event / VIX / GIFT gap) holds three tiles, and auto-fit stretches a short
+   row to fill the width -- so those three rendered much wider than the eight evidence tiles
+   beside them. auto-fill keeps the track size, so every tile on the screen matches. */
+.app-shell .common-group .field-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
