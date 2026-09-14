@@ -52,6 +52,21 @@ MarketCue publishes descriptive market reads for the Nifty 50 and Sensex indices
 - [Homepage](${SITE_URL}/): Live pre-market or post-market snapshot for today, depending on time of day.
 - [Nifty & Sensex Today](${SITE_URL}/nifty-sensex-today): Full archive of daily pre-market and post-market reads.
 - [How the rules engine works](${SITE_URL}/rules): The documented scoring framework behind every read.
+- [How MarketCue works](${SITE_URL}/how-it-works): The three-stage scoring method in plain prose.
+- [Disclaimer](${SITE_URL}/disclaimer): What MarketCue is and is not. Not investment advice.
+
+## Today's numbers
+
+Each page states the current reading, what the reading means, and which part of the scoring framework consumes it.
+
+- [India VIX today](${SITE_URL}/india-vix-today): Volatility level and its Option Readiness score.
+- [GIFT Nifty today](${SITE_URL}/gift-nifty-today): Overnight gap and the predicted Nifty open it implies.
+- [Nifty PCR today](${SITE_URL}/nifty-pcr-today): Put-Call Ratio and its Market Bias contribution.
+- [Nifty max pain today](${SITE_URL}/nifty-max-pain-today): Max pain strike and the pull it implies.
+- [Nifty support and resistance today](${SITE_URL}/nifty-support-resistance-today): Chart and open-interest levels.
+- [Nifty option chain analysis](${SITE_URL}/nse-option-chain-analysis): Open-interest structure read.
+- [Sensex option chain](${SITE_URL}/sensex-option-chain): Sensex open-interest structure read.
+- [FII and DII data today](${SITE_URL}/fii-dii-data-today): Institutional net flow for the session.
 
 ## Recent reads
 

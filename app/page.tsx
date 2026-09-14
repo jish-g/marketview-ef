@@ -14,9 +14,13 @@ const SUPABASE_KEY =
 const POSITIONING_DESCRIPTION =
   'MarketCue is an AI-Agentic Option Intelligence Platform for Indian Stock Market — reading data continuously through the trading day and turning it into a decision, not another chart to interpret.'
 
+// Meta descriptions truncate around 160 characters in Google's SERP.
+const META_DESCRIPTION =
+  'AI-Agentic Option Intelligence for Nifty and Sensex. Rules-based gap, OI, PCR and max-pain reads published before the open and after the close.'
+
 export const metadata: Metadata = {
   title: 'AI-Agentic Option Intelligence Platform for Indian Stock Market | MarketCue',
-  description: POSITIONING_DESCRIPTION,
+  description: META_DESCRIPTION,
   alternates: { canonical: `${SITE_URL}/` },
   openGraph: {
     title: 'MarketCue — AI-Agentic Option Intelligence Platform for Indian Stock Market',

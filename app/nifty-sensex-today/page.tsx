@@ -25,12 +25,14 @@ export const metadata: Metadata = {
     url: `${SITE_URL}/nifty-sensex-today`,
     siteName: 'MarketCue',
     type: 'website',
+    images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630, alt: 'MarketCue — daily Nifty and Sensex reads' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Nifty & Sensex Today — Daily pre-market and post-market reads',
     description:
       'Daily gap, PCR, Max Pain, and option-readiness reads for Nifty and Sensex — published before the open and after the close.',
+    images: [`${SITE_URL}/opengraph-image`],
   },
 }
 
@@ -72,11 +74,20 @@ async function getIndexData() {
   return { initialPosts, initialMarketRows }
 }
 
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'MarketCue', item: 'https://marketcue.in' },
+    { '@type': 'ListItem', position: 2, name: 'Nifty and Sensex today', item: 'https://marketcue.in/nifty-sensex-today' },
+  ],
+}
+
 export default async function Page() {
   const { initialPosts, initialMarketRows } = await getIndexData()
 
   return (
-    <>
+    <><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger

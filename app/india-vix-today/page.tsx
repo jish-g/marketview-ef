@@ -66,6 +66,8 @@ export default async function IndiaVixTodayPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(FAQ)) }} />
       <EvergreenPage
+      path="/india-vix-today"
+      sourceLabel="NSE option chain"
         eyebrow="India VIX"
         h1="India VIX Today"
         updatedISO={updated.iso}

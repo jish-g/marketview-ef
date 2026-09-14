@@ -5,7 +5,7 @@ import { BarChart3 } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'How MarketCue works — the three-stage scoring framework',
-  description: 'MarketCue scores Nifty and Sensex options data in three stages — market bias, option readiness, then a strategy recommendation. Every output traces to a published rule.',
+  description: 'MarketCue scores Nifty and Sensex options data in three stages: market bias, option readiness, then a strategy recommendation. Every output traces to a rule.',
   alternates: { canonical: '/how-it-works' },
 }
 
