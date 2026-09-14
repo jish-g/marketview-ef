@@ -29,5 +29,9 @@
   --leading-tight: 1.15;
   --leading-body: 1.6;
   --tracking-label: 0.08em;
-  --tracking-display: -0.02em;
+  /* Tracking tightens as type grows -- large text set at small-text spacing reads swollen.
+     This was -0.02em while h1/h2 already use -0.035em, so the 30px answer was set WIDER per
+     character than the 24px title above it. That inversion is what made it look bulged, and
+     it is why reducing the size twice did not fix it. */
+  --tracking-display: -0.035em;
 }
