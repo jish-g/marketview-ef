@@ -85,7 +85,7 @@ export function EvergreenPage({ eyebrow, h1, updatedISO, updatedLabel, metricLab
 
           <section className="doc-section">
             <table className="blog-metrics-table">
-              <caption className="visually-hidden">{`${metricLabel}: current value and reading, updated ${updatedLabel}`}</caption>
+              <caption className="visually-hidden">{`${metricLabel}: current value and reading. ${updatedLabel}`}</caption>
               <thead><tr><th scope="col">Metric</th><th scope="col">Value</th><th scope="col">Read</th></tr></thead>
               <tbody>
                 {tableRows.map((row) => (
