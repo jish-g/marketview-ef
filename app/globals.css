@@ -385,3 +385,12 @@ button, input { font: inherit; }
   .semantic-info { position: static; }
   .semantic-tooltip { position: fixed; left: var(--s-4); right: var(--s-4); width: auto; max-width: none; }
 }
+
+/* Rule 4: answer first, evidence under it. */
+.thesis-hero { margin-bottom: var(--s-5); padding: var(--s-6); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.thesis-hero-main { display: grid; gap: var(--s-3); max-width: 520px; }
+.thesis-hero-value { font-size: var(--text-h1); font-weight: 600; line-height: var(--leading-tight); letter-spacing: var(--tracking-display); color: var(--ink); }
+.thesis-hero-note { margin: 0; color: var(--ink-2); font-size: var(--text-meta); }
+.thesis-hero .action-button { justify-self: start; min-height: 44px; }
+.field-empty-headline { color: var(--ink-2); font-size: var(--text-value); font-weight: 600; }
+.field-empty-reason { display: block; margin-top: var(--s-1); color: var(--muted); font-size: var(--text-meta); line-height: 1.45; }
