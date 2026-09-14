@@ -12,12 +12,6 @@
    ============================================================ */
 
 .ds {
-  /* See the collision note at the foot of app/tokens/colors.css. Phase 2 deletes these
-     three lines along with the legacy token blocks, and the names below resolve directly. */
-  --border: var(--ds-border);
-  --muted: var(--ds-muted);
-  --ring: var(--ds-ring);
-
   background: var(--ground);
   color: var(--ink);
   font-family: var(--font-sans);
