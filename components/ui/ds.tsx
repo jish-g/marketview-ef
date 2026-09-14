@@ -16,7 +16,7 @@ import { fmt, freshness } from '@/lib/format'
 
 /* ---------------------------------------------------------------- Card */
 
-export type CardTone = 'default' | 'caution' | 'up' | 'down' | 'empty'
+export type CardTone = 'default' | 'caution' | 'up' | 'down' | 'empty' | 'raised'
 
 export function Card({ tone = 'default', flush, className, children }: {
   tone?: CardTone; flush?: boolean; className?: string; children: ReactNode
@@ -241,16 +241,22 @@ export function ProvenanceBadge({ source }: { source: 'system' | 'manual' }) {
 
 // Rule 5: a stop-loss is never shown without its target, and never in lighter type.
 // The component takes both or neither, so the pairing cannot be broken by a caller.
-export function TradeLevels({ variant, targetPts, stopPts, targetRupees, stopRupees }: {
+export function TradeLevels({ variant, targetPts, stopPts, targetRupees, stopRupees, heading, total }: {
   variant: 'conservative' | 'aggressive'
   targetPts: number | null | undefined
   stopPts: number | null | undefined
   targetRupees?: number | null
   stopRupees?: number | null
+  /** Market open shows the instrument and the expected move on one spread row above the
+   *  levels ("Nifty - conservative ... 151.9 pts"). Verdict keeps the plain "If taken" label. */
+  heading?: ReactNode
+  total?: ReactNode
 }) {
   return (
-    <Card className="ds-levels">
-      <Label>If taken — {variant}</Label>
+    <Card className={cx('ds-levels', heading != null && 'ds-levels--headed')}>
+      {heading != null
+        ? <div className="ds-levels__head"><Label>{heading}</Label><strong className="ds-levels__total">{total}</strong></div>
+        : <Label>If taken — {variant}</Label>}
       <div className="ds-levels__row">
         <span className="ds-levels__key"><span aria-hidden="true">↑</span> Target</span>
         <span className="ds-levels__val">
