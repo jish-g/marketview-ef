@@ -50,7 +50,7 @@ export function EvergreenPage({ eyebrow, h1, updatedISO, updatedLabel, metricLab
               <thead><tr><th scope="col">Metric</th><th scope="col">Value</th><th scope="col">Read</th></tr></thead>
               <tbody>
                 {tableRows.map((row) => (
-                  <tr key={row.metric}><th scope="row">{row.metric}</th><td>{row.value}</td><td>{row.read}</td></tr>
+                  <tr key={row.metric}><th scope="row">{row.metric}</th><td data-col="Value">{row.value}</td><td data-col="Read">{row.read}</td></tr>
                 ))}
               </tbody>
             </table>

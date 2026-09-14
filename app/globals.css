@@ -445,3 +445,65 @@ button, input { font: inherit; }
   .archive-filter button { flex: 1 1 0; padding: 0 var(--s-2); }
 }
 .archive-links-inner { display: inline-flex; gap: var(--s-1); align-items: baseline; white-space: nowrap; }
+
+/* ============================================================
+   Mobile audit fixes
+   ============================================================ */
+
+/* iOS Safari auto-zooms the viewport when a focused form field is under 16px, and there is
+   no way to dismiss that zoom without a manual pinch. Every sign-in and sign-up field was
+   13px, so the page jumped on first tap. 16px is the threshold, not a preference. */
+@media (max-width: 760px) {
+  .login-field input, .login-field select, .login-field textarea,
+  input[type="email"], input[type="password"], input[type="text"], input[type="number"], select, textarea {
+    font-size: 16px;
+  }
+}
+
+/* The single-metric pages carry a real table that is ~348px wide and was overflowing a
+   320px viewport. It reflows to label-above-value cards and keeps its column names via
+   data-col, matching the archive. */
+@media (max-width: 560px) {
+  .blog-metrics-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .blog-metrics-table tbody tr { display: grid; gap: var(--s-1); padding: var(--s-3) var(--s-4); }
+  .blog-metrics-table th, .blog-metrics-table td { padding: 0; }
+  .blog-metrics-table tbody td { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-4); align-items: baseline; }
+  .blog-metrics-table tbody td::before {
+    content: attr(data-col);
+    color: var(--muted); font-size: var(--text-label); font-weight: 600;
+    letter-spacing: var(--tracking-label); text-transform: uppercase;
+  }
+  .blog-metrics-table tbody th { padding-bottom: var(--s-1); color: var(--ink); }
+}
+
+/* 44px minimum touch target on controls. Scoped to the mobile layouts so desktop keeps its
+   density -- these are the same controls, just given a bigger tap area rather than a bigger
+   look. Inline links inside prose are deliberately excluded: padding them to 44px would
+   break the line box of the paragraph they sit in. */
+@media (max-width: 760px) {
+  .icon-button, .mobile-menu, .landing-menu-toggle { min-width: 44px; min-height: 44px; }
+  .sign-in-link, .oauth-button, .action-button { min-height: 44px; }
+  .login-field input { min-height: 44px; }
+  /* Links that act as navigation rather than prose: grow the hit area, not the text. */
+  .back-link, .rules-doc-nav a, .landing-footer-col a, .blog-brand-mark, .brand-mark {
+    display: inline-flex; align-items: center; min-height: 44px;
+  }
+  .landing-footer-col a { padding-block: var(--s-1); }
+  /* The tooltip trigger is a 20px circle by design; the tap area grows around it. */
+  .semantic-info { position: relative; }
+  .semantic-info::after { content: ''; position: absolute; inset: -12px; }
+}
+@media (max-width: 760px) {
+  /* 43.5px rounds under the threshold on these two. */
+  .landing-cta-primary, .landing-cta-secondary { min-height: 44px; }
+  /* Archive bias filter: 36px pills in a row are the easiest thing on the page to mis-tap. */
+  .archive-filter button { min-height: 44px; }
+  /* "Read the full pre-market" sits alone under the snapshot card, so it can take the space. */
+  .landing-snapshot-link a { display: inline-flex; align-items: center; min-height: 44px; }
+}
+@media (max-width: 760px) {
+  /* The archive's Pre / Post links sit in table rows, which the handoff calls out explicitly
+     for the 44px minimum. In the reflowed card they already occupy their own line, so the
+     tap area costs one row-height rather than two. */
+  .archive-links-inner a { display: inline-flex; align-items: center; min-height: 44px; padding-inline: var(--s-1); }
+}
