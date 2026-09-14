@@ -756,3 +756,67 @@ button, input { font: inherit; }
 }
 .landing-footer-summary a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
 .landing-footer-summary a:hover { color: var(--ink); }
+
+/* ============================================================
+   Marketing readability.
+   The token scale is tuned for the dashboard, where density is the point and 13px body is
+   right. Applied to marketing prose it read as small next to comparable platforms, which
+   run 16-18px. These sizes are scoped to .landing-shell so the dashboard is untouched.
+   ============================================================ */
+.landing-shell { --read: 17px; --read-sm: 15px; }
+.landing-shell .landing-body-text,
+.landing-shell .landing-diff-card p,
+.landing-shell .landing-how-card p,
+.landing-shell .landing-feature p,
+.landing-shell .landing-testimonial-quote {
+  font-size: var(--read); line-height: 1.65;
+}
+.landing-shell .landing-diff-card strong,
+.landing-shell .landing-how-card strong,
+.landing-shell .landing-feature strong {
+  font-size: var(--read-sm);
+}
+.landing-shell .landing-testimonial-author span,
+.landing-shell .landing-snapshot-note p,
+.landing-shell .landing-footer-summary { font-size: var(--read-sm); line-height: 1.6; }
+
+/* ---- What you get ---- */
+.landing-features-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 18px; margin: 18px 0 0; padding: 0; list-style: none;
+}
+.landing-feature {
+  display: grid; gap: 7px; align-content: start;
+  padding: 20px; border: 1px solid var(--border);
+  border-radius: var(--radius-md); background: var(--surface);
+}
+.landing-feature strong { color: var(--ink); font-weight: 600; letter-spacing: -.01em; }
+.landing-feature p { margin: 0; color: var(--muted); }
+
+/* ---- About ---- */
+.landing-about { padding: 64px 0; }
+.landing-about-inner { display: grid; gap: 14px; max-width: 74ch; }
+.landing-about-links { display: flex; flex-wrap: wrap; gap: 20px; margin: 6px 0 0; }
+.landing-about-links a {
+  color: var(--ink-2); font-size: var(--read-sm); font-weight: 600;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.landing-about-links a:hover { color: var(--ink); }
+
+/* ---- First-fold preview motion ----
+   The card's pre/post state is driven by the time of day, so it is never animated between
+   the two -- cycling would show a post-market read during pre-market hours and label it
+   live. What animates is the arrival: the card rises in, its rows stagger, and the live dot
+   breathes. Entirely CSS, and the whole block is off under prefers-reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .landing-snapshot-card { animation: mc-rise 620ms cubic-bezier(.22,.61,.36,1) both; }
+  .landing-snapshot-rows .landing-snapshot-row { animation: mc-fade 520ms ease-out both; }
+  .landing-snapshot-rows .landing-snapshot-row:nth-child(1) { animation-delay: 180ms; }
+  .landing-snapshot-rows .landing-snapshot-row:nth-child(3) { animation-delay: 300ms; }
+  .landing-snapshot-vix,
+  .landing-snapshot-note { animation: mc-fade 520ms ease-out 400ms both; }
+  .landing-live-dot { animation: mc-pulse 2.4s ease-in-out infinite; }
+}
+@keyframes mc-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes mc-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes mc-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
