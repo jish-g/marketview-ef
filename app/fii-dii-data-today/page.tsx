@@ -32,7 +32,7 @@ const FAQ: FaqItem[] = [
 ]
 
 function flowRead(v: any): string {
-  if (v == null || v === '') return '—'
+  if (v == null || v === '') return 'Not available'
   const n = Number(v)
   if (n > 0) return 'Net buyer'
   if (n < 0) return 'Net seller'
@@ -61,8 +61,8 @@ export default async function FiiDiiDataTodayPage() {
   const asOfDisplay = asOfLabel ? formatDateLabel(asOfLabel) : 'unavailable'
 
   const tableRows = [
-    { metric: 'FII Net Cash Flow', value: fii != null ? `₹${fii} Cr` : '—', read: flowRead(fii) },
-    { metric: 'DII Net Cash Flow', value: dii != null ? `₹${dii} Cr` : '—', read: flowRead(dii) },
+    { metric: 'FII Net Cash Flow', value: fii != null ? `₹${fii} Cr` : 'Not available', read: flowRead(fii) },
+    { metric: 'DII Net Cash Flow', value: dii != null ? `₹${dii} Cr` : 'Not available', read: flowRead(dii) },
   ]
 
   const paragraphs = [
@@ -81,7 +81,7 @@ export default async function FiiDiiDataTodayPage() {
         updatedISO={updated.iso}
         updatedLabel={updated.label}
         metricLabel="FII Net Flow"
-        metricValue={fii != null ? `₹${fii} Cr` : '—'}
+        metricValue={fii != null ? `₹${fii} Cr` : 'Not available'}
         metricSub={`As of ${asOfDisplay} — DII ₹${fmtNum(dii)} Cr`}
         tableRows={tableRows}
         paragraphs={paragraphs}

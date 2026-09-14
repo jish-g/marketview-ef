@@ -6,6 +6,7 @@
 @import './tokens/spacing.css';
 @import './tokens/radius.css';
 @import './tokens/motion.css';
+@import './design-system.css';
 @custom-variant dark (&:is(.dark *));
 @theme inline { --color-background: var(--ground); --color-foreground: var(--ink); --color-card: var(--surface); --color-card-foreground: var(--ink); --color-muted: var(--surface-2); --color-muted-foreground: var(--surface-2); --color-border: var(--border); --color-input: var(--border); --color-primary: var(--action); --color-primary-foreground: var(--action-ink); --color-accent: var(--surface-2); --color-accent-foreground: var(--ink); --color-ring: var(--ring); --radius-md: var(--radius-md); --font-sans: var(--font-sans); --font-mono: var(--font-mono); }
 :root { color-scheme: dark; }
@@ -15,7 +16,7 @@
 
 @layer base { * { @apply border-border outline-ring/50; } html { background: var(--ground); } body { @apply bg-background text-foreground; margin: 0; } }
 button, input { font: inherit; }
-html, body { overflow-x: hidden; }
+/* overflow-x mask removed -- see item 10; the real cause is fixed at source. */
 .app-shell { min-height: 100vh; overflow-x: clip; background: var(--ground); color: var(--ink); font-family: ui-sans-serif, system-ui, sans-serif; }
 .topbar { height: 68px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--ground) 92%, transparent); }
 .brand-mark, .topbar-meta, .head-actions, .action-button, .icon-button, .phase-nav, .side-footer, .interpretation, .data-footer { display: flex; align-items: center; }
@@ -373,3 +374,33 @@ html, body { overflow-x: hidden; }
 .blog-post-cta-link { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 11px 16px; border: 1px solid var(--ink); background: var(--ink); color: var(--ground); font-size: var(--text-label); font-weight: 600; text-decoration: none; border-radius: var(--radius-sm); white-space: nowrap; transition: .15s; }
 .blog-post-cta-link:hover { opacity: .85; }
 @media (max-width: 560px) { .blog-post-cta { flex-direction: column; align-items: stretch; text-align: left; } .blog-post-cta-link { width: 100%; justify-content: center; } }
+.sync-strip-empty { color: var(--muted); }
+
+/* Item 10: the real cause behind the old `html, body { overflow-x: hidden }`.
+   .semantic-tooltip is absolutely positioned at left:0 of a 20px trigger, so at 375px a
+   ~327px tooltip ran ~22px past the viewport. Anchoring it to the viewport gutters on
+   narrow screens keeps it on-screen wherever its trigger sits, which left-or-right
+   anchoring cannot do without :has() or JS. */
+@media (max-width: 560px) {
+  .semantic-info { position: static; }
+  .semantic-tooltip { position: fixed; left: var(--s-4); right: var(--s-4); width: auto; max-width: none; }
+}
+
+/* Rule 4: answer first, evidence under it. */
+.thesis-hero { margin-bottom: var(--s-5); padding: var(--s-6); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.thesis-hero-main { display: grid; gap: var(--s-3); max-width: 520px; }
+.thesis-hero-value { font-size: var(--text-h1); font-weight: 600; line-height: var(--leading-tight); letter-spacing: var(--tracking-display); color: var(--ink); }
+.thesis-hero-note { margin: 0; color: var(--ink-2); font-size: var(--text-meta); }
+.thesis-hero .action-button { justify-self: start; min-height: 44px; }
+.field-empty-headline { color: var(--ink-2); font-size: var(--text-value); font-weight: 600; }
+.field-empty-reason { display: block; margin-top: var(--s-1); color: var(--muted); font-size: var(--text-meta); line-height: 1.45; }
+
+/* The doc topbar packs a back-link and the lockup onto one row. Raising the type floor to
+   12px in the token migration pushed the brand text ~5px past the viewport at 375px, which
+   the old overflow-x mask hid. Let the flex children shrink and drop the sub-label. */
+@media (max-width: 560px) {
+  .rules-doc-topbar { gap: var(--s-2); }
+  .rules-doc-topbar .topbar-meta, .rules-doc-topbar .brand-mark, .rules-doc-topbar .brand-mark > div { min-width: 0; }
+  .rules-doc-topbar .brand-mark > div { display: none; }
+  .rules-doc-topbar .back-link { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

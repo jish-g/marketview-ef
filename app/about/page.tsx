@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import { ArrowLeft, BarChart3 } from 'lucide-react'
 
@@ -31,7 +32,7 @@ export default function AboutPage() {
         <header className="rules-doc-topbar">
           <Link href="/" className="back-link"><ArrowLeft size={16} /> Back to MarketCue</Link>
           <div className="brand-mark">
-            <div className="brand-symbol"><BarChart3 size={16} /></div>
+            <BrandSymbol size={32} />
             <div><strong>MarketCue</strong><span>ABOUT</span></div>
           </div>
         </header>

@@ -49,7 +49,7 @@ function todayIST() {
 }
 
 function formatTime(value: unknown) {
-  if (!value) return '—'
+  if (!value) return 'Not recorded'
   return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }).format(new Date(String(value)))
 }
 
@@ -157,8 +157,8 @@ function TradeCard({ instrument, trade, legs, rationale, mutate }: { instrument:
         {legs.length === 0 ? <p className="history-empty">No leg fills recorded.</p> : legs.map((leg) => <div className="leg-row" key={String(leg.id ?? leg.leg_key)}>
           <span className={`leg-badge leg-${leg.side.toLowerCase()}`}>{leg.side}</span>
           <span className="leg-label">{legKeyLabel(String(leg.leg_key), leg.side, trade.strategy)}</span>
-          <b className="trade-strike">{leg.strike ?? '—'}</b>
-          <span className="trade-premium">₹{leg.premium != null ? Number(leg.premium).toFixed(1) : '—'}</span>
+          <b className="trade-strike">{leg.strike ?? 'Not set'}</b>
+          <span className="trade-premium">₹{leg.premium != null ? Number(leg.premium).toFixed(1) : 'Not filled'}</span>
         </div>)}
       </div>
       <div className="position-outputs"><span>Net Premium ({isCredit ? 'received' : 'paid'}) <b>₹{Math.abs(netPremium).toFixed(1)}</b></span></div>
@@ -268,9 +268,9 @@ export function TradeView() {
         <div className="field-card field-card-accent"><span>Open positions</span><strong>{openPositions.length}</strong></div>
       </div>
       <div className="trade-summary-tiles">
-        <div className="field-card"><span>Average profit</span><strong><em className="breadth-flag positive">{summary.avgProfit > 0 ? `+₹${summary.avgProfit.toFixed(0)}` : '—'}</em></strong></div>
-        <div className="field-card"><span>Average loss</span><strong><em className="breadth-flag negative">{summary.avgLoss < 0 ? `−₹${Math.abs(summary.avgLoss).toFixed(0)}` : '—'}</em></strong></div>
-        <div className="field-card"><span>Avg risk-reward</span><strong>{summary.riskReward != null ? `1 : ${summary.riskReward.toFixed(1)}` : '—'}</strong></div>
+        <div className="field-card"><span>Average profit</span><strong><em className="breadth-flag positive">{summary.avgProfit > 0 ? `+₹${summary.avgProfit.toFixed(0)}` : 'Not available'}</em></strong></div>
+        <div className="field-card"><span>Average loss</span><strong><em className="breadth-flag negative">{summary.avgLoss < 0 ? `−₹${Math.abs(summary.avgLoss).toFixed(0)}` : 'Not available'}</em></strong></div>
+        <div className="field-card"><span>Avg risk-reward</span><strong>{summary.riskReward != null ? `1 : ${summary.riskReward.toFixed(1)}` : 'Not available'}</strong></div>
       </div>
       {summary.eodUnresolvedCount > 0 && <p className="history-empty">{summary.eodUnresolvedCount} trade{summary.eodUnresolvedCount === 1 ? '' : 's'} closed at market close without hitting a target or stop — counted above by actual profit or loss, not as a clean hit.</p>}
       {openPositions.length > 0 && <div className="trade-open-positions">
@@ -293,13 +293,13 @@ export function TradeView() {
                 <span className={`trade-status sync-${trade.state === 'locked_conservative' ? 'warning' : 'accent'}`}>{stateLabel(trade.state)}</span>
               </div>
               <div className="trade-open-figures">
-                <div><span>Entry premium</span><b>{entry != null ? `₹${entry.toFixed(2)}` : '—'}</b></div>
+                <div><span>Entry premium</span><b>{entry != null ? `₹${entry.toFixed(2)}` : 'Not available'}</b></div>
                 <div><span>Current premium</span><b>{`₹${current.toFixed(2)}`}</b></div>
                 {distance != null && <div><span>Distance to target</span><b>{`₹${distance.toFixed(2)} away`}</b></div>}
               </div>
               <div className="trade-open-bar"><div className="trade-open-bar-fill" style={{ width: `${progressPct}%` }} /></div>
-              <div className="trade-open-levels"><span>Stop {stopCons != null ? stopCons.toFixed(2) : '—'}</span><span>Target (cons.) {targetCons != null ? targetCons.toFixed(2) : '—'}</span></div>
-              <p className="trade-open-checked">Last checked {trade.last_checked_at ? formatTime(trade.last_checked_at) : '—'} — rechecks every 5 min</p>
+              <div className="trade-open-levels"><span>Stop {stopCons != null ? stopCons.toFixed(2) : 'Not available'}</span><span>Target (cons.) {targetCons != null ? targetCons.toFixed(2) : 'Not available'}</span></div>
+              <p className="trade-open-checked">Last checked {trade.last_checked_at ? formatTime(trade.last_checked_at) : 'Not available'} — rechecks every 5 min</p>
             </div>
           })}
         </div>

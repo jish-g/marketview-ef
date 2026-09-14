@@ -1,0 +1,179 @@
+/* ============================================================
+   Design system component styles, consumed by components/ui/ds.tsx.
+
+   Every value here resolves to app/tokens/. No hex, no size off
+   the type scale, no radius outside the three steps, no shadow.
+   ============================================================ */
+
+/* --- numerals: every figure in the product --- */
+.ds-num { font-variant-numeric: tabular-nums; }
+.ds-num-strike { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.ds-muted { color: var(--muted); }
+
+/* --- directional value: ONLY for signed changes --- */
+.ds-delta { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ds-delta--up { color: var(--up); }
+.ds-delta--down { color: var(--down); }
+.ds-delta--flat { color: var(--muted); }
+.ds-delta--value { font-size: var(--text-value); }
+.ds-delta--value-lg { font-size: var(--text-value-lg); }
+
+/* --- label --- */
+.ds-label {
+  display: block;
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ds-label--caution { color: var(--caution-ink); }
+.ds-label--down { color: var(--down); }
+.ds-label--info { color: var(--info); }
+
+/* --- card --- */
+.ds-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--s-5);
+}
+.ds-card--flush { padding: 0; overflow: hidden; }
+.ds-card--empty { border-style: dashed; background: none; }
+.ds-card--caution { background: color-mix(in srgb, var(--caution) 9%, var(--ground)); border-color: color-mix(in srgb, var(--caution) 45%, transparent); }
+.ds-card--up { background: color-mix(in srgb, var(--up) 8%, var(--ground)); border-color: color-mix(in srgb, var(--up) 45%, transparent); }
+.ds-card--down { background: color-mix(in srgb, var(--down) 8%, var(--ground)); border-color: color-mix(in srgb, var(--down) 45%, transparent); }
+
+/* --- metric tile, three weights --- */
+.ds-metric { display: flex; flex-direction: column; gap: var(--s-2); }
+.ds-metric__value { font-size: var(--text-value); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+.ds-metric--primary .ds-metric__value { font-size: var(--text-value-lg); }
+.ds-metric--hero .ds-metric__value { font-size: var(--text-h1); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); }
+.ds-metric__sub { font-size: var(--text-meta); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ds-metric__value--empty { font-size: var(--text-value); color: var(--ink-2); }
+.ds-metric__sub--empty { color: var(--muted); }
+
+/* --- badge / band --- */
+.ds-badge {
+  display: inline-flex; align-items: center; gap: var(--s-1);
+  padding: var(--s-1) 10px; border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  font-size: var(--text-label); font-weight: 600; line-height: 1.4;
+}
+.ds-badge--up { background: color-mix(in srgb, var(--up) 16%, transparent); color: var(--up); }
+.ds-badge--down { background: color-mix(in srgb, var(--down) 16%, transparent); color: var(--down); }
+.ds-badge--caution { background: color-mix(in srgb, var(--caution) 16%, transparent); color: var(--caution-ink); }
+.ds-badge--info { background: color-mix(in srgb, var(--info) 16%, transparent); color: var(--info); }
+.ds-badge--neutral { background: var(--surface-2); color: var(--muted); }
+.ds-badge--outline { border-color: var(--border); color: var(--muted); }
+
+/* --- table: real semantics, numeric columns right-aligned --- */
+.ds-table-wrap { overflow-x: auto; }
+.ds-table { width: 100%; border-collapse: collapse; font-size: var(--text-meta); }
+.ds-table caption.ds-table__caption {
+  padding: var(--s-3) var(--s-4); text-align: left;
+  color: var(--muted); font-size: var(--text-label); font-weight: 600;
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+}
+.ds-table th, .ds-table td { padding: var(--s-3) var(--s-4); text-align: left; }
+.ds-table thead th {
+  background: var(--surface-2); color: var(--muted);
+  font-size: var(--text-label); font-weight: 600;
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+}
+.ds-table tbody tr { border-top: 1px solid var(--border); }
+.ds-table .ds-table__rowhead { font-weight: 500; color: var(--ink); }
+/* Declared after the generic cell rule so right-alignment actually wins -- the handoff's
+   reference HTML loses this contest and renders every figure left-aligned. */
+.ds-table th.ds-num-col, .ds-table td.ds-num-col { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* --- banner --- */
+.ds-banner {
+  display: flex; gap: var(--s-3); align-items: flex-start;
+  padding: var(--s-4) var(--s-5); border-radius: var(--radius-md);
+  border: 1px solid var(--border); background: var(--surface);
+}
+.ds-banner--caution { background: color-mix(in srgb, var(--caution) 9%, var(--ground)); border-color: color-mix(in srgb, var(--caution) 45%, transparent); }
+.ds-banner--blocking { background: color-mix(in srgb, var(--down) 9%, var(--ground)); border-color: color-mix(in srgb, var(--down) 50%, transparent); }
+.ds-banner__body { margin-top: 6px; font-size: var(--text-body); line-height: var(--leading-body); color: var(--ink-2); max-width: var(--measure); }
+.ds-banner__body strong { color: var(--ink); }
+
+/* --- freshness + provenance --- */
+.ds-stamp {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--text-label); font-weight: 600;
+  padding: var(--s-1) 10px; border-radius: var(--radius-full);
+}
+.ds-stamp--live { background: color-mix(in srgb, var(--up) 16%, transparent); color: var(--up); }
+.ds-stamp--aging { background: color-mix(in srgb, var(--caution) 16%, transparent); color: var(--caution-ink); }
+.ds-stamp--stale { background: color-mix(in srgb, var(--down) 16%, transparent); color: var(--down); }
+.ds-stamp--closed { background: var(--surface-2); color: var(--muted); }
+.ds-stamp time { font-variant-numeric: tabular-nums; }
+.ds-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+/* --- score meter --- */
+.ds-meter { display: flex; gap: 3px; }
+.ds-meter span { flex: 1; height: 5px; border-radius: 3px; background: var(--border); }
+.ds-meter span[data-on] { background: var(--muted); }
+.ds-meter span[data-on="up"] { background: var(--up); }
+.ds-meter span[data-on="down"] { background: var(--down); }
+.ds-meter span[data-on="caution"] { background: var(--caution); }
+
+/* --- trade levels: target and stop always together, same weight (rule 5) --- */
+.ds-levels { display: grid; gap: var(--s-3); }
+.ds-levels__row { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: baseline; justify-content: space-between; }
+.ds-levels__key { color: var(--ink-2); font-size: var(--text-meta); }
+.ds-levels__val { display: inline-flex; align-items: baseline; gap: var(--s-2); }
+.ds-levels__rupees { color: var(--muted); font-size: var(--text-meta); font-style: normal; font-variant-numeric: tabular-nums; }
+
+/* --- phase header --- */
+.ds-phase-head {
+  display: flex; flex-wrap: wrap; gap: var(--s-3);
+  align-items: flex-start; justify-content: space-between;
+  padding-bottom: var(--s-4); border-bottom: 1px solid var(--border);
+}
+.ds-phase-head__title {
+  margin-top: 6px; font-size: var(--text-h2); font-weight: 600;
+  letter-spacing: var(--tracking-display); line-height: var(--leading-tight);
+  color: var(--ink); text-transform: none;
+}
+.ds-phase-head__aside { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
+
+/* --- disclaimer --- */
+.ds-disclaimer { font-size: var(--text-meta); line-height: 1.5; color: var(--faint); max-width: 60ch; }
+
+/* --- skeleton --- */
+.ds-skeleton { background: var(--surface-2); border-radius: var(--radius-sm); }
+
+/* --- layout helpers --- */
+.ds-grid { display: grid; gap: var(--s-3); }
+.ds-grid--3 { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+.ds-stack { display: grid; gap: var(--s-5); }
+
+/* ============================================================
+   Responsive: two named breakpoints only.
+   Below --bp-wide the sidebar is an overlay drawer (app/globals.css);
+   below --bp-narrow data tables reflow to label-above-value cards --
+   keeping their column headers, which is the thing the old
+   `.rule-table-labels { display: none }` got wrong.
+   ============================================================ */
+@media (max-width: 560px) {
+  .ds-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .ds-table tbody tr { display: grid; gap: var(--s-1); padding: var(--s-3) var(--s-4); }
+  .ds-table th, .ds-table td { padding: 0; }
+  .ds-table tbody td, .ds-table tbody th { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-4); align-items: baseline; }
+  /* The header text comes back as a per-cell label, so no row loses its column names. */
+  .ds-table tbody td::before {
+    content: attr(data-col);
+    color: var(--muted); font-size: var(--text-label); font-weight: 600;
+    letter-spacing: var(--tracking-label); text-transform: uppercase;
+  }
+  .ds-table th.ds-num-col, .ds-table td.ds-num-col { text-align: right; }
+  .ds-phase-head { flex-direction: column; }
+}
+
+/* Minimum 44px touch target on every interactive element (handoff: Responsive). */
+@media (pointer: coarse) {
+  .ds-table tbody tr, .ds-badge, .ds-stamp { min-height: 44px; }
+  .ds-badge, .ds-stamp { align-items: center; }
+}
