@@ -188,7 +188,7 @@ export function ScoreBreakdown({ inputs, caption }: { inputs: ScoreInput[]; capt
             <tr key={i.name}>
               <th scope="row" className="ds-table__rowhead">{i.name}</th>
               <td className="ds-num-col" data-col="Value"><Num>{i.value}</Num></td>
-              <td className="ds-num-col" data-col="Score"><Num>{fmt.score(i.score)}</Num></td>
+              <td className={cx('ds-num-col', i.score > 0 && 'ds-score--up', i.score < 0 && 'ds-score--down')} data-col="Score"><Num>{fmt.score(i.score)}</Num></td>
               {inputs.some((x) => x.weight) && <td className="ds-num-col ds-muted" data-col="Weight"><Num>{i.weight ?? 'Not weighted'}</Num></td>}
             </tr>
           ))}

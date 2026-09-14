@@ -89,6 +89,12 @@ function oiTone(key: string, action: string) {
 }
 function value(row: Row | null, key: string, pct = false) { const v = row?.[key]; if (v === null || v === undefined || v === '') return 'Not available'; const numeric = Number(v); const display = String(v); if (pct) return fmt.pct(numeric); if (/days_to_expiry/.test(key)) return `${display} day${numeric === 1 ? '' : 's'}`; if (/avg_move/.test(key)) return fmt.ptsAbs(numeric); if (/_pts_|gap_points|opening_points/.test(key)) return fmt.pts(numeric); if (/prev_close|max_pain|oi_support|oi_resistance|chart_support|chart_resistance|post_close/.test(key) && Number.isFinite(numeric)) return fmt.level(numeric); if (/^pcr_|^mid_pcr_|atm_iv|india_vix/.test(key) && Number.isFinite(numeric)) return fmt.ratio(numeric); if (/points|support|resistance|prev_close|opening|straddle|max_pain|avg_move|theta|close/.test(key)) return display; return display }
 function fmtTimeIST(v: any) { if (!v) return null; return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(v)) }
+// Colour for a signed change in value. The row-based tone() below reads a field; this takes
+// a number already in hand, for figures computed rather than read straight off the row.
+function signTone(n: number | null | undefined) {
+  if (n == null || !Number.isFinite(Number(n)) || Number(n) === 0) return ''
+  return Number(n) > 0 ? 'positive' : 'negative'
+}
 function tone(row: Row | null, key: string) { const n = Number(row?.[key]); return Number.isNaN(n) || n === 0 ? '' : n > 0 ? 'positive' : 'negative' }
 function gapBandLabel(gapPct: number) { if (gapPct > 0.75) return 'Strong Gap Up'; if (gapPct >= 0.25) return 'Normal Gap Up'; if (gapPct >= -0.25) return 'Flat'; if (gapPct >= -0.75) return 'Normal Gap Down'; return 'Strong Gap Down' }
 function highImpactEvent(eventToday: string | null | undefined) { const text = String(eventToday ?? ''); if (!text.includes('(High')) return null; const match = text.match(/^(.*?)\s*\(High,\s*([^)]+)\)/); if (!match) return null; return { name: match[1].trim(), time: match[2].trim() } }
@@ -726,7 +732,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
       <h3>{instrument}<button type="button" className="semantic-info verdict-info" aria-label={`${instrument} verdict details`}><Info size={14} aria-hidden="true" /><span className="semantic-tooltip" role="tooltip">{summary}</span></button></h3>
     </div>
     {instrument === 'NIFTY'
-      ? <div className="sync-strip"><span>Predicted <b>{calc.predicted.toFixed(1)}</b></span><span>Actual <b>{calc.open.toFixed(1)}</b></span><span>Difference <b>{calc.difference >= 0 ? '+' : ''}{calc.difference.toFixed(1)}</b></span><strong className={`sync-${sync[1]}`}>{sync[0]}</strong><small>{sync[2]}</small></div>
+      ? <div className="sync-strip">{/* All three are signed changes in value, so they take the up/down colour and go through fmt -- they were rendering in ink with a hyphen-minus and no leading +. */}<span>Predicted <b className={signTone(calc.predicted)}>{fmt.pts(calc.predicted)}</b></span><span>Actual <b className={signTone(calc.open)}>{fmt.pts(calc.open)}</b></span><span>Difference <b className={signTone(calc.difference)}>{fmt.pts(calc.difference)}</b></span><strong className={`sync-${sync[1]}`}>{sync[0]}</strong><small>{sync[2]}</small></div>
       : <div className="sync-strip sync-strip-empty"><small>No predicted open for SENSEX — GIFT Nifty leads NIFTY only, so there is no overnight leading indicator to compare against.</small></div>}
     <div className="verdict-answer">
       <div className="verdict-answer-main">
