@@ -60,6 +60,14 @@ export const fmt = {
     return `${v < 0 ? MINUS : ''}₹${Math.abs(v).toFixed(2)}`
   },
 
+  /** Signed rupee P&L: whole rupees, thousands separator, always signed. `+₹1,240` */
+  pnl(n: number | null | undefined) {
+    if (n == null || Number.isNaN(Number(n))) return 'Not available'
+    const v = Number(n)
+    const body = Math.abs(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+    return `${v < 0 ? MINUS : '+'}₹${body}`
+  },
+
   /** Time: 24-hour, always with IST. `08:45 IST` */
   timeIST(value: string | number | Date | null | undefined) {
     if (!value) return null

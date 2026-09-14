@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { PhaseAside } from '@/components/ui/ds'
-import { Progress } from '@/components/ui/ds'
+import { PhaseAside, Progress, Disclaimer } from '@/components/ui/ds'
+import { fmt } from '@/lib/format'
 import useSWR from 'swr'
 import { CheckCircle2, ArrowDown, RotateCcw } from 'lucide-react'
 import { calculateVerdict } from '@/app/dashboard/page'
@@ -51,8 +51,7 @@ function todayIST() {
 }
 
 function formatTime(value: unknown) {
-  if (!value) return 'Not recorded'
-  return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }).format(new Date(String(value)))
+  return fmt.timeIST(value as string | null) ?? 'Not recorded'
 }
 
 // exit_reason carries the detailed automated-poll outcome; falls back to the plain
@@ -151,7 +150,7 @@ function TradeCard({ instrument, trade, legs, rationale, mutate }: { instrument:
     </p>}
     <div className="verdict-card verdict-strategy-summary">
       <div className="verdict-strategy-box"><span className="eyebrow">Strategy</span><strong>{String(trade.strategy)}</strong></div>
-      <div className="day-summary"><span className="eyebrow">Rationale</span><p>{rationale ? `${String(rationale.bias ?? 'Neutral')} bias, India VIX ${Number(rationale.vix ?? 0).toFixed(1)}, ${String(rationale.iv ?? 'current IV')} conditions, PCR ${Number(rationale.pcr ?? 0).toFixed(2)}.` : 'System-generated strategy from the latest market snapshot.'}</p></div>
+      <div className="day-summary"><span className="eyebrow">Rationale</span><p>{rationale ? `${String(rationale.bias ?? 'Neutral')} bias, India VIX ${fmt.ratio(Number(rationale.vix ?? 0))}, ${String(rationale.iv ?? 'current IV')} conditions, PCR ${fmt.ratio(Number(rationale.pcr ?? 0))}.` : 'System-generated strategy from the latest market snapshot.'}</p></div>
     </div>
     <div className="position-calculator">
       <div className="position-head"><div><p className="eyebrow">Filled legs</p><strong>{trade.trade_date}</strong></div><span>Auto-filled record</span></div>
@@ -159,12 +158,12 @@ function TradeCard({ instrument, trade, legs, rationale, mutate }: { instrument:
         {legs.length === 0 ? <p className="history-empty">No leg fills recorded.</p> : legs.map((leg) => <div className="leg-row" key={String(leg.id ?? leg.leg_key)}>
           <span className={`leg-badge leg-${leg.side.toLowerCase()}`}>{leg.side}</span>
           <span className="leg-label">{legKeyLabel(String(leg.leg_key), leg.side, trade.strategy)}</span>
-          <b className="trade-strike">{leg.strike ?? 'Not set'}</b>
-          <span className="trade-premium">₹{leg.premium != null ? Number(leg.premium).toFixed(1) : 'Not filled'}</span>
+          <b className="trade-strike">{leg.strike != null ? fmt.strike(leg.strike) : 'Not set'}</b>
+          <span className="trade-premium">{leg.premium != null ? fmt.rupees(leg.premium) : 'Not filled'}</span>
         </div>)}
       </div>
-      <div className="position-outputs"><span>Net Premium ({isCredit ? 'received' : 'paid'}) <b>₹{Math.abs(netPremium).toFixed(1)}</b></span></div>
-      {trade.target_price_cons != null && <div className="position-outputs"><span>Target (cons.) <b>{Number(trade.target_price_cons).toFixed(2)}</b></span><span>Stop (cons.) <b>{Number(trade.stop_price_cons ?? 0).toFixed(2)}</b></span>{trade.target_price_aggr != null && <span>Target (agg.) <b>{Number(trade.target_price_aggr).toFixed(2)}</b></span>}</div>}
+      <div className="position-outputs"><span>Net Premium ({isCredit ? 'received' : 'paid'}) <b>{fmt.rupees(Math.abs(netPremium))}</b></span></div>
+      {trade.target_price_cons != null && <div className="position-outputs"><span>Target (cons.) <b>{fmt.rupees(Number(trade.target_price_cons))}</b></span><span>Stop (cons.) <b>{fmt.rupees(Number(trade.stop_price_cons ?? 0))}</b></span>{trade.target_price_aggr != null && <span>Target (agg.) <b>{fmt.rupees(Number(trade.target_price_aggr))}</b></span>}</div>}
     </div>
     {isOpen ? (
       overriding ? (
@@ -181,7 +180,7 @@ function TradeCard({ instrument, trade, legs, rationale, mutate }: { instrument:
       )
     ) : (
       <div className="trade-confirmation">
-        <span className={`sync-${statusTone(trade)}`}>✓ {statusLabel(trade)}{trade.exit_time || trade.outcome_at ? ` — ${formatTime(trade.exit_time ?? trade.outcome_at)}` : ''}{trade.exit_premium != null ? ` at ${Number(trade.exit_premium).toFixed(2)}` : ''}</span>
+        <span className={`sync-${statusTone(trade)}`}>✓ {statusLabel(trade)}{trade.exit_time || trade.outcome_at ? ` — ${formatTime(trade.exit_time ?? trade.outcome_at)}` : ''}{trade.exit_premium != null ? ` at ${fmt.rupees(trade.exit_premium)}` : ''}</span>
         <button type="button" className="action-button" onClick={undo} disabled={saving}><RotateCcw size={13} /> Undo</button>
       </div>
     )}
@@ -266,13 +265,13 @@ export function TradeView() {
         <div className="field-card"><span>Target hit count</span><strong>{summary.targets}</strong></div>
         <div className="field-card"><span>Stop-loss hit count</span><strong>{summary.stops}</strong></div>
         <div className="field-card"><span>Win rate %</span><strong>{summary.winRate.toFixed(0)}%</strong></div>
-        <div className="field-card"><span>Total P&amp;L</span><strong><em className={`breadth-flag ${summary.pnl >= 0 ? 'positive' : 'negative'}`}>{summary.pnl >= 0 ? '+' : '−'}₹{Math.abs(summary.pnl).toFixed(0)}</em></strong></div>
+        <div className="field-card"><span>Total P&amp;L</span><strong><em className={`breadth-flag ${summary.pnl >= 0 ? 'positive' : 'negative'}`}>{fmt.pnl(summary.pnl)}</em></strong></div>
         <div className="field-card field-card-accent"><span>Open positions</span><strong>{openPositions.length}</strong></div>
       </div>
       <div className="trade-summary-tiles">
-        <div className="field-card"><span>Average profit</span><strong><em className="breadth-flag positive">{summary.avgProfit > 0 ? `+₹${summary.avgProfit.toFixed(0)}` : 'Not available'}</em></strong></div>
-        <div className="field-card"><span>Average loss</span><strong><em className="breadth-flag negative">{summary.avgLoss < 0 ? `−₹${Math.abs(summary.avgLoss).toFixed(0)}` : 'Not available'}</em></strong></div>
-        <div className="field-card"><span>Avg risk-reward</span><strong>{summary.riskReward != null ? `1 : ${summary.riskReward.toFixed(1)}` : 'Not available'}</strong></div>
+        <div className="field-card"><span>Average profit</span><strong><em className="breadth-flag positive">{summary.avgProfit > 0 ? fmt.pnl(summary.avgProfit) : 'Not available'}</em></strong></div>
+        <div className="field-card"><span>Average loss</span><strong><em className="breadth-flag negative">{summary.avgLoss < 0 ? fmt.pnl(summary.avgLoss) : 'Not available'}</em></strong></div>
+        <div className="field-card"><span>Avg risk-reward</span><strong>{summary.riskReward != null ? `1 : ${fmt.ratio(summary.riskReward)}` : 'Not available'}</strong></div>
       </div>
       {summary.eodUnresolvedCount > 0 && <p className="history-empty">{summary.eodUnresolvedCount} trade{summary.eodUnresolvedCount === 1 ? '' : 's'} closed at market close without hitting a target or stop — counted above by actual profit or loss, not as a clean hit.</p>}
       {openPositions.length > 0 && <div className="trade-open-positions">
@@ -295,27 +294,39 @@ export function TradeView() {
                 <span className={`trade-status sync-${trade.state === 'locked_conservative' ? 'warning' : 'accent'}`}>{stateLabel(trade.state)}</span>
               </div>
               <div className="trade-open-figures">
-                <div><span>Entry premium</span><b>{entry != null ? `₹${entry.toFixed(2)}` : 'Not available'}</b></div>
-                <div><span>Current premium</span><b>{`₹${current.toFixed(2)}`}</b></div>
-                {distance != null && <div><span>Distance to target</span><b>{`₹${distance.toFixed(2)} away`}</b></div>}
+                <div><span>Entry premium</span><b>{fmt.rupees(entry)}</b></div>
+                <div><span>Current premium</span><b>{fmt.rupees(current)}</b></div>
+                {distance != null && <div><span>Distance to target</span><b>{`${fmt.rupees(distance)} away`}</b></div>}
               </div>
               <Progress value={progressPct} label="Progress to target" />
-              <div className="trade-open-levels"><span>Stop {stopCons != null ? stopCons.toFixed(2) : 'Not available'}</span><span>Target (cons.) {targetCons != null ? targetCons.toFixed(2) : 'Not available'}</span></div>
+              <div className="trade-open-levels"><span>Stop {fmt.rupees(stopCons)}</span><span>Target (cons.) {fmt.rupees(targetCons)}</span></div>
               <p className="trade-open-checked">Last checked {trade.last_checked_at ? formatTime(trade.last_checked_at) : 'Not available'} — rechecks every 5 min</p>
             </div>
           })}
         </div>
       </div>}
-      {rows.length === 0 ? <p className="history-empty">No past trades recorded yet.</p> : <div className="history-list">
-        <div className="history-row history-head trade-log-row" aria-hidden="true"><span>Date</span><span>Instrument</span><span>Strategy</span><span>Net Premium</span><span>Outcome</span></div>
-        {rows.map((trade) => <article className="history-row trade-log-row" key={String(trade.id)}>
-          <span>{trade.trade_date}</span>
-          <span>{trade.instrument} <span className={`source-badge source-${trade.source ?? 'system'}`}>{sourceLabel(trade.source)}</span></span>
-          <span>{String(trade.strategy)}</span>
-          <span>₹{Math.abs(Number(trade.net_premium) || 0).toFixed(1)} {trade.is_credit ? 'received' : 'paid'}</span>
-          <span className={`trade-status sync-${statusTone(trade)}`}>{trade.outcome === 'open' ? stateLabel(trade.state) : statusLabel(trade)}</span>
-        </article>)}
-      </div>}
+      {rows.length === 0 ? <p className="history-empty">No past trades recorded yet.</p> : <div className="trade-log-scroll"><table className="trade-log-table">
+        <caption>Every recorded trade, newest first{sourceFilter === 'all' ? '' : ` · ${sourceFilter === 'manual' ? 'manual' : 'system'} trades only`}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Instrument</th>
+            <th scope="col">Strategy</th>
+            <th scope="col" className="num">Net premium</th>
+            <th scope="col">Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((trade) => <tr key={String(trade.id)}>
+            <td>{trade.trade_date}</td>
+            <td>{trade.instrument} <span className={`source-badge source-${trade.source ?? 'system'}`}>{sourceLabel(trade.source)}</span></td>
+            <td>{String(trade.strategy)}</td>
+            <td className="num">{fmt.rupees(Math.abs(Number(trade.net_premium) || 0))} {trade.is_credit ? 'received' : 'paid'}</td>
+            <td><span className={`trade-status sync-${statusTone(trade)}`}>{trade.outcome === 'open' ? stateLabel(trade.state) : statusLabel(trade)}</span></td>
+          </tr>)}
+        </tbody>
+      </table></div>}
     </section>
+    <Disclaimer capturedAt={fmt.timeIST(new Date())} />
   </section>
 }
