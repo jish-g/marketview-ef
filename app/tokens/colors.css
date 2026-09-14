@@ -53,7 +53,7 @@
   --ring: #5b9bd8;
 }
 
-/* ---- light: public reads, SEO pages, print ---- */
+/* ---- light: opt-in via the theme toggle, and print ---- */
 .light {
   --ground: #f7f6f3;
   --surface: #ffffff;

@@ -47,11 +47,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  colorScheme: 'light dark',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
-  ],
+  // The app renders dark whatever the OS prefers, so the browser-chrome hints are not
+  // keyed on prefers-color-scheme: they would disagree with the page on a light OS.
+  colorScheme: 'dark light',
+  themeColor: '#151515',
 }
 
 const organizationJsonLd = {
@@ -70,7 +69,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`light ${plexSans.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
       <body className="antialiased">
         <script
           type="application/ld+json"

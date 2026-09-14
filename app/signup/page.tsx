@@ -19,7 +19,7 @@ function signupErrorMessage(error: unknown): string {
 }
 
 export default function SignupPage() {
-  const [dark, setDark] = useState(false)
+  const [dark, setDark] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [phone, setPhone] = useState('')

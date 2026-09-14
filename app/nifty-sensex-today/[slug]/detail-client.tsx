@@ -133,7 +133,7 @@ function buildMetricRows(isPre: boolean, marketRow: Row): MetricRow[] {
 
 export default function NiftySensexTodayPostClient({ initialPost, initialMarketRow, publishedAtIST, previousPost, evergreenLink }: DetailClientProps) {
   const params = useParams<{ slug: string }>()
-  const [dark, setDark] = useState(false)
+  const [dark, setDark] = useState(true)
   useEffect(() => { document.documentElement.classList.toggle('light', !dark) }, [dark])
   const supabase = createClient()
 

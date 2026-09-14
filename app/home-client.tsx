@@ -77,7 +77,7 @@ function istHour() {
 }
 
 export default function HomeClient({ tradeDate: initialTradeDate, initialPre, initialPost }: HomeClientProps) {
-  const [dark, setDark] = useState(false)
+  const [dark, setDark] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const isMobile = useIsMobile()
   // The header links do not fit beside the brand on a phone, so below the breakpoint they move into a drawer.

@@ -44,7 +44,7 @@ function biasFrom(pctNifty: any, pctSensex: any, openBiasNifty: any) {
 }
 
 export default function NiftySensexTodayIndexClient({ initialPosts, initialMarketRows, faqSlot }: IndexClientProps) {
-  const [dark, setDark] = useState(false)
+  const [dark, setDark] = useState(true)
   useEffect(() => { document.documentElement.classList.toggle('light', !dark) }, [dark])
   const supabase = createClient()
 
