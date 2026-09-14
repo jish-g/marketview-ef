@@ -18,10 +18,12 @@
   --text-meta: 13px;     /* secondary values, captions */
   --text-body: 15px;     /* prose, tile sub-values */
   --text-value: 18px;    /* supporting tile values */
+  --text-value-sm: 20px; /* supporting evidence values (dashboard spec) */
   --text-value-lg: 26px; /* primary tile values */
   --text-h3: 20px;
   --text-h2: 26px;
-  --text-h1: 34px;       /* the session answer */
+  --text-h1: 24px;       /* screen title -- deliberately smaller than the answer */
+  --text-answer: 34px;   /* THE answer. Largest thing on any screen. */
   --text-display: 40px;  /* marketing only */
 
   --leading-tight: 1.15;

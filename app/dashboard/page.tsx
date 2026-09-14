@@ -9,7 +9,7 @@ import { TradeView } from '@/components/trade-view'
 import { JournalView } from '@/components/journal-view'
 import { useSession } from '@/hooks/use-session'
 import { fmt, freshness } from '@/lib/format'
-import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, ScoreMeter, Label } from '@/components/ui/ds'
+import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, BiasAxis, Label } from '@/components/ui/ds'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sun } from 'lucide-react'
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
@@ -664,9 +664,6 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
       setSubmittingTrade(false)
     }
   }
-  const biasKey = String(marketBias.label).toLowerCase()
-  const biasTone: 'up' | 'down' | 'neutral' = biasKey.includes('bullish') ? 'up' : biasKey.includes('bearish') ? 'down' : 'neutral'
-  const biasSlot = biasKey === 'strong bearish' ? 1 : biasKey === 'bearish' ? 2 : biasKey === 'neutral' ? 3 : biasKey === 'bullish' ? 4 : 5
   const sync = Math.abs(calc.difference) <= 5 ? ['In Sync', 'success', 'Prediction is tracking the actual open.'] : Math.abs(calc.difference) <= 15 ? ['Minor Divergence', 'warning', 'Prediction is slightly away from the actual open.'] : ['Diverging', 'danger', 'Prediction is materially away from the actual open.']
   const realGapPct = calc.prev ? (calc.open / calc.prev) * 100 : calc.gapPct
   const summary = `${row.trade_date} · ${row.day_name}: ${instrument} opened ${realGapPct >= 0 ? '+' : ''}${realGapPct.toFixed(2)}% gap (${calc.open.toFixed(1)}). ${marketBias.label} bias with India VIX ${calc.vix.toFixed(1)} (${calc.vix < 11 ? 'low volatility — momentum only' : calc.vix <= 14 ? 'normal volatility — ATM / ITM by setup' : 'elevated volatility — prefer defined risk'}), ${calc.dte <= 7 ? 'Weekly' : 'Monthly'} expiry in ${calc.dte} days, ${calc.iv} versus VIX, PCR ${calc.pcr.toFixed(2)}, OI support ${calc.support.toFixed(0)} (${calc.oiSupport}) / resistance ${calc.resistance.toFixed(0)} (${calc.oiResistance}), chart ${calc.chartSupport.toFixed(0)}–${calc.chartResistance.toFixed(0)}, max pain ${calc.maxPain.toFixed(0)}.`
@@ -687,7 +684,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
         <div className="verdict-score-card">
           <div className="verdict-score-head"><Label>Market bias</Label><span className="ds-num verdict-score-num">{fmt.score(marketBias.score)}</span></div>
           <strong className="verdict-score-band">{marketBias.label}</strong>
-          <ScoreMeter steps={5} filled={biasSlot} tone={biasTone} />
+          <BiasAxis value={marketBias.score} />
         </div>
         <div className="verdict-score-card">
           <div className="verdict-score-head"><Label>Option readiness</Label><span className="ds-num verdict-score-num">{optionReadiness.score} / 6</span></div>
@@ -918,14 +915,11 @@ function ThesisHero({ row, onSeeVerdict }: { row: Row; onSeeVerdict: () => void 
   const bias = useMemo(() => computeMarketBias(row, calc, 'NIFTY'), [row, calc])
   const readiness = useMemo(() => computeOptionReadiness(calc), [calc])
   const band = String(bias.label).toLowerCase()
-  const tone = band.includes('bullish') ? 'up' : band.includes('bearish') ? 'down' : 'neutral'
-  // Five bias bands, strong bearish through strong bullish: the meter fills to the band's slot.
-  const slot = band === 'strong bearish' ? 1 : band === 'bearish' ? 2 : band === 'neutral' ? 3 : band === 'bullish' ? 4 : 5
   return <div className="thesis-hero">
     <div className="thesis-hero-main">
       <Label>Thesis for the open</Label>
       <strong className="thesis-hero-value">{bias.label}</strong>
-      <ScoreMeter steps={5} filled={slot} tone={tone === 'neutral' ? 'neutral' : tone} />
+      <BiasAxis value={bias.score} />
       <p className="thesis-hero-note">
         Bias {fmt.score(bias.score)} · {readiness.label.toLowerCase()} readiness · {calc.dte} day{calc.dte === 1 ? '' : 's'} to expiry.
       </p>
