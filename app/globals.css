@@ -1,6 +1,11 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
+@import './tokens/colors.css';
+@import './tokens/typography.css';
+@import './tokens/spacing.css';
+@import './tokens/radius.css';
+@import './tokens/motion.css';
 @custom-variant dark (&:is(.dark *));
 @theme inline { --color-background: var(--background); --color-foreground: var(--foreground); --color-card: var(--card); --color-card-foreground: var(--card-foreground); --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground); --color-border: var(--border); --color-input: var(--input); --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground); --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground); --color-ring: var(--ring); --radius-md: var(--radius); }
 :root { color-scheme: light; --background: #f3f1ed; --foreground: #292724; --card: #faf9f6; --card-foreground: #292724; --muted: #e8e5df; --muted-foreground: #78736b; --border: #d9d5cd; --input: #d9d5cd; --primary: #403d38; --primary-foreground: #faf9f6; --accent: #e5e1da; --accent-foreground: #292724; --ring: #888177; --radius: .55rem; }

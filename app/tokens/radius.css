@@ -1,0 +1,9 @@
+/* ============================================================
+   Radius tokens. Copied verbatim from the handoff.
+   Three steps only -- normalise every corner to one of these.
+   ============================================================ */
+:root {
+  --radius-sm: 6px;     /* chips, badges, inputs */
+  --radius-md: 12px;    /* cards, tiles, tables */
+  --radius-full: 999px; /* pills, buttons */
+}

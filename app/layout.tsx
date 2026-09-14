@@ -1,13 +1,30 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
+import { IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
+
+// Design system type: Plex Sans for everything, Plex Mono for strike prices and option
+// symbols only. Exposed as CSS variables so app/tokens/typography.css can build
+// --font-sans / --font-mono from them.
+const plexSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-plex-sans',
+  display: 'swap',
+})
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-plex-mono',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://marketcue.in'),
   title: 'MarketCue — Trading Dashboard',
   description: 'A read-only premarket dashboard for Indian equity markets.',
-  generator: 'v0.app',
   icons: {
     icon: [
       {
@@ -53,7 +70,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
       <body className="antialiased">
         <script
           type="application/ld+json"

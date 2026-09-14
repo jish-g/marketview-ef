@@ -1,0 +1,31 @@
+/* ============================================================
+   Type tokens. Copied verbatim from the handoff.
+
+   IBM Plex Sans for everything; IBM Plex Mono for strike prices
+   and option symbols ONLY. Plex Sans carries true tabular
+   figures, which is why monospace is no longer needed for
+   column alignment.
+
+   12px is the floor, and only for uppercase labels at full
+   contrast. The families are supplied by next/font in
+   app/layout.tsx, which sets --font-plex-sans / --font-plex-mono.
+   ============================================================ */
+:root {
+  --font-sans: var(--font-plex-sans), "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+
+  --text-label: 12px;    /* uppercase labels, eyebrows. FLOOR. */
+  --text-meta: 13px;     /* secondary values, captions */
+  --text-body: 15px;     /* prose, tile sub-values */
+  --text-value: 18px;    /* supporting tile values */
+  --text-value-lg: 26px; /* primary tile values */
+  --text-h3: 20px;
+  --text-h2: 26px;
+  --text-h1: 34px;       /* the session answer */
+  --text-display: 40px;  /* marketing only */
+
+  --leading-tight: 1.15;
+  --leading-body: 1.6;
+  --tracking-label: 0.08em;
+  --tracking-display: -0.02em;
+}
