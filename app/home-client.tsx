@@ -27,6 +27,18 @@ function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('')
 }
 
+// Every line here restates something the site already commits to elsewhere -- /about names
+// the pre-market call and post-market recap, /rules publishes the scoring, /how-it-works
+// describes the three stages, /nifty-sensex-today is the archive. Nothing new is claimed.
+const features = [
+  { title: 'A pre-market call before the open', body: 'Gap, open interest, PCR, max pain, IV and India VIX scored into one read, published before the session starts.' },
+  { title: 'A post-market recap after the close', body: 'What the read expected, what the session actually did, and what carries into tomorrow.' },
+  { title: 'Five intraday checkpoints', body: 'The bias is re-scored through the day, so a call that stops being true says so rather than standing all session.' },
+  { title: 'Every rule written down', body: 'The full scoring framework is public. Each output traces back to a table lookup you can check yourself.' },
+  { title: 'A dated archive', body: 'Every prior session stays published — the calls that worked and the ones that did not.' },
+  { title: 'Nifty and Sensex, both sides', body: 'Both indices read each session, with Sensex prediction suppressed where it has no leading indicator rather than faked.' },
+]
+
 const testimonials = [
   {
     quote: 'I was spending 45 minutes every morning interpreting PCR, gap analysis, and OI levels across Nifty and Sensex. MarketCue cut that down to 3 minutes — and I actually trust the read more because the rules are documented.',
@@ -281,6 +293,40 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
               </article>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="landing-band landing-features">
+        <div className="landing-section-inner">
+          <h2 className="eyebrow">What you get</h2>
+          <ul className="landing-features-grid">
+            {features.map(({ title, body }) => (
+              <li className="landing-feature" key={title}>
+                <strong>{title}</strong>
+                <p>{body}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section className="landing-about">
+        <div className="landing-section-inner landing-about-inner">
+          <h2 className="eyebrow">About</h2>
+          <p className="landing-body-text">
+            MarketCue is built and maintained by Jishnu. It reads Nifty and Sensex options data
+            — gap, open interest, PCR, max pain, IV and India VIX — continuously through the
+            trading day and turns it into a decision, not another chart to interpret.
+          </p>
+          <p className="landing-body-text">
+            It is not a licensed investment adviser, and nothing published here is personalized
+            investment advice — it is a documented, mechanical read on publicly available market
+            data. The full methodology is on the <Link href="/rules">rules page</Link>.
+          </p>
+          <p className="landing-about-links">
+            <Link href="/about">More about MarketCue</Link>
+            <Link href="/how-it-works">How the scoring works</Link>
+          </p>
         </div>
       </section>
 
