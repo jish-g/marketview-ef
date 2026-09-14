@@ -700,3 +700,12 @@ button, input { font: inherit; }
   box-shadow: 0 0 0 2px var(--ring);
   border-radius: var(--radius-sm);
 }
+
+/* Rules engine: today's scoring path as three chips with arrows, per the reference. The
+   detailed stage tables stay beneath -- they are the interpretation guide the sidebar
+   promises, and the path is the summary of what they produced today. */
+.scoring-path { display: grid; gap: var(--s-3); padding: var(--s-5); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); margin-bottom: var(--s-5); }
+.scoring-path-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); }
+.scoring-path-chips .ds-badge { font-size: var(--text-meta); padding: 7px 12px; }
+.scoring-path-arrow { color: var(--faint); }
+.scoring-path-note { margin: 0; color: var(--ink-2); font-size: var(--text-body); line-height: var(--leading-body); max-width: var(--measure); }

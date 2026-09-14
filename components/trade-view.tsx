@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { Progress } from '@/components/ui/ds'
 import useSWR from 'swr'
 import { CheckCircle2, ArrowDown, RotateCcw } from 'lucide-react'
 import { calculateVerdict } from '@/app/dashboard/page'
@@ -297,7 +298,7 @@ export function TradeView() {
                 <div><span>Current premium</span><b>{`₹${current.toFixed(2)}`}</b></div>
                 {distance != null && <div><span>Distance to target</span><b>{`₹${distance.toFixed(2)} away`}</b></div>}
               </div>
-              <div className="trade-open-bar"><div className="trade-open-bar-fill" style={{ width: `${progressPct}%` }} /></div>
+              <Progress value={progressPct} label="Progress to target" />
               <div className="trade-open-levels"><span>Stop {stopCons != null ? stopCons.toFixed(2) : 'Not available'}</span><span>Target (cons.) {targetCons != null ? targetCons.toFixed(2) : 'Not available'}</span></div>
               <p className="trade-open-checked">Last checked {trade.last_checked_at ? formatTime(trade.last_checked_at) : 'Not available'} — rechecks every 5 min</p>
             </div>
