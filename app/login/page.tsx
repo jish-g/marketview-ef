@@ -20,7 +20,7 @@ function loginErrorMessage(error: unknown): string {
 }
 
 export default function LoginPage() {
-  const [dark, setDark] = useState(false)
+  const [dark, setDark] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
