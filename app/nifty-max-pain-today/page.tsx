@@ -69,6 +69,8 @@ export default async function NiftyMaxPainTodayPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(FAQ)) }} />
       <EvergreenPage
+      path="/nifty-max-pain-today"
+      sourceLabel="NSE option chain"
         eyebrow="Nifty Max Pain"
         h1="Nifty Max Pain Today"
         updatedISO={updated.iso}

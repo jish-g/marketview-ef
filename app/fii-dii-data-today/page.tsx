@@ -76,6 +76,8 @@ export default async function FiiDiiDataTodayPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(FAQ)) }} />
       <EvergreenPage
+      path="/fii-dii-data-today"
+      sourceLabel="FII/DII participant-wise flow, NSE and BSE"
         eyebrow="FII / DII Data"
         h1="FII DII Data Today"
         updatedISO={updated.iso}

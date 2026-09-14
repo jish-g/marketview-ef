@@ -77,6 +77,8 @@ export default async function NseOptionChainAnalysisPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(FAQ)) }} />
       <EvergreenPage
+      path="/nse-option-chain-analysis"
+      sourceLabel="NSE option chain"
         eyebrow="NSE Option Chain"
         h1="NSE Option Chain Analysis Today"
         updatedISO={updated.iso}

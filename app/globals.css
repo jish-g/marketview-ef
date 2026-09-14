@@ -508,6 +508,13 @@ button, input { font: inherit; }
   .archive-links-inner a { display: inline-flex; align-items: center; min-height: 44px; padding-inline: var(--s-1); }
 }
 
+/* Clipped rather than display:none so a table caption stays in the accessibility tree and
+   is still read to screen readers -- it names the table, it is not decoration. */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.evergreen-source { margin-top: var(--s-3); color: var(--faint); font-size: var(--text-meta); }
+.evergreen-related ul { margin: var(--s-3) 0 0; padding-left: 1.1em; color: var(--ink-2); font-size: var(--text-body); line-height: var(--leading-body); }
+.evergreen-related li { margin-bottom: var(--s-2); }
+
 /* ---- Dashboard shell, matched to the prototype ---- */
 
 /* Worded toggles rather than icon buttons: the prototype labels them, which removes the

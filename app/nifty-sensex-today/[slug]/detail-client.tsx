@@ -201,6 +201,7 @@ export default function NiftySensexTodayPostClient({ initialPost, initialMarketR
               <section className="blog-scorecard">
                 <p className="blog-scorecard-eyebrow">{isPre ? 'Pre-market readout' : 'Post-market readout'}</p>
                 <table className="blog-metrics-table">
+                  <caption className="visually-hidden">{`${isPre ? 'Pre-market' : 'Post-market'} readout — metric, value and reading`}</caption>
                   <thead>
                     <tr><th scope="col">Metric</th><th scope="col">Value</th><th scope="col">Read</th></tr>
                   </thead>
