@@ -1,7 +1,9 @@
 /* ============================================================
    MarketCue colour tokens.
-   Source of truth: design_handoff_marketcue_design_system.
-   Copied verbatim from the handoff -- do not edit values here
+   Structure (token names, semantics, the light ramp) comes from
+   design_handoff_marketcue_design_system. The DARK neutral ramp does
+   not: it was replaced deliberately -- see the note above :root below.
+   Everything else here is the handoff's, so do not edit those values
    without a corresponding change to the design system.
 
    Eight semantic colours, two modes. There is no neutral ramp
@@ -11,31 +13,33 @@
    ============================================================ */
 
 /* ---- dark: the app. default. ---- */
-/* Neutral grey rather than the handoff's blue slate, at the product owner's direction.
-   Measured off TradingView's own dark theme (their site chrome, not the chart pane -- the
-   chart pane is #131722, a 224-degree blue, which is what most people picture but is bluer
-   than what this replaces, not less blue). Zero saturation, so no colour cast at all.
+/* Measured from claude.ai's own dark theme rather than matched by eye: its scale is
+   published as HSL custom properties, so these are conversions of the real values.
+     --bg-100 (body)            hsl(0, 0%, 8.24%)        -> #151515
+     --bg-000 (lightest surface) hsl(60, 1.59%, 12.35%)  -> #20201f
+     --text-000 (ink)           hsl(60, 14.29%, 97.25%)  -> #f9f9f7
+     --text-200 (muted)         hsl(55, 9.09%, 74.12%)   -> #c3c2b7
+   The surfaces and ink carry a very slight WARM tint (55-60deg at 1-14% saturation),
+   which is the difference from the neutral this replaces -- it is not pure grey, and it
+   is the opposite direction from the handoff's 210deg blue slate.
 
-   Measured directly: --ground #0f0f0f, --surface #1f1f1f, --border #3d3d3d,
-   --border-strong #4a4a4a, --ink #dbdbdb. The rest sit on the same neutral axis.
+   --surface-2, --border, --border-strong, --ink-2 and --faint are interpolated on the same
+   axis, since claude.ai applies its border token at low opacity rather than as a flat
+   colour and there is nothing to copy directly.
 
-   Two deliberate departures from the measured source, both for the 4.5:1 body-text floor
-   the handoff requires:
-     --muted is #9a9a9a, not TradingView's #8c8c8c. Their value clears 4.5:1 only just, and
-       lifting it leaves room for --faint to stay a visible step below while also clearing.
-     --down is #e35f5f, not #e05252. The original reads 4.32:1 on --surface, under the floor.
-   Every text token here clears 4.5:1 against BOTH --ground and --surface. */
+   Every text token clears 4.5:1 against BOTH --ground and --surface; the semantic colours
+   were re-checked against the new ground and all pass unchanged. */
 :root, .dark {
-  --ground: #0f0f0f;
-  --surface: #1f1f1f;
-  --surface-2: #2a2a2a;
-  --border: #3d3d3d;
-  --border-strong: #4a4a4a;
+  --ground: #151515;
+  --surface: #20201f;
+  --surface-2: #292928;
+  --border: #343432;
+  --border-strong: #444441;
 
-  --ink: #dbdbdb;
-  --ink-2: #b4b4b4;
-  --muted: #9a9a9a;
-  --faint: #868686;
+  --ink: #f9f9f7;
+  --ink-2: #e1e1da;
+  --muted: #c3c2b7;
+  --faint: #9b9a8c;
 
   --up: #23b26a;
   --down: #e35f5f;
