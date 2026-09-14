@@ -1,0 +1,136 @@
+/* ============================================================
+   Pre-login design, matched to marketcue-prototype.html.
+
+   Design only: not a single word of page copy changes here.
+   Everything is a restyle of markup that already exists, so the
+   indexed text, the headings and the link anchors are identical
+   to what shipped before.
+
+   Kept in its own file rather than appended to globals.css --
+   two branches appending to the same tail is what caused the
+   last merge conflict.
+   ============================================================ */
+
+/* ---- Single-metric pages: the big-value card ----
+   The prototype leads with the number at display weight, its reading as a
+   badge underneath, and the capture line as a caption. Previously all three
+   sat on one baseline at roughly equal weight, so the page had no focal
+   point and the value read as a label. */
+.rules-doc-shell .evergreen-metric-callout {
+  display: grid;
+  gap: var(--s-2);
+  align-items: start;
+  margin-top: var(--s-5);
+  padding: var(--s-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.rules-doc-shell .evergreen-metric-callout span {
+  color: var(--muted);
+  font: 600 var(--text-label) var(--font-sans);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+.rules-doc-shell .evergreen-metric-callout strong {
+  font-family: var(--font-sans);
+  font-size: var(--text-display);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.rules-doc-shell .evergreen-metric-callout small {
+  color: var(--muted);
+  font-size: var(--text-meta);
+  line-height: 1.5;
+}
+
+/* ---- The lead paragraph as the short-answer block ----
+   The prototype boxes the opening prose, because that paragraph is the one an
+   answer engine quotes and the one a returning reader wants first. Same text,
+   given a frame. */
+.rules-doc-shell .evergreen-paragraph:first-of-type {
+  padding: var(--s-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 60%, var(--ground));
+  color: var(--ink-2);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+.rules-doc-shell .evergreen-paragraph:first-of-type strong { color: var(--ink); }
+
+/* ---- Doc hero ---- */
+.rules-doc-shell .doc-hero h1 {
+  font-size: clamp(28px, 4vw, var(--text-display));
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-display);
+  text-transform: none;
+}
+.rules-doc-shell .evergreen-updated {
+  display: block;
+  margin-top: var(--s-2);
+  color: var(--muted);
+  font-size: var(--text-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Related readings, as cards rather than a bare list ---- */
+.rules-doc-shell .evergreen-related ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: var(--s-3);
+  margin: var(--s-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.rules-doc-shell .evergreen-related li {
+  margin: 0;
+  padding: var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: var(--text-meta);
+  color: var(--muted);
+}
+.rules-doc-shell .evergreen-related li a {
+  display: block;
+  margin-bottom: var(--s-1);
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  text-decoration: none;
+}
+.rules-doc-shell .evergreen-related li a:hover { color: var(--brand); }
+
+/* ---- Marketing home ----
+   NOT matched to the prototype's hero layout, deliberately. The prototype runs a
+   single left-aligned column because its headline is five words ("One read, not
+   six charts."). This headline is the thirty-word positioning sentence, and copy
+   is frozen -- forcing it into that column produced a thin wall of text taller
+   than the viewport. The two-column layout is the right one for THIS content.
+
+   What is adopted from the prototype is its treatment rather than its geometry:
+   pill buttons, a neutral primary action, and the type scale. */
+.landing-shell .landing-headline { line-height: 1.12; letter-spacing: var(--tracking-display); }
+.landing-shell .landing-headline-long { font-size: clamp(24px, 2.6vw, 34px); }
+.landing-shell .landing-hero-ctas { gap: var(--s-3); }
+
+/* Rule 2: the primary action is high-contrast neutral, not the brand amber --
+   amber is identity, and green and red are spoken for by direction. */
+.landing-shell .landing-cta-primary {
+  background: var(--action);
+  color: var(--action-ink);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+}
+.landing-shell .landing-cta-primary:hover { background: color-mix(in srgb, var(--action) 88%, var(--ground)); }
+.landing-shell .landing-cta-secondary {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink-2);
+}
+.landing-shell .landing-cta-secondary:hover { background: var(--surface-2); color: var(--ink); }
