@@ -304,11 +304,11 @@ export function JournalView() {
               <span className="journal-log-actions">
                 {shots.length > 0 && <span className="journal-log-shot-count"><ImagePlus size={11} /> {shots.length}</span>}
                 {isLong && (
-                  <button type="button" className="action-button journal-view-button" onClick={() => toggleExpanded(entry.trade_date)}>
-                    {isExpanded ? <EyeOff size={12} /> : <Eye size={12} />}
+                  <button type="button" className="action-button journal-view-button" onClick={() => toggleExpanded(entry.trade_date)} aria-expanded={isExpanded} aria-label={isExpanded ? `Collapse the note for ${formatDateLabel(entry.trade_date)}` : `Expand the note for ${formatDateLabel(entry.trade_date)}`}>
+                    {isExpanded ? <EyeOff size={12} /> : <Eye size={12} />} {isExpanded ? 'Less' : 'More'}
                   </button>
                 )}
-                <button type="button" className="action-button journal-edit-button" onClick={() => startEdit(entry.trade_date)}><RotateCcw size={12} /></button>
+                <button type="button" className="action-button journal-edit-button" onClick={() => startEdit(entry.trade_date)} aria-label={`Edit the note for ${formatDateLabel(entry.trade_date)}`}><RotateCcw size={12} /> Edit</button>
               </span>
             </div>
             {isExpanded && shots.length > 0 && (

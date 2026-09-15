@@ -204,14 +204,19 @@ function historyOutcomeRead(trade: Row | undefined) {
 // missing 2 of computeMarketBias's 4 inputs and pinning almost every midday reading to "Neutral" regardless
 // of the real intraday move (verified against real PCR/spot/max-pain swings on 2026-08-26, where the stored
 // value correctly moved Neutral -> Bearish -> Strong Bearish through the day).
-// Reference #s-history renders "Fri, 11 Sept", not an ISO date with the weekday beside it.
+// Reference #s-history renders "Fri, 11 Sep", not an ISO date with the weekday beside it.
+// The month comes from the MON table below for the same reason navDate uses it: Intl's
+// en-GB short month is "Sept" for September and varies by ICU version, so a column of dates
+// changed width on exactly one month of the year. This is the screen that shows fifteen of
+// them stacked, which is where that jump was most visible.
 function historyDateLabel(row: Row): string {
   const raw = row.trade_date ? String(row.trade_date) : null
   if (!raw) return 'Date not recorded'
   const d = new Date(`${raw}T00:00:00+05:30`)
   if (Number.isNaN(d.getTime())) return raw
-  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short' })
-    .format(d).replace(/^(\w+)\s/, '$1, ')
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'numeric' }).formatToParts(d)
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? ''
+  return `${get('weekday')}, ${get('day')} ${MON[Number(get('month')) - 1]}`
 }
 
 function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid: Row | undefined; post: Row | undefined; trade: Row | undefined }) {
@@ -476,6 +481,37 @@ function TargetStopCard({ instrument, calc, delta = 0.5 }: { instrument?: Instru
   </div>
 }
 
+// Token colours for the payoff chart. Recharts sets stroke and fill as SVG ATTRIBUTES, and
+// `var(--up)` does not resolve in an attribute -- which is why this chart shipped seven
+// hardcoded hexes that never changed with the theme, and why its buy/sell green and red
+// were a second pair sitting inches from .leg-badge's --up/--down. The values are read off
+// documentElement instead and re-read when the theme class flips, so the chart is finally
+// painted from the same palette as everything around it.
+const CHART_FALLBACK = { up: '#23b26a', down: '#e35f5f', caution: '#e2b660', info: '#9288d9', muted: '#c3c2b7', faint: '#9b9a8c', rule: '#444441' }
+function useChartColors() {
+  const [colors, setColors] = useState(CHART_FALLBACK)
+  useEffect(() => {
+    const read = () => {
+      const style = getComputedStyle(document.documentElement)
+      const pick = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback
+      setColors({
+        up: pick('--up', CHART_FALLBACK.up),
+        down: pick('--down', CHART_FALLBACK.down),
+        caution: pick('--caution-ink', CHART_FALLBACK.caution),
+        info: pick('--info', CHART_FALLBACK.info),
+        muted: pick('--muted', CHART_FALLBACK.muted),
+        faint: pick('--faint', CHART_FALLBACK.faint),
+        rule: pick('--border-strong', CHART_FALLBACK.rule),
+      })
+    }
+    read()
+    const observer = new MutationObserver(read)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
+  return colors
+}
+
 function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarget, spotEstStop, spotAggressiveTarget, spotAggressiveStop, actualConservativeTarget, actualConservativeStop, actualAggressiveTarget, actualAggressiveStop, qty }: {
   legRows: { key: string; label: string; side: 'Buy' | 'Sell'; strike: number }[]
   atmNumber: number
@@ -491,6 +527,7 @@ function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarge
   actualAggressiveStop: number | null
   qty: number
 }) {
+  const chart = useChartColors()
   if (legRows.length === 0 || !atmNumber) return null
   const strikes = legRows.map((l) => l.strike)
   const lo = Math.min(atmNumber, ...strikes) - 6 * strikeStep
@@ -509,14 +546,16 @@ function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarge
   const stopPrice = spotEstStop != null ? +(atmNumber - spotEstStop).toFixed(0) : null
   const aggTargetPrice = spotAggressiveTarget != null ? +(atmNumber + spotAggressiveTarget).toFixed(0) : null
   const aggStopPrice = spotAggressiveStop != null ? +(atmNumber - spotAggressiveStop).toFixed(0) : null
-  const legColors: Record<string, string> = { Buy: '#008300', Sell: '#e34948' }
+  // Buy and Sell now match the .leg-badge pills directly beneath the chart, rather than
+  // being a second green and a second red for the same distinction.
+  const legColors: Record<string, string> = { Buy: chart.up, Sell: chart.down }
   // Approved design (confirmed against prototypes covering all 4 strategy types): plain P&L
   // curve colored by profit/loss segment, thin color-coded vertical guide lines with NO on-chart
   // text (recharts doesn't avoid label collisions — text overlapped when levels cluster near
   // spot), no y-axis gridlines/ticks (the shape + legend carry the meaning, not an absolute
   // scale), and a legend row of dot + stacked label/value chips carrying every actual number.
   const legendItems: { label: string; value: string; color: string }[] = [
-    { label: 'Spot', value: atmNumber.toLocaleString('en-IN'), color: '#898781' },
+    { label: 'Spot', value: atmNumber.toLocaleString('en-IN'), color: chart.muted },
   ]
   for (const leg of legRows) {
     legendItems.push({ label: leg.side, value: `${leg.strike.toLocaleString('en-IN')} ${leg.label.toLowerCase().includes('put') ? 'PE' : 'CE'}`, color: legColors[leg.side] })
@@ -524,8 +563,8 @@ function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarge
   if (!isNetSeller && targetPrice != null && stopPrice != null) {
     const targetValue = aggTargetPrice != null ? `${targetPrice.toLocaleString('en-IN')} / ${aggTargetPrice.toLocaleString('en-IN')}` : targetPrice.toLocaleString('en-IN')
     const stopValue = aggStopPrice != null ? `${stopPrice.toLocaleString('en-IN')} / ${aggStopPrice.toLocaleString('en-IN')}` : stopPrice.toLocaleString('en-IN')
-    legendItems.push({ label: aggTargetPrice != null ? 'Target (cons. / agg.)' : 'Target', value: targetValue, color: '#1baf7a' })
-    legendItems.push({ label: aggStopPrice != null ? 'Stop (cons. / agg.)' : 'Stop', value: stopValue, color: '#eda100' })
+    legendItems.push({ label: aggTargetPrice != null ? 'Target (cons. / agg.)' : 'Target', value: targetValue, color: chart.up })
+    legendItems.push({ label: aggStopPrice != null ? 'Stop (cons. / agg.)' : 'Stop', value: stopValue, color: chart.caution })
   }
   if (isNetSeller && actualConservativeTarget != null && actualConservativeStop != null) {
     const consTarget = Math.round(actualConservativeTarget * qty)
@@ -534,24 +573,24 @@ function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarge
     const aggStop = actualAggressiveStop != null ? Math.round(actualAggressiveStop * qty) : null
     const targetValue = aggTarget != null ? `₹${consTarget.toLocaleString('en-IN')} / ₹${aggTarget.toLocaleString('en-IN')}` : `₹${consTarget.toLocaleString('en-IN')}`
     const stopValue = aggStop != null ? `₹${consStop.toLocaleString('en-IN')} / ₹${aggStop.toLocaleString('en-IN')}` : `₹${consStop.toLocaleString('en-IN')}`
-    legendItems.push({ label: aggTarget != null ? 'Target (net premium, cons. / agg.)' : 'Target (net premium)', value: targetValue, color: '#1baf7a' })
-    legendItems.push({ label: aggStop != null ? 'Stop (net premium, cons. / agg.)' : 'Stop (net premium)', value: stopValue, color: '#eda100' })
+    legendItems.push({ label: aggTarget != null ? 'Target (net premium, cons. / agg.)' : 'Target (net premium)', value: targetValue, color: chart.up })
+    legendItems.push({ label: aggStop != null ? 'Stop (net premium, cons. / agg.)' : 'Stop (net premium)', value: stopValue, color: chart.caution })
   }
   return <div className="verdict-card payoff-chart-card">
     <span className="eyebrow">Strategy view</span>
     <div className="payoff-chart-canvas">
       <ResponsiveContainer width="100%" height={180}>
         <LineChart data={points} margin={{ top: 8, right: 10, bottom: 4, left: 6 }}>
-          <XAxis dataKey="x" type="number" domain={[lo, hi]} tick={{ fontSize: 11, fill: '#898781' }} tickFormatter={(v) => String(Math.round(v))} axisLine={{ stroke: '#c3c2b7' }} tickLine={false} />
+          <XAxis dataKey="x" type="number" domain={[lo, hi]} tick={{ fontSize: 11, fill: chart.faint }} tickFormatter={(v) => String(Math.round(v))} axisLine={{ stroke: chart.rule }} tickLine={false} />
           <YAxis hide domain={['dataMin', 'dataMax']} />
-          <ReferenceLine y={0} stroke="#c3c2b7" />
-          <ReferenceLine x={atmNumber} stroke="#898781" strokeWidth={1.5} />
+          <ReferenceLine y={0} stroke={chart.rule} />
+          <ReferenceLine x={atmNumber} stroke={chart.muted} strokeWidth={1.5} />
           {legRows.map((leg) => <ReferenceLine key={leg.key} x={leg.strike} stroke={legColors[leg.side]} strokeDasharray={leg.side === 'Sell' ? undefined : '4 3'} />)}
-          {!isNetSeller && targetPrice != null && <ReferenceLine x={targetPrice} stroke="#1baf7a" strokeDasharray="4 3" />}
-          {!isNetSeller && stopPrice != null && <ReferenceLine x={stopPrice} stroke="#eda100" strokeDasharray="4 3" />}
-          {!isNetSeller && aggTargetPrice != null && <ReferenceLine x={aggTargetPrice} stroke="#1baf7a" strokeDasharray="2 2" strokeOpacity={0.5} />}
-          {!isNetSeller && aggStopPrice != null && <ReferenceLine x={aggStopPrice} stroke="#eda100" strokeDasharray="2 2" strokeOpacity={0.5} />}
-          <Line type="monotone" dataKey="pnl" stroke="#2a78d6" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+          {!isNetSeller && targetPrice != null && <ReferenceLine x={targetPrice} stroke={chart.up} />}
+          {!isNetSeller && stopPrice != null && <ReferenceLine x={stopPrice} stroke={chart.caution} />}
+          {!isNetSeller && aggTargetPrice != null && <ReferenceLine x={aggTargetPrice} stroke={chart.up} strokeDasharray="2 2" strokeOpacity={0.55} />}
+          {!isNetSeller && aggStopPrice != null && <ReferenceLine x={aggStopPrice} stroke={chart.caution} strokeDasharray="2 2" strokeOpacity={0.55} />}
+          <Line type="monotone" dataKey="pnl" stroke={chart.info} strokeWidth={2.5} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>

@@ -1,10 +1,20 @@
 /* ============================================================
    Type tokens. Copied verbatim from the handoff.
 
-   IBM Plex Sans for everything; IBM Plex Mono for strike prices
-   and option symbols ONLY. Plex Sans carries true tabular
-   figures, which is why monospace is no longer needed for
-   column alignment.
+   IBM Plex Sans for everything the reader READS: prose, labels,
+   headings, controls. IBM Plex Mono for everything the reader
+   COMPARES: figures in the dashboard's ledger columns, strike
+   prices, option symbols.
+
+   That second rule used to be stated the other way round here --
+   "mono for strikes and symbols ONLY, Plex Sans carries tabular
+   figures so monospace is not needed" -- while ledger.css put mono
+   on every figure in the product. Both statements were live and
+   they contradicted each other, so neither described the app.
+   The ledger treatment is the one that ships, and this is now the
+   single place it is decided: --font-figure below is the switch.
+   Point it at --font-sans and every figure in the app changes
+   family in one edit; nothing else needs touching.
 
    12px is the floor, and only for uppercase labels at full
    contrast. The families are supplied by next/font in
@@ -13,6 +23,8 @@
 :root {
   --font-sans: var(--font-plex-sans), "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+  /* THE switch for figure type. See the note above before changing it. */
+  --font-figure: var(--font-mono);
 
   --text-label: 12px;    /* uppercase labels, eyebrows. FLOOR. */
   --text-meta: 13px;     /* secondary values, captions */
