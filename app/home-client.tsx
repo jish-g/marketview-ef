@@ -5,7 +5,7 @@ import { fmt } from '@/lib/format'
 import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import useSWR from 'swr'
-import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Menu, Moon, Newspaper, Send, Sun, X } from 'lucide-react'
+import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Menu, Moon, Newspaper, Send, Sun, UserRound, X } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { createClient } from '@/lib/supabase/client'
@@ -22,10 +22,6 @@ const howItWorks = [
   { step: '02', title: 'Rules produce a read', description: 'A documented scoring framework, not a model guessing at patterns.' },
   { step: '03', title: 'You get one clear read', description: 'Published pre-market and post-market, every session.' },
 ]
-
-function initials(name: string) {
-  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('')
-}
 
 // Every line here restates something the site already commits to elsewhere -- /about names
 // the pre-market call and post-market recap, /rules publishes the scoring, /how-it-works
@@ -338,10 +334,15 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
               <article className="landing-testimonial-card" key={author}>
                 <p className="landing-testimonial-quote">{quote}</p>
                 <div className="landing-testimonial-author">
-                  {/* An initials monogram, deliberately not a photograph. A stock or generated
-                      face would assert that a specific person sat for it, which is a claim the
-                      quote itself cannot support. */}
-                  <span className="landing-testimonial-avatar" aria-hidden="true">{initials(author)}</span>
+                  {/* A generic human silhouette, deliberately not a photograph -- a stock or
+                      generated face would assert that a specific person sat for it, which is a
+                      claim the quote itself cannot support. One neutral figure for everyone:
+                      there is no gender on these records, and guessing it from a first name
+                      would be inventing a detail about someone real. Decorative, so it is
+                      aria-hidden -- the author's name sits next to it as real text. */}
+                  <span className="landing-testimonial-avatar" aria-hidden="true">
+                    <UserRound size={19} strokeWidth={1.75} />
+                  </span>
                   <div>
                     <strong>{author}</strong>
                     <span>{role} · {location}</span>
