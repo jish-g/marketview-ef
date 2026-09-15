@@ -763,14 +763,14 @@ button, input { font: inherit; }
 .action-button-primary { border-color: transparent; background: var(--action); color: var(--action-ink); }
 .action-button-primary:hover { background: color-mix(in srgb, var(--action) 88%, var(--ground)); color: var(--action-ink); }
 
-/* Testimonial monogram. Not a photograph on purpose -- a stock or generated face would
-   assert that a specific person sat for it. Initials read as an avatar without claiming one. */
+/* Testimonial avatar. Not a photograph on purpose -- a stock or generated face would
+   assert that a specific person sat for it. A neutral silhouette reads as an avatar
+   without claiming one. The font/letter-spacing the initials needed are gone with them. */
 .landing-testimonial-avatar {
   display: inline-flex; align-items: center; justify-content: center;
   flex: 0 0 auto; width: 40px; height: 40px;
   border: 1px solid var(--border); border-radius: var(--radius-full);
   background: var(--surface-2); color: var(--ink-2);
-  font: 600 var(--text-meta) var(--font-sans); letter-spacing: .02em;
 }
 
 /* The brand lockup on login/signup is a link home; keep it looking like the lockup. */
