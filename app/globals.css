@@ -279,7 +279,7 @@ button, input { font: inherit; }
 .landing-testimonials-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .landing-testimonial-card { display: grid; gap: 16px; padding: 26px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); }
 .landing-testimonial-quote { margin: 0; color: var(--ink); font-size: var(--text-meta); line-height: 1.7; font-weight: 500; letter-spacing: -.01em; }
-.landing-testimonial-author { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.landing-testimonial-author { margin-top: 4px; }
 .landing-testimonial-author strong { display: block; font-size: var(--text-meta); letter-spacing: -.01em; color: var(--ink); }
 .landing-testimonial-author span { display: block; color: var(--muted); font-size: var(--text-label); letter-spacing: .02em; }
 
@@ -762,16 +762,6 @@ button, input { font: inherit; }
    --up / --down: those ARE directional trade actions.) */
 .action-button-primary { border-color: transparent; background: var(--action); color: var(--action-ink); }
 .action-button-primary:hover { background: color-mix(in srgb, var(--action) 88%, var(--ground)); color: var(--action-ink); }
-
-/* Testimonial avatar. Not a photograph on purpose -- a stock or generated face would
-   assert that a specific person sat for it. A neutral silhouette reads as an avatar
-   without claiming one. The font/letter-spacing the initials needed are gone with them. */
-.landing-testimonial-avatar {
-  display: inline-flex; align-items: center; justify-content: center;
-  flex: 0 0 auto; width: 40px; height: 40px;
-  border: 1px solid var(--border); border-radius: var(--radius-full);
-  background: var(--surface-2); color: var(--ink-2);
-}
 
 /* The brand lockup on login/signup is a link home; keep it looking like the lockup. */
 .brand-mark-link { text-decoration: none; color: inherit; }
