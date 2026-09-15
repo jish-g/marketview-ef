@@ -399,7 +399,7 @@ export function PhaseAside({ capturedAt, source = 'system' }: { capturedAt?: str
 export function Disclaimer({ source = 'NSE option chain', capturedAt }: { source?: string; capturedAt?: string | null }) {
   return (
     <p className="ds-disclaimer">
-      Rules-based output, not investment advice.{' '}
+      Views by the MarketCue intelligence layer, not investment advice.{' '}
       {capturedAt ? `Derived from ${source} data captured ${capturedAt}.` : `Derived from ${source} data.`}
     </p>
   )
