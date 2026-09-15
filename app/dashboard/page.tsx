@@ -9,7 +9,7 @@ import { TradeView } from '@/components/trade-view'
 import { JournalView } from '@/components/journal-view'
 import { useSession } from '@/hooks/use-session'
 import { fmt, freshness } from '@/lib/format'
-import { Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, BiasAxis, CheckpointTimeline, Progress, PhaseAside, Label, Metric, Banner, TradeLevels, Card, Sparkline, type Checkpoint } from '@/components/ui/ds'
+import { Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, CheckpointTimeline, Progress, PhaseAside, Label, Metric, Banner, TradeLevels, Card, Sparkline } from '@/components/ui/ds'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sun } from 'lucide-react'
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
@@ -144,21 +144,18 @@ function RulesView({ row }: { row: Row | null }) {
   const calc = row ? calculateVerdict(row, 'NIFTY') : null
   const bias = row && calc ? computeMarketBias(row, calc, 'NIFTY') : null
   const readiness = calc ? computeOptionReadiness(calc) : null
-  const strategyRec = bias && readiness && calc ? computeStrategyRecommendation(bias.label, readiness.ivCondition, calc.vix, calc.dte) : null
 
   return <section className="phase-view rules-view">
 
     <div className="review-section-head rules-header"><div><p className="eyebrow">Interpretation guide</p><h2>Rules engine</h2></div><div className="phase-head-aside"><a className="action-button rules-reference-link" href="/rules">Open the full reference <ChevronRight size={15} /></a></div></div>
-    {bias && readiness && strategyRec && <div className="scoring-path">
-      <Label>Today&apos;s scoring path</Label>
+    {bias && readiness && <div className="scoring-path">
+      <Label>How the intelligence layer reads a day</Label>
       <div className="scoring-path-chips">
         <span className="ds-badge ds-badge--neutral">Bias {fmt.score(bias.score)} · {bias.label}</span>
         <span className="scoring-path-arrow" aria-hidden="true">→</span>
         <span className="ds-badge ds-badge--caution">Readiness {readiness.score} · {readiness.label}</span>
-        <span className="scoring-path-arrow" aria-hidden="true">→</span>
-        <span className="ds-badge ds-badge--outline">{strategyRec.recommendation}</span>
       </div>
-      <p className="scoring-path-note">Each step is a table lookup, not a judgement. Change any input and the path changes with it — that is the whole claim.</p>
+      <p className="scoring-path-note">These are the weights and thresholds the intelligence layer is trained on. The view it publishes each session starts here and departs only with a stated reason.</p>
     </div>}
 
     <div className="rules-stage-summary">
@@ -185,7 +182,7 @@ function RulesView({ row }: { row: Row | null }) {
 }
 
 // Per-day extras History needs beyond the premarket_dashboard row itself, keyed by trade_date.
-type HistoryExtras = { rows: Row[]; mid: Record<string, Row>; midAll: Record<string, Row[]>; post: Record<string, Row>; trade: Record<string, Row> }
+type HistoryExtras = { rows: Row[]; mid: Record<string, Row>; midAll: Record<string, Row[]>; post: Record<string, Row>; trade: Record<string, Row>; agent: Record<string, AgentCall[]> }
 
 function historyOutcomeRead(trade: Row | undefined) {
   const outcome = trade?.outcome
@@ -195,15 +192,9 @@ function historyOutcomeRead(trade: Row | undefined) {
   return { label: 'No trade logged', cls: 'outcome-neutral' }
 }
 
-// One trading day told as a 4-beat story: Opening (real gap), Expected (fresh morning-call recompute),
-// Through the day (midday bias read from midmarket_snapshot's own stored value), Close (actual outcome).
-// Beat 2 is recomputed here with the same computeMarketBias/computeOptionReadiness/computeStrategyRecommendation
-// functions the Verdict page uses -- pre-market has all 4 inputs those functions need, so recomputing is fine.
-// Beat 3 reads midSnapshot's market_bias_{suffix}_mid / suggested_strategy_{suffix}_mid directly instead,
-// since midmarket_snapshot has no open-interest columns and no gap field -- recomputing here was silently
-// missing 2 of computeMarketBias's 4 inputs and pinning almost every midday reading to "Neutral" regardless
-// of the real intraday move (verified against real PCR/spot/max-pain swings on 2026-08-26, where the stored
-// value correctly moved Neutral -> Bearish -> Strong Bearish through the day).
+// One trading day told as a 4-beat story: Opening (real gap), the agent's morning view per instrument
+// (open row: view + strategy) with its post-close grade and lesson, and Close (actual outcome). Days that
+// predate the agent show "No agent view for this session" -- never a rule-engine recompute.
 // Reference #s-history renders "Fri, 11 Sep", not an ISO date with the weekday beside it.
 // The month comes from the MON table below for the same reason navDate uses it: Intl's
 // en-GB short month is "Sept" for September and varies by ICU version, so a column of dates
@@ -219,9 +210,23 @@ function historyDateLabel(row: Row): string {
   return `${get('weekday')}, ${get('day')} ${MON[Number(get('month')) - 1]}`
 }
 
-function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid: Row | undefined; post: Row | undefined; trade: Row | undefined }) {
-  const instrument: Instrument = 'NIFTY'
-  const suffix = 'nifty'
+function HistoryAgentBeat({ instrument, calls }: { instrument: Instrument; calls: AgentCall[] | undefined }) {
+  const open = agentFor(calls, 'open', instrument)
+  const close = agentFor(calls, 'post-close', instrument)
+  const strategy = open?.agent_strategy ?? close?.agent_strategy ?? null
+  const view = agentRaw(open, 'view') ?? strategy
+  const grade = close ? GRADE_BADGE[String(close.grade ?? '').toLowerCase()] : null
+  return <div className="history-beat">
+    <span className="history-beat-label">{instrument === 'NIFTY' ? 'Nifty view' : 'Sensex view'}</span>
+    {!open && !close ? <p className="history-beat-empty">No agent view for this session</p> : <p>
+      <b>{view}</b>
+      <br /><span className="agent-badges">{strategy && <span className={`ds-badge ${strategyBadgeTone(strategy)}`}>{strategy}</span>}{grade ? <span className={`ds-badge ${grade.cls}`}>{grade.label}</span> : <span className="ds-badge ds-badge--outline">Not graded yet</span>}</span>
+      {close?.lesson && <><br /><span className="history-beat-note">{String(close.lesson)}</span></>}
+    </p>}
+  </div>
+}
+
+function HistoryDayCard({ row, post, trade, agent }: { row: Row; post: Row | undefined; trade: Row | undefined; agent: AgentCall[] | undefined }) {
 
   // Beat 1 — Opening: NIFTY's own real opening gap (gap_points_nifty / prev_close_nifty), not GIFT Nifty's
   // predicted overnight gap.
@@ -230,17 +235,9 @@ function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid:
   const hasOpening = row.prev_close_nifty != null && row.gap_points_nifty != null
   const openGapPct = prevClose ? (gapPoints / prevClose) * 100 : 0
 
-  // Beat 2 — Expected: the morning call, recomputed fresh from this row's own morning inputs.
-  const morningCalc = useMemo(() => calculateVerdict(row, instrument), [row])
-  const morningBias = useMemo(() => computeMarketBias(row, morningCalc, instrument), [row, morningCalc])
-  const morningReadiness = useMemo(() => computeOptionReadiness(morningCalc), [morningCalc])
-  const morningStrategy = useMemo(() => computeStrategyRecommendation(morningBias.label, morningReadiness.ivCondition, morningCalc.vix, morningCalc.dte), [morningBias, morningReadiness, morningCalc])
-
-  // Beat 3 — Through the day: midday bias/strategy read directly from midSnapshot's own stored columns.
-  const hasMidday = Boolean(midSnapshot && midSnapshot[`market_bias_${suffix}_mid`] != null)
-  const middayBiasLabel = midSnapshot ? String(midSnapshot[`market_bias_${suffix}_mid`] ?? 'Not available') : 'Not available'
-  const middayStrategy = midSnapshot ? String(midSnapshot[`suggested_strategy_${suffix}_mid`] ?? 'Not available') : 'Not available'
-  const shifted = midSnapshot ? Boolean(midSnapshot[`bias_shifted_${suffix}`]) || Boolean(midSnapshot[`strategy_shifted_${suffix}`]) : false
+  // Beats 2 and 3 — the agent's morning view and its grade, per instrument (HistoryAgentBeat).
+  const headBias = agentFor(agent, 'open', 'NIFTY')?.agent_bias ?? null
+  const headWord = agentBiasWord(headBias)
 
   // Beat 4 — Close: postmarket_summary as-is (day_change_pct_nifty already reflects the corrected net_change
   // calculation), plus the actual logged auto_trades outcome for the day — not a range-based estimate.
@@ -249,9 +246,9 @@ function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid:
   return <article className="history-day-card">
     <div className="history-day-head">
       <strong className="history-day-date">{historyDateLabel(row)}</strong>
-      <span className={`ds-badge ds-badge--${morningBias.label === 'Bullish' || morningBias.label === 'Strong Bullish' ? 'up' : morningBias.label === 'Bearish' || morningBias.label === 'Strong Bearish' ? 'down' : 'neutral'}`}>
-        {morningBias.label === 'Bullish' || morningBias.label === 'Strong Bullish' ? '\u2191' : morningBias.label === 'Bearish' || morningBias.label === 'Strong Bearish' ? '\u2193' : '\u2192'} {morningBias.label}
-      </span>
+      {headBias && <span className={`ds-badge ds-badge--${headWord === 'Bullish' ? 'up' : headWord === 'Bearish' ? 'down' : 'neutral'}`}>
+        {headWord === 'Bullish' ? '\u2191' : headWord === 'Bearish' ? '\u2193' : '\u2192'} {headBias}
+      </span>}
       {post && <span className={`history-close-pill ${tone(post, 'day_change_pct_nifty')}`}>{value(post, 'day_change_pct_nifty', true)}</span>}
     </div>
     <div className="history-beats">
@@ -259,14 +256,8 @@ function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid:
         <span className="history-beat-label">Pre-market</span>
         {hasOpening ? <p><b className={openGapPct >= 0 ? 'positive' : 'negative'}>{fmt.pct(openGapPct)}</b> gap ({fmt.pts(gapPoints)}) — {gapBandLabel(openGapPct)}</p> : <p className="history-beat-empty">No opening data recorded</p>}
       </div>
-      <div className="history-beat">
-        <span className="history-beat-label">Verdict</span>
-        <p><b>{morningBias.label}</b> bias · {morningStrategy.recommendation}</p>
-      </div>
-      <div className="history-beat">
-        <span className="history-beat-label">Checkpoints</span>
-        {hasMidday ? <p><b className={shifted ? 'is-shifted' : ''}>{middayBiasLabel}</b> bias · {middayStrategy}<br /><span className="history-beat-note">{shifted ? 'Shifted since the morning call' : 'Unchanged since the morning call'}</span></p> : <p className="history-beat-empty">No midday snapshot recorded</p>}
-      </div>
+      <HistoryAgentBeat instrument="NIFTY" calls={agent} />
+      <HistoryAgentBeat instrument="SENSEX" calls={agent} />
       <div className="history-beat">
         <span className="history-beat-label">Outcome</span>
         {post ? <p>Close <b className={tone(post, 'day_change_pct_nifty')}>{value(post, 'day_change_pct_nifty', true)}</b>, high/low {value(post, 'day_high_nifty')} / {value(post, 'day_low_nifty')}<br /><span className={outcome.cls}>{outcome.label}</span></p> : <p className="history-beat-empty">Post-market data not available</p>}
@@ -277,7 +268,7 @@ function HistoryDayCard({ row, mid: midSnapshot, post, trade }: { row: Row; mid:
 
 function HistoryView({ data }: { data: HistoryExtras | null | undefined }) {
   const rows = data?.rows
-  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">Prior snapshots</p><h2>History</h2></div><PhaseAside /></div><div className="history-list history-days">{!rows ? <p className="history-empty">Loading history…</p> : rows.length === 0 ? <p className="history-empty">No history rows available yet.</p> : rows.map((row) => <HistoryDayCard key={String(row.trade_date)} row={row} mid={data?.mid[String(row.trade_date)]} post={data?.post[String(row.trade_date)]} trade={data?.trade[String(row.trade_date)]} />)}</div></section>
+  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">Prior snapshots</p><h2>History</h2></div><PhaseAside /></div><div className="history-list history-days">{!rows ? <p className="history-empty">Loading history…</p> : rows.length === 0 ? <p className="history-empty">No history rows available yet.</p> : rows.map((row) => <HistoryDayCard key={String(row.trade_date)} row={row} post={data?.post[String(row.trade_date)]} trade={data?.trade[String(row.trade_date)]} agent={data?.agent[String(row.trade_date)]} />)}</div></section>
 }
 
 type Instrument = 'NIFTY' | 'SENSEX'
@@ -450,6 +441,57 @@ function mapRecommendationToStrategy(recommendation: string): { strategy: Strate
   if (recommendation === 'No Trade') return { strategy: 'No Trade', noTrade: true }
   return { strategy: 'Iron Condor', noTrade: true }
 }
+// ---------------------------------------------------------------- agent_calls
+// The intelligence layer writes one row per (trade_date, phase, checkpoint, instrument). Every
+// user-facing bias / readiness / strategy / reasoning line on the five phase screens reads from
+// these rows; the rule-engine functions above still supply expected move, strikes and targets,
+// but no longer any judgement text. A missing row is shown as "lands at HH:MM IST", never as a
+// rule-engine fallback.
+type AgentPhase = 'premarket' | 'open' | 'mid' | 'post-close'
+type AgentInstrument = Instrument | 'BOTH'
+type AgentCall = {
+  trade_date: string; phase: AgentPhase; checkpoint: string | null; instrument: AgentInstrument
+  agent_bias: string | null; agent_strategy: string | null; action: string | null; confidence: string | null
+  reasoning: string | null; invalidation: string | null; guardrail_applied: string | null
+  grade: string | null; misleading_signal: string | null; lesson: string | null
+  raw_output: Record<string, unknown> | null; inputs?: Record<string, unknown> | null; created_at: string | null
+}
+// Latest row for a (phase, instrument, checkpoint) -- an agent re-run for the same slot supersedes
+// the earlier write, so pick by created_at rather than by array order.
+function agentFor(rows: AgentCall[] | null | undefined, phase: AgentPhase, instrument: AgentInstrument, checkpoint?: string): AgentCall | null {
+  if (!rows) return null
+  let best: AgentCall | null = null
+  for (const r of rows) {
+    if (r.phase !== phase || r.instrument !== instrument) continue
+    if (checkpoint !== undefined && String(r.checkpoint ?? '') !== checkpoint) continue
+    if (!best || String(r.created_at ?? '') > String(best.created_at ?? '')) best = r
+  }
+  return best
+}
+function agentRaw(call: AgentCall | null | undefined, key: string): string | null {
+  const v = call?.raw_output?.[key]
+  return v == null || v === '' ? null : String(v)
+}
+// Leg wing/side placement wants a three-way word; the agent's bias is a five-band label.
+function agentBiasWord(bias: string | null | undefined): 'Bullish' | 'Bearish' | 'Neutral' {
+  const b = String(bias ?? '')
+  return /bull/i.test(b) ? 'Bullish' : /bear/i.test(b) ? 'Bearish' : 'Neutral'
+}
+// open rows store reasoning as `view + " " + reasoning`; when both are shown, drop the prefix.
+function stripViewPrefix(reasoning: string | null | undefined, view: string | null): string {
+  const text = String(reasoning ?? '').trim()
+  if (view && text.startsWith(view.trim())) return text.slice(view.trim().length).trim()
+  return text
+}
+const BULLISH_STRUCTURES = ['Naked Call', 'Call Debit Spread', 'Put Credit Spread']
+const BEARISH_STRUCTURES = ['Naked Put', 'Put Debit Spread', 'Call Credit Spread']
+function strategyBadgeTone(strategy: string | null | undefined): string {
+  const s = String(strategy ?? '')
+  return BULLISH_STRUCTURES.includes(s) ? 'ds-badge--up' : BEARISH_STRUCTURES.includes(s) ? 'ds-badge--down' : 'ds-badge--neutral'
+}
+const REGIME_HEADLINE: Record<string, string> = { trend_up: 'Trend day, upside', trend_down: 'Trend day, downside', range: 'Range day', event_driven: 'Event-driven day', unclear: 'No clear regime yet' }
+const MID_ACTION_LABEL: Record<string, string> = { hold: 'Hold', adjust: 'Adjust', exit: 'Exit', enter: 'Enter', stay_out: 'Stay out' }
+const GRADE_BADGE: Record<string, { label: string; cls: string }> = { right: { label: 'Right', cls: 'ds-badge--up' }, partial: { label: 'Partial', cls: 'ds-badge--caution' }, wrong: { label: 'Wrong', cls: 'ds-badge--down' }, no_call: { label: 'Stayed out', cls: 'ds-badge--neutral' } }
 // Payoff diagram for the currently selected strategy: plots a stylized P&L curve across a strike
 // range around ATM, sized from each leg's strike/side/premium, with vertical reference lines for
 // Spot and every leg strike so it's immediately clear which strikes to short vs buy. For buyer
@@ -603,7 +645,7 @@ function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarge
   </div>
 }
 
-function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrument }) {
+function VerdictInstrument({ row, instrument, agentOpen }: { row: Row; instrument: Instrument; agentOpen: AgentCall | null }) {
   const calc = useMemo(() => calculateVerdict(row, instrument), [row, instrument])
   const legSupabase = useMemo(() => createClient(), [])
   // Live call/put premiums for a +/-20-strike band around ATM, refreshed by the Edge Function's
@@ -627,13 +669,13 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
     setUpdatingPremium(true)
     try { await mutateLegPremiums() } finally { setUpdatingPremium(false) }
   }
-  // 3-stage Bias / Option Readiness / Strategy Recommendation framework now drives autoStrategy (replacing the
-  // old normalizeStrategy(calc.strategy) vote-based pick). calc.bias/calc.strategy themselves are left intact
-  // since calc.bias still drives leg wing/side placement (strike/hedge placement logic, out of scope here).
-  const marketBias = useMemo(() => computeMarketBias(row, calc, instrument), [row, calc, instrument])
-  const optionReadiness = useMemo(() => computeOptionReadiness(calc), [calc])
-  const strategyRec = useMemo(() => computeStrategyRecommendation(marketBias.label, optionReadiness.ivCondition, calc.vix, calc.dte), [marketBias, optionReadiness, calc])
-  const mappedStrategy = useMemo(() => mapRecommendationToStrategy(strategyRec.recommendation), [strategyRec])
+  // The agent's open-phase view of record drives autoStrategy (and, via agentBias, leg wing/side
+  // placement). calc.bias/calc.strategy stay on the calc object but are no longer read for anything
+  // the user sees. No open row yet -> 'No Trade' until the 09:35 view lands.
+  const agentStrategyName = agentOpen?.agent_strategy ?? 'No Trade'
+  const mappedStrategy = useMemo(() => mapRecommendationToStrategy(agentStrategyName), [agentStrategyName])
+  const agentBias = agentBiasWord(agentOpen?.agent_bias)
+  const agentView = agentRaw(agentOpen, 'view')
   const autoStrategy = mappedStrategy.strategy
   const isNoTrade = mappedStrategy.noTrade
   const [strategy, setStrategy] = useState<StrategyChoice>(autoStrategy)
@@ -657,13 +699,13 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   const [hedgeWidthInput, setHedgeWidthInput] = useState(String(defaultHedgeWidth))
   useEffect(() => { setHedgeWidthInput(String(defaultHedgeWidth)) }, [defaultHedgeWidth])
   const hedgeWidth = Number(hedgeWidthInput) || defaultHedgeWidth
-  // Side toggle (Call side / Put side) for Debit/Credit Spread. Defaults from the Stage 3 recommendation's
-  // mapped side when the recommendation is itself a Debit/Credit Spread, else from today's Bias — but is the
-  // actual driver of leg construction from here on, fully user-overridable via the toggle below.
-  const defaultSide: Side = mappedStrategy.side ?? (calc.bias === 'Bearish' ? 'Put' : 'Call')
+  // Side toggle (Call side / Put side) for Debit/Credit Spread. Defaults from the agent strategy's mapped
+  // side when it is itself a Debit/Credit Spread, else from the agent's bias — but is the actual driver of
+  // leg construction from here on, fully user-overridable via the toggle below.
+  const defaultSide: Side = mappedStrategy.side ?? (agentBias === 'Bearish' ? 'Put' : 'Call')
   const [side, setSide] = useState<Side>(defaultSide)
   useEffect(() => { setSide(defaultSide) }, [defaultSide])
-  const legs = useMemo(() => legsForStrategy(strategy, calc.bias, side), [strategy, calc.bias, side])
+  const legs = useMemo(() => legsForStrategy(strategy, agentBias, side), [strategy, agentBias, side])
   const atmNumber = Number(atmSpot) || 0
   const roundedStrike = (value: number) => Math.round(value / strikeStep) * strikeStep
   const [legPremiums, setLegPremiums] = useState<Record<string, string>>({})
@@ -779,7 +821,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
   }
   const sync = Math.abs(calc.difference) <= 5 ? ['In Sync', 'success', 'Prediction is tracking the actual open.'] : Math.abs(calc.difference) <= 15 ? ['Minor Divergence', 'warning', 'Prediction is slightly away from the actual open.'] : ['Diverging', 'danger', 'Prediction is materially away from the actual open.']
   const realGapPct = calc.prev ? (calc.open / calc.prev) * 100 : calc.gapPct
-  const summary = `${row.trade_date} · ${row.day_name}: ${instrument} opened ${realGapPct >= 0 ? '+' : ''}${realGapPct.toFixed(2)}% gap (${calc.open.toFixed(1)}). ${marketBias.label} bias with India VIX ${calc.vix.toFixed(1)} (${calc.vix < 11 ? 'low volatility — momentum only' : calc.vix <= 14 ? 'normal volatility — ATM / ITM by setup' : 'elevated volatility — prefer defined risk'}), ${calc.dte <= 7 ? 'Weekly' : 'Monthly'} expiry in ${calc.dte} days, ${calc.iv} versus VIX, PCR ${calc.pcr.toFixed(2)}, OI support ${calc.support.toFixed(0)} (${calc.oiSupport}) / resistance ${calc.resistance.toFixed(0)} (${calc.oiResistance}), chart ${calc.chartSupport.toFixed(0)}–${calc.chartResistance.toFixed(0)}, max pain ${calc.maxPain.toFixed(0)}.`
+  const summary = `${row.trade_date} · ${row.day_name}: ${instrument} opened ${realGapPct >= 0 ? '+' : ''}${realGapPct.toFixed(2)}% gap (${calc.open.toFixed(1)}). ${agentOpen?.agent_bias ? `${agentOpen.agent_bias} bias` : 'Bias not yet read'} with India VIX ${calc.vix.toFixed(1)} (${calc.vix < 11 ? 'low volatility — momentum only' : calc.vix <= 14 ? 'normal volatility — ATM / ITM by setup' : 'elevated volatility — prefer defined risk'}), ${calc.dte <= 7 ? 'Weekly' : 'Monthly'} expiry in ${calc.dte} days, ${calc.iv} versus VIX, PCR ${calc.pcr.toFixed(2)}, OI support ${calc.support.toFixed(0)} (${calc.oiSupport}) / resistance ${calc.resistance.toFixed(0)} (${calc.oiResistance}), chart ${calc.chartSupport.toFixed(0)}–${calc.chartResistance.toFixed(0)}, max pain ${calc.maxPain.toFixed(0)}.`
   return <article className="verdict-instrument">
     <div className="verdict-instrument-head">
       <h3>{instrument}<button type="button" className="semantic-info verdict-info" aria-label={`${instrument} verdict details`}><Info size={14} aria-hidden="true" /><span className="semantic-tooltip" role="tooltip">{summary}</span></button></h3>
@@ -789,22 +831,24 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
       : <div className="sync-strip sync-strip-empty"><small>No predicted open for SENSEX — GIFT Nifty leads NIFTY only, so there is no overnight leading indicator to compare against.</small></div>}
     <div className="verdict-answer">
       <div className="verdict-answer-main">
-        <Label tone="caution">Recommendation</Label>
-        <strong className="verdict-answer-value">{strategyRec.recommendation}</strong>
-        <p className="verdict-answer-note">{strategyRec.reason}.{isNoTrade ? ' You can still build a position manually below.' : ''}</p>
+        <Label tone="info">View of record</Label>
+        {agentOpen ? <>
+          <strong className="verdict-answer-value">{agentView ?? agentStrategyName}</strong>
+          <div className="agent-badges">
+            <span className={`ds-badge ${strategyBadgeTone(agentOpen.agent_strategy)}`}>{agentStrategyName}</span>
+            {agentOpen.confidence && <span className="ds-badge ds-badge--outline">Confidence {agentOpen.confidence}</span>}
+          </div>
+          <p className="verdict-answer-note">{stripViewPrefix(agentOpen.reasoning, agentView)}{isNoTrade ? ' You can still build a position manually below.' : ''}</p>
+          {agentOpen.invalidation && <p className="agent-wrong-if">Wrong if — {agentOpen.invalidation}</p>}
+        </> : <p className="verdict-answer-note">View of record lands at 09:35 IST.</p>}
       </div>
-      <div className="verdict-answer-scores">
-        <div className="verdict-score-card">
-          <div className="verdict-score-head"><Label>Market bias</Label><span className="ds-num verdict-score-num">{fmt.score(marketBias.score)}</span></div>
-          <strong className="verdict-score-band">{marketBias.label}</strong>
-          <BiasAxis value={marketBias.score} />
-        </div>
-        <div className="verdict-score-card">
-          <div className="verdict-score-head"><Label>Option readiness</Label><span className="ds-num verdict-score-num">{optionReadiness.score} / 6</span></div>
-          <strong className={`verdict-score-band ${optionReadiness.label.toLowerCase() === 'caution' ? 'is-caution' : ''}`}>{optionReadiness.label}</strong>
-          <small className="verdict-score-note">{optionReadiness.ivCondition} IV · VIX {calc.vix} · DTE {calc.dte}</small>
-        </div>
-      </div>
+      {agentOpen && <div className="agent-ledger">
+        <Label>How it was read</Label>
+        <div className="field-card"><span>Bias</span><strong>{agentOpen.agent_bias ?? 'Not stated'}</strong></div>
+        <div className="field-card"><span>Readiness</span><strong>{agentRaw(agentOpen, 'readiness') ?? 'Not stated'}</strong></div>
+        <div className="field-card"><span>IV</span><strong>{agentRaw(agentOpen, 'iv_condition') ?? 'Not stated'}</strong></div>
+        {agentOpen.guardrail_applied && <span className="ds-badge ds-badge--caution agent-guardrail">Risk limit applied: {agentOpen.guardrail_applied}</span>}
+      </div>}
     </div>
     <div className="verdict-card verdict-strategy-summary">
       <div className="verdict-strategy-box">
@@ -819,7 +863,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
             <button type="button" className={side === 'Put' ? 'is-active' : ''} aria-pressed={side === 'Put'} onClick={() => setSide('Put')}>Put side</button>
           </div>}
         </div>
-        {autoStrategy !== strategy && <small className="strategy-suggestion">System suggested: {autoStrategy}</small>}
+        {autoStrategy !== strategy && <small className="strategy-suggestion">The view called for: {autoStrategy}</small>}
       </div>
       <div className="day-summary"><span className="eyebrow">Day summary</span><p>{summary}</p></div>
     </div>
@@ -896,7 +940,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
     <Disclaimer capturedAt={fmt.timeIST((row.updated_at ?? row.trade_date) as string | null)} />
   </article>
 }
-function VerdictView({ row }: { row: Row }) {
+function VerdictView({ row, agentCalls }: { row: Row; agentCalls: AgentCall[] | null | undefined }) {
   const eventFlag = useMemo(() => highImpactEvent(row.event_today as string | null), [row.event_today])
   // Verdict is computed from Open-phase fields (bias/strategy are derived from gap, PCR, IV
   // captured at 9:30). If those are still null, the 9:30 cron hasn't run yet today -- show a
@@ -904,7 +948,7 @@ function VerdictView({ row }: { row: Row }) {
   // render off of leftover/undefined values).
   const hasOpenData = row.market_bias_nifty != null && row.market_bias_sensex != null
   if (!hasOpenData) return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open · {syncLabel(row, '09:30')}</p><h2>Verdict</h2></div><PhaseAside capturedAt={(row?.updated_at ?? null) as string | null} /></div><p className="history-empty">Verdict data not available yet — updates at 9:30 AM IST once the market opens.</p></section>
-  return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open · {syncLabel(row, '09:30')}</p><h2>Verdict</h2></div><PhaseAside capturedAt={(row?.updated_at ?? null) as string | null} /></div>{eventFlag && <div className="event-caution"><AlertTriangle size={16} /><span><strong>{eventFlag.name}</strong> — high impact event at {eventFlag.time}. Trade with caution.</span></div>}<div className="verdict-instruments"><VerdictInstrument row={row} instrument="NIFTY" /><VerdictInstrument row={row} instrument="SENSEX" /></div></section>
+  return <section className="phase-view verdict-view"><div className="review-section-head"><div><p className="eyebrow">After Market Open · {syncLabel(row, '09:30')}</p><h2>Verdict</h2></div><PhaseAside capturedAt={(row?.updated_at ?? null) as string | null} /></div>{eventFlag && <div className="event-caution"><AlertTriangle size={16} /><span><strong>{eventFlag.name}</strong> — high impact event at {eventFlag.time}. Trade with caution.</span></div>}<div className="verdict-instruments"><VerdictInstrument row={row} instrument="NIFTY" agentOpen={agentFor(agentCalls, 'open', 'NIFTY')} /><VerdictInstrument row={row} instrument="SENSEX" agentOpen={agentFor(agentCalls, 'open', 'SENSEX')} /></div></section>
 }
 function OutcomeBadge({ label, target, sl }: { label: string; target?: boolean; sl?: boolean }) { const text = target === true ? 'Target hit' : sl === true ? 'SL hit' : target === false && sl === false ? 'Neither' : 'Not yet available'; const cls = target === true ? 'outcome-hit' : sl === true ? 'outcome-stop' : 'outcome-neutral'; return <div className={`outcome-badge ${cls}`}><span>{label}</span><strong>{text}</strong></div> }
 // Fixed daily checkpoint slots in order, with display label and 24h IST minute-of-day (used to
@@ -928,129 +972,61 @@ function nowMinuteOfDayIST(): number {
   const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? 0)
   return hour * 60 + minute
 }
-// One checkpoint's compact read for a single instrument -- time, bias (with the live intraday
-// % change alongside it), suggested strategy (with the IV-vs-VIX read that drove the pick), and
-// a one-line shift note when the bias/strategy actually moved since the morning call. All values
-// read directly from the stored midmarket_snapshot row (see the bias-source fix above) rather than
-// recalculated. intraday_change_pct_{suffix} is a genuine derived value -- (spot - prev_close) /
-// prev_close * 100 off two real captured prices, verified against today's actual spot/prev_close --
-// not a placeholder or estimate.
-function MidCheckpointRow({ cp, suffix, label }: { cp: Row; suffix: 'nifty' | 'sensex'; label: string }) {
-  const biasLabel = String(cp[`market_bias_${suffix}_mid`] ?? 'Not available')
-  const strategy = String(cp[`suggested_strategy_${suffix}_mid`] ?? 'Not available')
-  const ivRead = cp[`iv_vs_vix_${suffix}_mid`] != null ? String(cp[`iv_vs_vix_${suffix}_mid`]).toLowerCase() : null
-  const changePct = cp[`intraday_change_pct_${suffix}`]
-  const changeLabel = changePct != null ? `${Number(changePct) > 0 ? '+' : ''}${Number(changePct).toFixed(2)}%` : null
-  const shifted = Boolean(cp[`bias_shifted_${suffix}`]) || Boolean(cp[`strategy_shifted_${suffix}`])
-  const shiftNote = String(cp[`shift_note_${suffix}`] ?? '')
-  const tone = /bearish/i.test(biasLabel) ? 'negative' : /bullish/i.test(biasLabel) ? 'positive' : ''
-
-  return <div className={`mid-row-card ${shifted ? 'mid-row-card-shifted' : ''}`}>
-    <div className="mid-row-top">
-      <span className="mid-row-time">{label}</span>
-      <span className={`mid-row-bias ${tone}`}>{biasLabel}{changeLabel && <em className="mid-row-change">{changeLabel}</em>}</span>
-    </div>
-    <p className="mid-row-strategy">{strategy}{ivRead && <span className="mid-row-iv"> · IV {ivRead}</span>}</p>
-    {shifted && shiftNote && <p className="mid-row-shift-note">{shiftNote}</p>}
-  </div>
+// The per-checkpoint verdict is the agent's mid row for that instrument + slot: the action it
+// took (hold / adjust / exit / enter / stay out), the strategy that is on after it, and why.
+// The midmarket_snapshot row for the same slot still supplies the figures (intraday %, PCR,
+// VIX) that sit under it as evidence -- data, not judgement.
+type MidRead = { slot: (typeof CHECKPOINT_SLOTS)[number]; call: AgentCall | null; cp: Row | undefined }
+function midReads(agentCalls: AgentCall[] | null | undefined, instrument: Instrument, byId: Map<string, Row>): MidRead[] {
+  return CHECKPOINT_SLOTS.map((slot) => ({ slot, call: agentFor(agentCalls, 'mid', instrument, slot.id), cp: byId.get(slot.id) }))
 }
+function midActionKey(call: AgentCall | null): string { return String(call?.action ?? '').toLowerCase() }
 
-// A checkpoint slot whose cron hasn't run yet today, for one instrument column.
-function MidCheckpointRowPending({ label }: { label: string }) {
-  return <div className="mid-row-card mid-row-card-pending">
-    <span className="mid-row-time">{label}</span>
-    <span className="mid-row-pending-tag">Pending</span>
-  </div>
-}
-
-// One instrument's full day at a glance: all 5 checkpoints stacked, expanded by default (no
-// tap-to-expand) so the whole session is visible in one compact column.
-// The screen answers one question: did the morning call survive the day? It should say so
-// in a sentence, in the place every other screen puts its answer, rather than leaving the
-// reader to infer it from ten rows. Built only from what the checkpoints already report --
-// which instrument shifted, when, and to what -- so nothing is asserted that is not in the
-// data.
-function MidAnswer({ byId }: { byId: Map<string, Row> }) {
-  const read = (instrument: Instrument) => {
-    const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
+// The screen answers one question: what did the agent do with the morning call? One clause per
+// instrument, built from the latest checkpoint's action -- "Nifty: stayed out since the open.
+// Sensex: exited at 10:30, out since." Nothing is asserted that is not in an agent row.
+function MidAnswer({ agentCalls, byId }: { agentCalls: AgentCall[] | null | undefined; byId: Map<string, Row> }) {
+  const clause = (instrument: Instrument): string | null => {
     const name = instrument === 'NIFTY' ? 'Nifty' : 'Sensex'
-    let band: string | null = null
-    let shiftAt: string | null = null
-    let shiftTo: string | null = null
-    let seen = 0
-    for (const slot of CHECKPOINT_SLOTS) {
-      const cp = byId.get(slot.id)
-      if (!cp) continue
-      seen += 1
-      const b = cp[`market_bias_${suffix}_mid`]
-      if (b != null) band = String(b)
-      if (Boolean(cp[`bias_shifted_${suffix}`]) || Boolean(cp[`strategy_shifted_${suffix}`])) {
-        shiftAt = slot.label
-        shiftTo = b != null ? String(b).toLowerCase() : null
-      }
+    const seen = midReads(agentCalls, instrument, byId).filter((r): r is MidRead & { call: AgentCall } => r.call != null)
+    if (seen.length === 0) return null
+    const last = seen[seen.length - 1]
+    const action = midActionKey(last.call)
+    const strategy = last.call.agent_strategy ?? 'the position'
+    if (action === 'stay_out') {
+      const lastActive = [...seen].reverse().find((r) => midActionKey(r.call) !== 'stay_out')
+      if (!lastActive) return `${name}: stayed out since the open`
+      if (midActionKey(lastActive.call) === 'exit') return `${name}: exited at ${lastActive.slot.label}, out since`
+      return `${name}: out since ${lastActive.slot.label}`
     }
-    return { name, band, shiftAt, shiftTo, seen }
+    if (action === 'exit') return `${name}: exited ${strategy} at ${last.slot.label}, out since`
+    if (action === 'enter') return `${name}: entered ${strategy} at ${last.slot.label}`
+    if (action === 'adjust') return `${name}: adjusted to ${strategy} at ${last.slot.label}`
+    if (action === 'hold') return `${name}: holding ${strategy} as of ${last.slot.label}`
+    return `${name}: ${strategy} as of ${last.slot.label}`
   }
-  const a = read('NIFTY')
-  const b = read('SENSEX')
-  if (a.seen === 0 && b.seen === 0) return null
-
-  const clause = (r: ReturnType<typeof read>) =>
-    r.seen === 0 ? `${r.name} has not reported yet`
-      : r.shiftAt ? `${r.name} turned ${r.shiftTo ?? 'a new band'} at ${r.shiftAt}`
-      : `${r.name} held ${(r.band ?? 'its band').toLowerCase()} all day`
-  const moved = a.shiftAt || b.shiftAt
-  const total = a.seen + b.seen
-  const shifts = (a.shiftAt ? 1 : 0) + (b.shiftAt ? 1 : 0)
-
+  const a = clause('NIFTY')
+  const b = clause('SENSEX')
+  const seen = ['NIFTY', 'SENSEX'].flatMap((i) => midReads(agentCalls, i as Instrument, byId).filter((r) => r.call)).length
+  const moved = ['NIFTY', 'SENSEX'].some((i) => midReads(agentCalls, i as Instrument, byId).some((r) => ['adjust', 'exit'].includes(midActionKey(r.call))))
   return <div className={`mid-answer ${moved ? 'is-moved' : ''}`}>
-    <Label tone={moved ? 'caution' : undefined}>Where the read stands</Label>
-    <p className="mid-answer-line">{clause(a)}. {clause(b)}.</p>
-    <p className="mid-answer-sub">
-      {total - shifts} of {total} checkpoint{total === 1 ? '' : 's'} came back unchanged.
-      {moved ? ' Only the shift above changed what the framework recommends.' : ' The morning call stood for the whole session.'}
-    </p>
+    <Label tone="info">Where the read stands</Label>
+    {a == null && b == null
+      ? <p className="mid-answer-sub">First checkpoint view lands at 10:33 IST.</p>
+      : <>
+        <p className="mid-answer-line">{[a, b].filter(Boolean).map((c) => `${c}.`).join(' ')}</p>
+        <p className="mid-answer-sub">{seen} checkpoint view{seen === 1 ? '' : 's'} in so far.{moved ? ' At least one position was changed or closed since the open.' : ' No position has been changed since the open.'}</p>
+      </>}
   </div>
 }
 
-function MidInstrumentColumn({ instrument, byId, nowMin }: { instrument: Instrument; byId: Map<string, Row>; nowMin: number }) {
+function MidInstrumentColumn({ instrument, agentCalls, byId, nowMin }: { instrument: Instrument; agentCalls: AgentCall[] | null | undefined; byId: Map<string, Row>; nowMin: number }) {
   const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
-  // Spec §3: five checkpoint rows through CheckpointTimeline. A checkpoint whose bias moved
-  // gets the caution tone and a one-line explanation; unchanged ones stay neutral, so the eye
-  // lands on the one that actually did something. Two columns because MarketCue tracks two
-  // instruments -- the reference shows one, but the row design is the part that transfers.
-  const rows: Checkpoint[] = CHECKPOINT_SLOTS.map((slot) => {
-    const cp = byId.get(slot.id)
-    if (!cp) {
-      const overdue = nowMin >= slot.minuteOfDay
-      return {
-        time: slot.label,
-        headline: overdue ? 'Running a little late' : 'Not captured yet',
-        badge: overdue ? 'overdue' : 'scheduled',
-        detail: overdue
-          ? 'The checkpoint is past due and has not reported.'
-          : `Captures at ${slot.label} IST.`,
-      }
-    }
-    const biasLabel = String(cp[`market_bias_${suffix}_mid`] ?? 'Not available')
-    const strategy = String(cp[`suggested_strategy_${suffix}_mid`] ?? 'Not available')
-    const changePct = cp[`intraday_change_pct_${suffix}`]
-    const shifted = Boolean(cp[`bias_shifted_${suffix}`]) || Boolean(cp[`strategy_shifted_${suffix}`])
-    const shiftNote = String(cp[`shift_note_${suffix}`] ?? '')
-    const parts = [
-      changePct != null ? `${instrument === 'NIFTY' ? 'Nifty' : 'Sensex'} ${fmt.pct(Number(changePct))}` : null,
-      cp[`pcr_${suffix}_mid`] != null ? `PCR ${fmt.ratio(Number(cp[`pcr_${suffix}_mid`]))}` : null,
-      cp[`india_vix_mid`] != null ? `VIX ${fmt.ratio(Number(cp['india_vix_mid']))}` : null,
-    ].filter(Boolean)
-    return {
-      time: slot.label,
-      headline: shifted ? `Bias shifted to ${biasLabel.toLowerCase()}` : `Bias held ${biasLabel.toLowerCase()}`,
-      badge: shifted ? `${biasLabel} · shifted` : `${biasLabel} · unchanged`,
-      detail: parts.length ? parts.join(' · ') : strategy,
-      shifted,
-      note: shifted ? (shiftNote || 'Bias moved since the previous checkpoint.') : undefined,
-    }
-  })
+  const reads = midReads(agentCalls, instrument, byId)
+  const landed = reads.filter((r): r is MidRead & { call: AgentCall } => r.call != null)
+  const pending = reads.filter((r) => !r.call)
+  const overdue = pending.filter((r) => nowMin >= r.slot.minuteOfDay + 3)
+  const later = pending.filter((r) => nowMin < r.slot.minuteOfDay + 3)
 
   // The five readings as a series, for the drift line. Nulls stay null -- a checkpoint that
   // never reported is a gap, not a zero.
@@ -1062,69 +1038,56 @@ function MidInstrumentColumn({ instrument, byId, nowMin }: { instrument: Instrum
   const first = seen[0] ?? null
   const last = seen.length ? seen[seen.length - 1] : null
   const drift = first != null && last != null ? last - first : null
-
-  const captured = rows.filter((r) => r.badge !== 'overdue' && r.badge !== 'scheduled')
-  const shifts = captured.filter((r) => r.shifted)
-  const held = captured.filter((r) => !r.shifted)
-  const pending = rows.filter((r) => r.badge === 'overdue' || r.badge === 'scheduled')
-  const band = captured.length ? String(captured[captured.length - 1].badge).split(' · ')[0] : null
+  const changed = landed.some((r) => ['adjust', 'exit'].includes(midActionKey(r.call)))
+  const latest = landed.length ? landed[landed.length - 1] : null
+  const latestAction = latest ? MID_ACTION_LABEL[midActionKey(latest.call)] ?? latest.call.action ?? '' : ''
 
   const name = instrument === 'NIFTY' ? 'Nifty' : 'Sensex'
 
   return <div className="mid-track">
     <div className="mid-track-head">
       <span className="mid-track-inst">{name}</span>
-      <span className={`mid-track-verdict ${shifts.length ? 'is-moved' : ''}`}>
-        {captured.length === 0
-          ? 'No checkpoint yet'
-          : shifts.length
-            ? `${held.length} held · ${shifts.length} shift${shifts.length === 1 ? '' : 's'}`
-            : `${held.length} of ${CHECKPOINT_SLOTS.length} held${band ? ` · ${band.toLowerCase()}` : ''}`}
+      <span className={`mid-track-verdict ${changed ? 'is-moved' : ''}`}>
+        {landed.length === 0 ? 'No checkpoint view yet' : `${landed.length} of ${CHECKPOINT_SLOTS.length} read${latestAction ? ` · ${latestAction.toLowerCase()}` : ''}`}
       </span>
     </div>
 
     {seen.length >= 2 && <div className="mid-drift">
-      <Sparkline values={series} endTone={shifts.length ? 'caution' : drift != null && drift > 0 ? 'up' : drift != null && drift < 0 ? 'down' : 'neutral'} />
+      <Sparkline values={series} endTone={changed ? 'caution' : drift != null && drift > 0 ? 'up' : drift != null && drift < 0 ? 'down' : 'neutral'} />
       <span className="mid-drift-ends">{fmt.pct(first)} → <b>{fmt.pct(last)}</b></span>
       {drift != null && <span className={`mid-drift-delta ${drift > 0 ? 'positive' : drift < 0 ? 'negative' : ''}`}>{fmt.pct(drift)}</span>}
     </div>}
 
-    {/* The one thing that happened, at full weight. */}
-    {shifts.map((r) => <div className="mid-event" key={r.time}>
-      <span className="mid-event-time">{r.time}<small>IST</small></span>
-      <span>
-        <span className="mid-event-head">{r.headline}</span>
-        {r.note && <span className="mid-event-from">{r.note}</span>}
-        <span className="mid-event-evidence">{r.detail}</span>
-      </span>
-    </div>)}
-
-    {shifts.length === 0 && captured.length > 0 && <p className="mid-quiet">
-      <b>No band crossed.</b> The morning call stood for {captured.length === CHECKPOINT_SLOTS.length ? 'the whole session' : `all ${captured.length} checkpoints so far`}.
-    </p>}
-
-    {/* The non-events, folded but not hidden. */}
-    {held.length > 0 && <details className="mid-held">
-      <summary>
-        <span className="mid-held-chev" aria-hidden="true">›</span>
-        {held.length === CHECKPOINT_SLOTS.length ? `All ${held.length} checkpoints unchanged` : `${held.length} earlier checkpoint${held.length === 1 ? '' : 's'}, unchanged`}
-        <span className="mid-held-range">{held[0].time} – {held[held.length - 1].time}</span>
-      </summary>
-      <div className="mid-held-rows">
-        {held.map((r) => <div className="mid-held-row" key={r.time}>
-          <span className="mid-held-time">{r.time}</span>
-          <span className="mid-held-detail">{r.detail}</span>
-        </div>)}
+    {landed.map((r) => {
+      const action = midActionKey(r.call)
+      const cp = r.cp
+      const changePct = cp?.[`intraday_change_pct_${suffix}`]
+      const evidence = [
+        changePct != null ? `${name} ${fmt.pct(Number(changePct))}` : null,
+        cp?.[`pcr_${suffix}_mid`] != null ? `PCR ${fmt.ratio(Number(cp[`pcr_${suffix}_mid`]))}` : null,
+        cp?.india_vix_mid != null ? `VIX ${fmt.ratio(Number(cp.india_vix_mid))}` : null,
+      ].filter(Boolean)
+      const invalidationHit = (r.call.inputs?.state as Record<string, unknown> | undefined)?.invalidation_hit === true
+      return <div className="mid-agent-row" key={r.slot.id}>
+        <span className="mid-agent-time">{r.slot.label}<small>IST</small></span>
+        <span>
+          <span className="mid-agent-head"><b className={`mid-agent-action is-${action}`}>{MID_ACTION_LABEL[action] ?? r.call.action ?? 'No action'}</b>{r.call.agent_strategy && <span className="mid-agent-strategy">{r.call.agent_strategy}</span>}{r.call.confidence && <span className="ds-badge ds-badge--outline">{r.call.confidence}</span>}{invalidationHit && <span className="ds-badge ds-badge--down">Invalidation hit</span>}</span>
+          {r.call.reasoning && <span className="mid-agent-reason">{r.call.reasoning}</span>}
+          {evidence.length > 0 && <span className="mid-event-evidence">{evidence.join(' · ')}</span>}
+        </span>
       </div>
-    </details>}
+    })}
 
-    {pending.length > 0 && <p className="mid-pending">
-      {pending.length} checkpoint{pending.length === 1 ? '' : 's'} still to report — {pending.map((r) => r.time).join(', ')} IST.
+    {overdue.length > 0 && <p className="mid-pending">
+      {overdue.length} checkpoint view{overdue.length === 1 ? '' : 's'} past due and not yet written — {overdue.map((r) => r.slot.label).join(', ')} IST.
+    </p>}
+    {later.length > 0 && <p className="mid-pending">
+      {later.length} checkpoint view{later.length === 1 ? '' : 's'} still to land — {later.map((r) => r.slot.label).join(', ')} IST (about three minutes after each capture).
     </p>}
   </div>
 }
 
-function MidMarketView({ row, midCheckpoints }: { row: Row; midCheckpoints: Row[] | null | undefined }) {
+function MidMarketView({ row, midCheckpoints, agentCalls }: { row: Row; midCheckpoints: Row[] | null | undefined; agentCalls: AgentCall[] | null | undefined }) {
   // Re-render every minute so a slot flips from "pending" to actually landed (or from
   // not-yet-due to overdue-looking) without needing a manual refresh.
   const [, forceTick] = useState(0)
@@ -1137,75 +1100,60 @@ function MidMarketView({ row, midCheckpoints }: { row: Row; midCheckpoints: Row[
 
   return <section className="phase-view special-view mid-checkpoint-view">
     <div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><PhaseAside capturedAt={(midCheckpoints?.[midCheckpoints.length - 1]?.created_at ?? row?.updated_at ?? null) as string | null} /></div>
-    <MidAnswer byId={byId} />
+    <MidAnswer agentCalls={agentCalls} byId={byId} />
     <div className="mid-instrument-grid">
-      <MidInstrumentColumn instrument="NIFTY" byId={byId} nowMin={nowMin} />
-      <MidInstrumentColumn instrument="SENSEX" byId={byId} nowMin={nowMin} />
+      <MidInstrumentColumn instrument="NIFTY" agentCalls={agentCalls} byId={byId} nowMin={nowMin} />
+      <MidInstrumentColumn instrument="SENSEX" agentCalls={agentCalls} byId={byId} nowMin={nowMin} />
     </div>
   </section>
 }
 
-function PostInstrumentCard({ row, postSummary, instrument }: { row: Row; postSummary: Row; instrument: Instrument }) {
+// Close, high and low stay as captured; the outcome read is the agent's post-close grade of its
+// own morning view, not a range-vs-target estimate.
+function PostInstrumentCard({ postSummary, instrument, call }: { postSummary: Row; instrument: Instrument; call: AgentCall | null }) {
   const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
-  const calc = useMemo(() => calculateVerdict(row, instrument), [row, instrument])
-  const high = num(postSummary, `day_high_${suffix}`)
-  const low = num(postSummary, `day_low_${suffix}`)
-  const range = high - low
-  const label = range >= calc.target ? 'Target likely hit' : range < calc.stop ? 'SL likely hit' : 'Neither / mid-range'
-  const cls = label === 'Target likely hit' ? 'outcome-hit' : label === 'SL likely hit' ? 'outcome-stop' : 'outcome-neutral'
-  return <article className="verdict-instrument"><div className="verdict-instrument-head"><h3>{instrument}</h3></div><div className="close-grid"><div className="close-card"><span>Close</span><strong>{value(postSummary, `close_${suffix}`)}</strong><b className={tone(postSummary, `day_change_pct_${suffix}`)}>{value(postSummary, `day_change_pct_${suffix}`, true)}</b></div><div className="close-card"><span>Day High / Low</span><strong>{value(postSummary, `day_high_${suffix}`)} / {value(postSummary, `day_low_${suffix}`)}</strong></div></div><div className={`outcome-badge ${cls}`}><span>Target / SL estimate</span><strong>{label}</strong><small>(range-based estimate)</small></div></article>
+  const grade = call ? GRADE_BADGE[String(call.grade ?? '').toLowerCase()] : null
+  const misleading = call?.misleading_signal && String(call.misleading_signal).trim().toLowerCase() !== 'none' ? String(call.misleading_signal) : null
+  return <article className="verdict-instrument">
+    <div className="verdict-instrument-head"><h3>{instrument}</h3></div>
+    <div className="close-grid"><div className="close-card"><span>Close</span><strong>{value(postSummary, `close_${suffix}`)}</strong><b className={tone(postSummary, `day_change_pct_${suffix}`)}>{value(postSummary, `day_change_pct_${suffix}`, true)}</b></div><div className="close-card"><span>Day High / Low</span><strong>{value(postSummary, `day_high_${suffix}`)} / {value(postSummary, `day_low_${suffix}`)}</strong></div></div>
+    <div className="agent-grade">
+      <Label tone="info">The view, graded</Label>
+      {call ? <>
+        <div className="agent-badges">
+          {grade ? <span className={`ds-badge ${grade.cls}`}>{grade.label}</span> : <span className="ds-badge ds-badge--neutral">Not graded</span>}
+          {call.agent_strategy && <span className="agent-grade-strategy">{call.agent_strategy}{call.agent_bias ? ` · ${call.agent_bias}` : ''}</span>}
+        </div>
+        {call.reasoning && <p className="agent-grade-note">{call.reasoning}</p>}
+        {misleading && <p className="agent-grade-meta">Misleading signal: {misleading}</p>}
+      </> : <p className="agent-grade-meta">Grade lands at 15:50 IST.</p>}
+    </div>
+  </article>
 }
 /* --------------------------------------------------------------- Post-market
-   Reference: marketcue-dashboard.html #s-post. The screen led with two instrument cards
-   and no answer; the design leads with the verdict-vs-outcome read, then the four figures
-   that justify it, then what carries into tomorrow.
+   Reference: marketcue-dashboard.html #s-post. The screen leads with the outcome read, then
+   the four figures that justify it, then what carries into tomorrow.
 
-   The headline and the carry-forward lines are assembled from values this screen (and
-   Market open) already derived -- the verdict's recommendation, the range-vs-target
-   outcome PostInstrumentCard already computed, the prediction miss, the OI levels and the
-   DTE weighting. No new model, no new arithmetic; each line restates a number the app
-   already shows somewhere, in words. A line whose inputs are missing is dropped rather
-   than guessed, so the list is never padded.
+   The carry-forward is the agent's own lesson per instrument from its post-close row -- one
+   line for NIFTY, one for SENSEX -- rather than sentence-templated restatements of the
+   prediction miss, OI levels and DTE weighting. A missing row says when it lands.
 
-   Sensex keeps its close card below the Nifty block. The design shows Nifty only -- the
-   prediction tiles are meaningless for an index with no leading indicator -- but the
-   close, high and low are real data the screen already carried, so they stay rather than
-   being silently dropped. */
-function CarryForward({ row, postSummary, calc }: { row: Row; postSummary: Row; calc: ReturnType<typeof calculateVerdict> }) {
-  const lines: string[] = []
-  const actual = row.gap_points_nifty != null ? Number(row.gap_points_nifty) : null
-  const predicted = row.gift_nifty_gap_pts != null ? Number(row.gift_nifty_gap_pts)
-    : row.gift_nifty_gap_pct != null && row.prev_close_nifty != null ? (Number(row.gift_nifty_gap_pct) / 100) * Number(row.prev_close_nifty) : null
-  if (actual != null && predicted != null) {
-    const miss = Math.abs(actual - predicted)
-    lines.push(miss >= 50
-      ? `GIFT Nifty misled by ${fmt.ptsAbs(miss)} — treat the predicted open as a weak signal this week.`
-      : `GIFT Nifty was within ${fmt.ptsAbs(miss)} of the open — the predicted gap held up today.`)
-  }
-  const support = row.oi_support_nifty != null ? Number(row.oi_support_nifty) : null
-  const supportAction = String(row.oi_change_support_nifty ?? '')
-  if (support != null && supportAction) {
-    lines.push(`OI support at ${fmt.strike(support)} saw ${supportAction.toLowerCase()} through the session. Watch it on expiry.`)
-  }
-  const dte = calc.dte
-  if (Number.isFinite(dte)) {
-    lines.push(dte <= 3
-      ? `${dte} day${dte === 1 ? '' : 's'} to expiry moves OI to 45% weight — a single OI flip can move the band.`
-      : `${dte} days to expiry keeps gap at 45% weight — OI matters less until the final three sessions.`)
-  }
-  if (lines.length === 0) return null
+   Sensex keeps its close card below the Nifty block. The prediction tiles are meaningless
+   for an index with no leading indicator, but the close, high and low are real data. */
+function CarryForward({ nifty, sensex }: { nifty: AgentCall | null; sensex: AgentCall | null }) {
+  const rows: [string, AgentCall | null][] = [['NIFTY', nifty], ['SENSEX', sensex]]
   return <div className="post-carry">
     <span className="section-title">What to carry into tomorrow</span>
     <Card className="post-carry-list">
-      {lines.map((line, i) => <div className="post-carry-row" key={line}>
-        <span className="post-carry-index">{String(i + 1).padStart(2, '0')}</span>
-        <span>{line}</span>
+      {rows.map(([name, call]) => <div className="post-carry-row" key={name}>
+        <span className="post-carry-index">{name}</span>
+        <span className={call?.lesson ? '' : 'agent-grade-meta'}>{call?.lesson ? String(call.lesson) : 'Grade lands at 15:50 IST.'}</span>
       </div>)}
     </Card>
   </div>
 }
 
-function PostMarketView({ row, postSummary }: { row: Row; postSummary: Row | null | undefined }) {
+function PostMarketView({ row, postSummary, agentCalls }: { row: Row; postSummary: Row | null | undefined; agentCalls: AgentCall[] | null | undefined }) {
   const head = (aside: ReactNode) => <div className="review-section-head">
     <div><p className="eyebrow">After the close · review &amp; learn</p><h2>How the session played out</h2></div>
     {aside}
@@ -1214,6 +1162,10 @@ function PostMarketView({ row, postSummary }: { row: Row; postSummary: Row | nul
   if (!postSummary) return <section className="phase-view special-view">{head(<PhaseAside />)}<p className="history-empty">Post-market data not available yet — updates at 9:00 PM IST.</p></section>
 
   const calc = calculateVerdict(row, 'NIFTY')
+  const postNifty = agentFor(agentCalls, 'post-close', 'NIFTY')
+  const postSensex = agentFor(agentCalls, 'post-close', 'SENSEX')
+  // The morning view as the agent wrote it (post-close copies it forward; fall back to the open row).
+  const morning = postNifty ?? agentFor(agentCalls, 'open', 'NIFTY')
   const fii = postSummary.fii_net_cash_cr
   const dii = postSummary.dii_net_cash_cr
   const asOf = postSummary.fii_dii_data_date
@@ -1246,7 +1198,9 @@ function PostMarketView({ row, postSummary }: { row: Row; postSummary: Row | nul
           : 'The day stayed inside the expected range'
       }</strong>
       <p className="post-hero-body">
-        {calc.bias} bias, {calc.strategy} recommended.
+        {morning?.agent_bias || morning?.agent_strategy
+          ? <>{morning.agent_bias ?? 'No bias stated'} bias, {morning.agent_strategy ?? 'no strategy'} was the view.</>
+          : <>No view of record was written for this session.</>}
         {closePct != null && <> Nifty closed <strong className={`num ${tone(postSummary, 'day_change_pct_nifty')}`}>{fmt.pct(closePct)}</strong></>}
         {rangeOutcome != null && <> and {rangeOutcome} the <strong className="num">{targetPts}</strong> a conservative target needed</>}.
       </p>
@@ -1269,11 +1223,11 @@ function PostMarketView({ row, postSummary }: { row: Row; postSummary: Row | nul
         : <Metric label="Day range" value={dayRange.toFixed(1)} sub={`pts · ${dayRange < calc.conservative ? 'under' : 'over'} ${calc.conservative.toFixed(2)} expected`} />}
     </div>
 
-    <CarryForward row={row} postSummary={postSummary} calc={calc} />
+    <CarryForward nifty={postNifty} sensex={postSensex} />
 
     <div className="post-secondary">
       <span className="section-title">Closing levels</span>
-      <div className="verdict-instruments"><PostInstrumentCard row={row} postSummary={postSummary} instrument="NIFTY" /><PostInstrumentCard row={row} postSummary={postSummary} instrument="SENSEX" /></div>
+      <div className="verdict-instruments"><PostInstrumentCard postSummary={postSummary} instrument="NIFTY" call={postNifty} /><PostInstrumentCard postSummary={postSummary} instrument="SENSEX" call={postSensex} /></div>
       <div className="flow-card"><span>FII / DII net cash flow</span><strong>{fii != null && dii != null ? `FII: ${fmt.rupees(Number(fii))} Cr, DII: ${fmt.rupees(Number(dii))} Cr (as of ${asOf ?? row.trade_date})` : 'Not available'}</strong></div>
     </div>
 
@@ -1281,21 +1235,26 @@ function PostMarketView({ row, postSummary }: { row: Row; postSummary: Row | nul
   </section>
 }
 
-// The read, stated before its evidence. Derived from the same computeMarketBias object the
-// Verdict page uses, so the two pages cannot disagree about the day.
-function ThesisHero({ row, onSeeVerdict }: { row: Row; onSeeVerdict: () => void }) {
-  const calc = useMemo(() => calculateVerdict(row, 'NIFTY'), [row])
-  const bias = useMemo(() => computeMarketBias(row, calc, 'NIFTY'), [row, calc])
-  const readiness = useMemo(() => computeOptionReadiness(calc), [calc])
-  const band = String(bias.label).toLowerCase()
+// The read, stated before its evidence: the agent's pre-market regime call (instrument BOTH),
+// its risk flags, the note, and the one sentence that decides the day. No strategy here --
+// that is the 09:35 open view's job.
+function ThesisHero({ call, onSeeVerdict }: { call: AgentCall | null; onSeeVerdict: () => void }) {
+  const regime = String(call?.agent_bias ?? '').toLowerCase()
+  const headline = REGIME_HEADLINE[regime] ?? (regime ? regime.replace(/_/g, ' ') : 'No clear regime yet')
+  const rawFlags = call?.raw_output?.risk_flags
+  const flags = Array.isArray(rawFlags) ? rawFlags.map((f) => String(f).trim()).filter(Boolean) : []
   return <div className="thesis-hero">
     <div className="thesis-hero-main">
-      <Label>Thesis for the open</Label>
-      <strong className="thesis-hero-value">{bias.label}</strong>
-      <BiasAxis value={bias.score} />
-      <p className="thesis-hero-note">
-        Bias {fmt.score(bias.score)} · {readiness.label.toLowerCase()} readiness · {calc.dte} day{calc.dte === 1 ? '' : 's'} to expiry.
-      </p>
+      <Label tone="info">The read for the open</Label>
+      {call ? <>
+        <strong className="thesis-hero-value">{headline}</strong>
+        {flags.length > 0 && <div className="agent-badges">{flags.map((f) => <span className="ds-badge ds-badge--caution" key={f}>{f}</span>)}</div>}
+        {call.reasoning && <p className="thesis-hero-note">{call.reasoning}</p>}
+        {call.invalidation && <div className="mid-answer agent-decides">
+          <Label>What decides the day</Label>
+          <p className="mid-answer-sub">{call.invalidation}</p>
+        </div>}
+      </> : <p className="thesis-hero-note">The read lands at 08:48 IST.</p>}
       <button type="button" className="action-button" onClick={onSeeVerdict}>See the verdict <ChevronRight size={14} /></button>
     </div>
   </div>
@@ -1311,7 +1270,7 @@ function ThesisHero({ row, onSeeVerdict }: { row: Row; onSeeVerdict: () => void 
 
    Every figure here already existed on the row or came out of calculateVerdict. Nothing is
    computed that was not computed before -- this is presentation only. */
-function MarketOpenView({ row, capturedAt }: { row: Row; capturedAt: string | null }) {
+function MarketOpenView({ row, capturedAt, agentCalls }: { row: Row; capturedAt: string | null; agentCalls: AgentCall[] | null | undefined }) {
   const gapPts = row.gap_points_nifty != null ? Number(row.gap_points_nifty) : null
   const prevClose = row.prev_close_nifty != null ? Number(row.prev_close_nifty) : null
   const gapPct = gapPts != null && prevClose ? (gapPts / prevClose) * 100 : null
@@ -1359,8 +1318,8 @@ function MarketOpenView({ row, capturedAt }: { row: Row; capturedAt: string | nu
         </div>
     */}
 
-    <OpenInstrument row={row} instrument="NIFTY" heading="Nifty 50" />
-    <OpenInstrument row={row} instrument="SENSEX" heading="Sensex" />
+    <OpenInstrument row={row} instrument="NIFTY" heading="Nifty 50" call={agentFor(agentCalls, 'open', 'NIFTY')} />
+    <OpenInstrument row={row} instrument="SENSEX" heading="Sensex" call={agentFor(agentCalls, 'open', 'SENSEX')} />
 
     <Disclaimer capturedAt={fmt.timeIST(capturedAt)} />
   </section>
@@ -1370,8 +1329,9 @@ function MarketOpenView({ row, capturedAt }: { row: Row; capturedAt: string | nu
    Sensex was absent from this screen entirely while Pre-market, Verdict and Post-market all
    carry both -- every field it needs was already populated and calculateVerdict already takes
    'SENSEX'. Nothing here computes anything the other screens do not already compute. */
-function OpenInstrument({ row, instrument, heading }: { row: Row; instrument: Instrument; heading: string }) {
+function OpenInstrument({ row, instrument, heading, call }: { row: Row; instrument: Instrument; heading: string; call: AgentCall | null }) {
   const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
+  const view = agentRaw(call, 'view')
   const calc = calculateVerdict(row, instrument)
   const gapKey = `gap_points_${suffix}`
   const gapPts = row[gapKey] != null ? Number(row[gapKey]) : null
@@ -1389,6 +1349,10 @@ function OpenInstrument({ row, instrument, heading }: { row: Row; instrument: In
 
   return <section className="metric-group open-instrument">
     <div className="group-heading"><h3>{heading} — at the open</h3></div>
+    {/* The agent's one-line view for this instrument, stamped violet. Data tiles below are unchanged. */}
+    {view
+      ? <p className="agent-view-line"><i aria-hidden="true" />{view}</p>
+      : <p className="agent-view-line is-empty">View lands at 09:35 IST.</p>}
 
     <div className="field-grid">
       <div className="field-card"><span>Opening points</span><strong className={tone(row, gapKey)}>{value(row, gapKey)}</strong><small>{gapPct != null ? `${fmt.pct(gapPct)} vs prev close` : 'Previous close not recorded'}</small></div>
@@ -1427,7 +1391,7 @@ function OpenInstrument({ row, instrument, heading }: { row: Row; instrument: In
   </section>
 }
 
-function PhaseView({ phase, row, historyData, onSeeVerdict }: { phase: Phase; row: Row | null; historyData?: HistoryExtras | null; onSeeVerdict?: () => void }) {
+function PhaseView({ phase, row, historyData, onSeeVerdict, agentCalls }: { phase: Phase; row: Row | null; historyData?: HistoryExtras | null; onSeeVerdict?: () => void; agentCalls?: AgentCall[] | null }) {
   const supabase = useMemo(() => createClient(), [])
   const { data: giftRow } = useSWR(
     phase === 'premarket' && row?.trade_date ? ['gift-nifty-staging', row.trade_date] : null,
@@ -1543,7 +1507,7 @@ function PhaseView({ phase, row, historyData, onSeeVerdict }: { phase: Phase; ro
     <TargetStopCard instrument="NIFTY" calc={calculateVerdict(row, 'NIFTY')} />
     <TargetStopCard instrument="SENSEX" calc={calculateVerdict(row, 'SENSEX')} />
   </div> : null
-  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><div className="phase-head-aside"><FreshnessStamp state={headStamp.state} label={headStamp.label} capturedAt={(row?.updated_at ?? null) as string | null} /><ProvenanceBadge source="system" /></div></div>{phase === 'premarket' && row && onSeeVerdict && <div className="thesis-row"><ThesisHero row={row} onSeeVerdict={onSeeVerdict} />{priorDayLines && priorDayLines.story && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p><p className="prior-session-line prior-session-story">{priorDayLines.story}</p></div>}</div>}<div className="metric-groups">{renderGroup('Common market data', common)}{openTargetCards}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div><Disclaimer capturedAt={fmt.timeIST((row?.updated_at ?? null) as string | null)} /></section>
+  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><div className="phase-head-aside"><FreshnessStamp state={headStamp.state} label={headStamp.label} capturedAt={(row?.updated_at ?? null) as string | null} /><ProvenanceBadge source="system" /></div></div>{phase === 'premarket' && row && onSeeVerdict && <div className="thesis-row"><ThesisHero call={agentFor(agentCalls, 'premarket', 'BOTH')} onSeeVerdict={onSeeVerdict} />{priorDayLines && priorDayLines.story && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p><p className="prior-session-line prior-session-story">{priorDayLines.story}</p></div>}</div>}<div className="metric-groups">{renderGroup('Common market data', common)}{openTargetCards}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div><Disclaimer capturedAt={fmt.timeIST((row?.updated_at ?? null) as string | null)} /></section>
 }
 export default function Dashboard() {
   const [phase, setPhase] = useState<Phase>('premarket'); const [dark, setDark] = useState(true); const [navOpen, setNavOpen] = useState(false); const [liveDate, setLiveDate] = useState(''); const [liveDay, setLiveDay] = useState(''); const [liveTime, setLiveTime] = useState('')
@@ -1610,15 +1574,17 @@ export default function Dashboard() {
     if (error) throw error
     const rows = (dashboardRows ?? []) as Row[]
     const tradeDates = rows.map((r) => r.trade_date).filter((d): d is string => typeof d === 'string')
-    if (tradeDates.length === 0) return { rows, mid: {}, midAll: {}, post: {}, trade: {} }
-    const [{ data: midRows, error: midError }, { data: postRows, error: postError }, { data: tradeRows, error: tradeError }] = await Promise.all([
+    if (tradeDates.length === 0) return { rows, mid: {}, midAll: {}, post: {}, trade: {}, agent: {} }
+    const [{ data: midRows, error: midError }, { data: postRows, error: postError }, { data: tradeRows, error: tradeError }, { data: agentRows, error: agentError }] = await Promise.all([
       supabase.from('midmarket_snapshot').select('*').in('trade_date', tradeDates),
       supabase.from('postmarket_summary').select('*').in('trade_date', tradeDates),
       supabase.from('auto_trades').select('trade_date, instrument, outcome').in('trade_date', tradeDates),
+      supabase.from('agent_calls').select('*').in('trade_date', tradeDates).in('phase', ['open', 'post-close']),
     ])
     if (midError) throw midError
     if (postError) throw postError
     if (tradeError) throw tradeError
+    if (agentError) throw agentError
     // Since the mid-market schedule became 5 checkpoints/day, midmarket_snapshot now has up to
     // 5 rows per trade_date (one per checkpoint) instead of 1. For history/recap purposes we
     // want exactly one representative mid-market read per day -- the LATEST checkpoint that
@@ -1644,7 +1610,10 @@ export default function Dashboard() {
     for (const p of (postRows ?? []) as Row[]) { const d = String(p.trade_date ?? ''); if (d) post[d] = p }
     const trade: Record<string, Row> = {}
     for (const t of (tradeRows ?? []) as Row[]) { const d = String(t.trade_date ?? ''); if (d && t.instrument === 'NIFTY') trade[d] = t }
-    return { rows, mid, midAll, post, trade }
+    // The agent's open + post-close rows per day, for the History cards' morning view and grade.
+    const agent: Record<string, AgentCall[]> = {}
+    for (const a of (agentRows ?? []) as AgentCall[]) { const d = String(a.trade_date ?? ''); if (d) (agent[d] ??= []).push(a) }
+    return { rows, mid, midAll, post, trade, agent }
   }, { revalidateOnFocus: false })
   // Use the real row's own values as-is when we have one -- a null field means that phase
   // genuinely hasn't run yet today, and must stay null/empty rather than being silently
@@ -1674,6 +1643,12 @@ export default function Dashboard() {
     if (error) throw error
     const rows = (data ?? []) as Row[]
     return rows.sort((a, b) => checkpointOrder.indexOf(String(a.checkpoint)) - checkpointOrder.indexOf(String(b.checkpoint)))
+  }, { revalidateOnFocus: false })
+  // Every agent row for the session in one fetch; the phase views pick theirs with agentFor().
+  const { data: agentCalls } = useSWR<AgentCall[] | null>(row.trade_date ? ['agent-calls', row.trade_date] : null, async () => {
+    const { data, error } = await supabase.from('agent_calls').select('*').eq('trade_date', row.trade_date)
+    if (error) throw error
+    return (data ?? []) as AgentCall[]
   }, { revalidateOnFocus: false })
   const { data: postSummary } = useSWR<Row | null>(row.trade_date ? ['postmarket-summary', row.trade_date] : null, async () => { const { data, error } = await supabase.from('postmarket_summary').select('*').eq('trade_date', row.trade_date).order('trade_date', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data as Row | null }, { revalidateOnFocus: false })
   useEffect(() => { document.documentElement.classList.toggle('light', !dark) }, [dark])
@@ -1732,5 +1707,5 @@ export default function Dashboard() {
       </span>
       <button type="button" className="archive-bar-exit" onClick={() => goToSession(null)}>Back to today</button>
     </div>}
-    <div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile === true && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)} aria-current={phase === id ? 'page' : undefined}><span><strong>{label}</strong><small>{subtitle}</small></span></button>)}<div className="side-rule" /><div className="side-source"><span className="side-label">Data source</span><strong>NSE option chain</strong><small>{capturedLabel}</small></div></aside>{isMobile === true && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView row={row} /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} /> : phase === 'open' && row && row.gap_points_nifty != null ? <MarketOpenView row={row} capturedAt={(row.updated_at ?? null) as string | null} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} onSeeVerdict={() => setPhase('verdict')} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
+    <div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile === true && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)} aria-current={phase === id ? 'page' : undefined}><span><strong>{label}</strong><small>{subtitle}</small></span></button>)}<div className="side-rule" /><div className="side-source"><span className="side-label">Data source</span><strong>NSE option chain</strong><small>{capturedLabel}</small></div></aside>{isMobile === true && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView row={row} /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} agentCalls={agentCalls} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} agentCalls={agentCalls} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} agentCalls={agentCalls} /> : phase === 'open' && row && row.gap_points_nifty != null ? <MarketOpenView row={row} capturedAt={(row.updated_at ?? null) as string | null} agentCalls={agentCalls} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} onSeeVerdict={() => setPhase('verdict')} agentCalls={agentCalls} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
 }
