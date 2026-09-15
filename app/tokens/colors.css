@@ -45,7 +45,12 @@
   --down: #e35f5f;
   --caution: #d9a343;
   --caution-ink: #e2b660;
-  --info: #5b9bd8;
+  /* Violet, not blue. --info marks system and provenance -- the Manual badge, the verdict
+     banner -- and carries no judgement, so it has to be unmistakably none of the three
+     semantic colours. At 248deg it is more than 100deg from every one of them: up 150,
+     caution 38, brand 31, down 0. Blue sat closer to nothing in particular and read as
+     another signal. 5.87 on ground, 5.24 on surface. */
+  --info: #9288d9;
 
   --brand: #e0821f;
   --action: var(--ink);
@@ -75,7 +80,7 @@
   --down: #bb2b2b;
   --caution: #8a6100;
   --caution-ink: #8a6100;
-  --info: #1d5fb0;
+  --info: #5646a8;
 
   --brand: #b5651a;
   --action: var(--ink);
