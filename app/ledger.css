@@ -367,12 +367,15 @@
    that cannot be missed, and an accent that carries across the topbar, the bar
    and the exit button, so the state registers before anything is read.
 
-   The accent is --up, by request. Worth knowing what that costs: --up otherwise
-   means "this value rose", and spending it on a chrome state is the same class
-   of overload the audit raises as F-01. It is milder here -- the archive bar is
-   not a figure, so nothing green in it can be misread as a number going up --
-   but green now means two things in the product. --info was chosen originally
-   because it meant nothing else. One line to switch back if it reads wrong. */
+   The accent is --caution, which is the right word for the state: an archived
+   session is neither an error nor a success, it is "pay attention, this is not
+   live". It is also the family the freshness stamp already uses for an ageing
+   capture, so the two agree instead of competing -- and it releases --up, which
+   means "this value rose" and should not be spent on chrome.
+
+   Tint is 7%, not the 16% the stamp uses. The text sits on a wash of its own
+   hue, and at 16% light mode's #8a6100 measures 4.14:1 -- under the floor. At
+   7% it is 4.65:1 light and 8.6:1 dark. */
 .app-shell.app-shell .session-picker {
   display: inline-flex;
   align-items: stretch;
@@ -417,7 +420,7 @@
   cursor: pointer;
 }
 .app-shell.app-shell .session-today:hover { color: var(--ink); }
-.app-shell.app-shell .topbar-date-archived { color: var(--up); font-weight: 600; }
+.app-shell.app-shell .topbar-date-archived { color: var(--caution-ink); font-weight: 600; }
 
 .app-shell.app-shell .archive-bar {
   display: flex;
@@ -426,17 +429,17 @@
   gap: 8px 14px;
   padding: 10px clamp(18px, 4vw, 58px);
   border-bottom: 1px solid var(--border);
-  border-left: 3px solid var(--up);
+  border-left: 3px solid var(--caution-ink);
   /* 6%, not 11%. The green sits on its own tint, so a heavier wash darkens the ground
      under light-mode's #137a4b and drops it to 4.28:1 -- under the floor, in the theme the
      screenshot was taken in. At 6% it measures 4.60:1 light and 6.19:1 dark. */
-  background: color-mix(in srgb, var(--up) 6%, var(--ground));
+  background: color-mix(in srgb, var(--caution) 7%, var(--ground));
 }
 .app-shell.app-shell .archive-bar-tag {
   font: 600 var(--text-label) var(--font-sans);
   letter-spacing: .14em;
   text-transform: uppercase;
-  color: var(--up);
+  color: var(--caution-ink);
 }
 .app-shell.app-shell .archive-bar-text { font-size: var(--text-meta); color: var(--ink-2); }
 .app-shell.app-shell .archive-bar-text b { color: var(--ink); font-weight: 600; }
@@ -444,14 +447,14 @@
   margin-left: auto;
   min-height: 36px;
   padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--up) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--caution-ink) 45%, transparent);
   border-radius: var(--radius-sm);
   background: none;
-  color: var(--up);
+  color: var(--caution-ink);
   font: 600 var(--text-label) var(--font-sans);
   cursor: pointer;
 }
-.app-shell.app-shell .archive-bar-exit:hover { background: color-mix(in srgb, var(--up) 14%, transparent); }
+.app-shell.app-shell .archive-bar-exit:hover { background: color-mix(in srgb, var(--caution-ink) 14%, transparent); }
 
 /* 44px is the floor, and these are new controls -- no reason to ship them under it. */
 .app-shell.app-shell .session-picker button,
@@ -483,7 +486,7 @@
 .app-shell.app-shell .field-card strong.positive,
 .app-shell.app-shell .field-card strong .positive,
 .app-shell.app-shell .close-card strong.positive,
-.app-shell.app-shell .verdict-card .positive { color: var(--up); }
+.app-shell.app-shell .verdict-card .positive { color: var(--caution-ink); }
 
 .app-shell.app-shell .field-card strong.negative,
 .app-shell.app-shell .field-card strong .negative,
@@ -494,12 +497,12 @@
    not the strike they sit under, so they keep their colour while the level
    above them stays ink. */
 .app-shell.app-shell .field-card .oi-action.is-strengthening,
-.app-shell.app-shell .field-card small.positive { color: var(--up); }
+.app-shell.app-shell .field-card small.positive { color: var(--caution-ink); }
 .app-shell.app-shell .field-card .oi-action.is-capping,
 .app-shell.app-shell .field-card small.negative { color: var(--down); }
 
 /* the trailing points figure follows its percentage rather than going muted */
-.app-shell.app-shell .field-card strong.positive em.prior-day-pts { color: color-mix(in srgb, var(--up) 78%, var(--ink-2)); }
+.app-shell.app-shell .field-card strong.positive em.prior-day-pts { color: color-mix(in srgb, var(--caution-ink) 78%, var(--ink-2)); }
 .app-shell.app-shell .field-card strong.negative em.prior-day-pts { color: color-mix(in srgb, var(--down) 78%, var(--ink-2)); }
 
 /* the caution reading on the GIFT gap stays amber, as the reference has it */
