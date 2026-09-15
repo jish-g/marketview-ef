@@ -80,7 +80,10 @@ button, input { font: inherit; }
 .journal-log-entry-active { border-color: var(--info); background: color-mix(in srgb, var(--info) 5%, var(--surface)); }
 
 .journal-log-edited { color: var(--muted); font-style: normal; font-size: var(--text-label); text-transform: uppercase; letter-spacing: .04em; }
-.journal-edit-button, .journal-view-button { padding: 4px 6px; font-size: var(--text-label); gap: 0; }
+/* gap was 0 when these were icon-only. They carry a word now -- because `.action-button svg
+   { display: none }` fires at 430px and left both buttons rendering completely empty on a
+   phone -- so the icon and its label need space between them. */
+.journal-edit-button, .journal-view-button { padding: 4px 8px; font-size: var(--text-label); gap: 5px; }
 .journal-log-actions { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
 .journal-log-shot-count { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); font-size: var(--text-label); }
 .journal-trade-cards-compact { flex: 0 1 auto; margin: 0; }
@@ -111,7 +114,6 @@ button, input { font: inherit; }
 .trade-summary-tiles:last-of-type { margin-bottom: 18px; }
 .trade-summary-tiles .field-card span { font-size: var(--text-label); }
 .trade-summary-tiles .field-card strong { font-size: var(--text-h3); }
-.trade-summary-tiles .field-card strong em.breadth-flag { font-size: var(--text-meta); }
 .field-card-accent { border-color: var(--info); background: color-mix(in srgb, var(--info) 10%, var(--surface)); }
 .field-card-accent span { color: var(--info); }
 
@@ -571,9 +573,21 @@ button, input { font: inherit; }
 .phase-nav span { display: grid; gap: 2px; }
 .phase-nav strong { display: block; font-size: 14px; font-weight: 600; color: inherit; }
 .phase-nav small { display: block; font-size: var(--text-meta); color: var(--muted); }
-.phase-nav:hover { background: var(--surface-2); color: var(--ink); }
-.phase-nav.active { background: var(--surface-2); color: var(--ink); }
+/* Hover and active resolved to exactly the same declaration, so the phase you were ON was
+   indistinguishable from the one under the cursor -- and the nav carried no marker of any
+   other kind. Hover stays a surface; active takes a rail.
+
+   --brand, not a semantic colour: "you are here" is not up, down or caution, and the brand
+   hue appears nowhere else in the rail, so it cannot be misread as a signal about the
+   market. Same 2px rule the rest of the ledger uses to mark the thing that matters. */
+.phase-nav:hover { background: color-mix(in srgb, var(--surface-2) 60%, transparent); color: var(--ink); }
+.phase-nav.active {
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: inset 2px 0 0 var(--brand);
+}
 .phase-nav.active strong { color: var(--ink); }
+.phase-nav.active small { color: var(--ink-2); }
 
 /* Rule 6 again: where the numbers came from, pinned to the shell rather than buried. */
 .side-source { display: grid; gap: var(--s-1); padding: 0 var(--s-3); }
@@ -635,8 +649,10 @@ button, input { font: inherit; }
 /* Evidence tiles sit at the supporting step, not the primary one. */
 .app-shell .field-card strong { font-size: var(--text-value); }
 
-/* Spec §5: every figure gets tabular-nums so decimals line up vertically. Plex Sans provides
-   them, which is why monospace is no longer needed for alignment. */
+/* Spec §5: every figure gets tabular-nums so decimals line up vertically. Both Plex faces
+   provide them, so this holds whichever way --font-figure is pointed -- it is the floor for
+   any figure the ledger layer does not reach. Which family figures take is decided in one
+   place only: --font-figure in tokens/typography.css. */
 .app-shell, .rules-doc-shell, .landing-shell, .blog-index-shell, .blog-post-shell { font-variant-numeric: tabular-nums; }
 
 /* ============================================================

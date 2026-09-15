@@ -265,12 +265,12 @@ export function TradeView() {
         <div className="field-card"><span>Target hit count</span><strong>{summary.targets}</strong></div>
         <div className="field-card"><span>Stop-loss hit count</span><strong>{summary.stops}</strong></div>
         <div className="field-card"><span>Win rate %</span><strong>{summary.winRate.toFixed(0)}%</strong></div>
-        <div className="field-card"><span>Total P&amp;L</span><strong><em className={`breadth-flag ${summary.pnl >= 0 ? 'positive' : 'negative'}`}>{fmt.pnl(summary.pnl)}</em></strong></div>
+        <div className="field-card"><span>Total P&amp;L</span><strong><em className={`trade-figure ${summary.pnl >= 0 ? 'positive' : 'negative'}`}>{fmt.pnl(summary.pnl)}</em></strong></div>
         <div className="field-card field-card-accent"><span>Open positions</span><strong>{openPositions.length}</strong></div>
       </div>
       <div className="trade-summary-tiles">
-        <div className="field-card"><span>Average profit</span><strong><em className="breadth-flag positive">{summary.avgProfit > 0 ? fmt.pnl(summary.avgProfit) : 'Not available'}</em></strong></div>
-        <div className="field-card"><span>Average loss</span><strong><em className="breadth-flag negative">{summary.avgLoss < 0 ? fmt.pnl(summary.avgLoss) : 'Not available'}</em></strong></div>
+        <div className="field-card"><span>Average profit</span><strong><em className="trade-figure positive">{summary.avgProfit > 0 ? fmt.pnl(summary.avgProfit) : 'Not available'}</em></strong></div>
+        <div className="field-card"><span>Average loss</span><strong><em className="trade-figure negative">{summary.avgLoss < 0 ? fmt.pnl(summary.avgLoss) : 'Not available'}</em></strong></div>
         <div className="field-card"><span>Avg risk-reward</span><strong>{summary.riskReward != null ? `1 : ${fmt.ratio(summary.riskReward)}` : 'Not available'}</strong></div>
       </div>
       {summary.eodUnresolvedCount > 0 && <p className="history-empty">{summary.eodUnresolvedCount} trade{summary.eodUnresolvedCount === 1 ? '' : 's'} closed at market close without hitting a target or stop — counted above by actual profit or loss, not as a clean hit.</p>}
