@@ -1345,8 +1345,41 @@ export default function Dashboard() {
   const isAdmin = DEV_BYPASS || session?.user?.email === 'jishnu@ziovy.com'
   const visiblePhases = isAdmin ? phases : phases.filter((p) => p.id !== 'trade' && p.id !== 'journal')
   useEffect(() => { if (!sessionLoading && !isAdmin && phase === 'trade') setPhase('premarket') }, [sessionLoading, isAdmin, phase])
+  // Which trading session the whole dashboard is showing. null means "the newest published
+  // session", which is the behaviour the app had before this existed. A date pins every
+  // screen to that session, because everything below Pre-market already filters on
+  // row.trade_date -- only this top query had to learn about it.
+  //
+  // The value lives in the URL so a session is linkable and survives a reload. Read on mount
+  // rather than through useSearchParams, which would force a Suspense boundary here for no
+  // benefit; popstate keeps the back button honest.
+  const [sessionDate, setSessionDate] = useState<string | null>(null)
+  useEffect(() => {
+    const read = () => {
+      const v = new URLSearchParams(window.location.search).get('session')
+      setSessionDate(v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null)
+    }
+    read()
+    window.addEventListener('popstate', read)
+    return () => window.removeEventListener('popstate', read)
+  }, [])
+  const goToSession = (next: string | null) => {
+    setSessionDate(next)
+    const url = new URL(window.location.href)
+    if (next) url.searchParams.set('session', next)
+    else url.searchParams.delete('session')
+    window.history.pushState({}, '', url)
+  }
+
   const supabase = useMemo(() => createClient(), [])
-  const { data: liveRow } = useSWR<Row | null>('premarket-dashboard', async () => { const { data, error } = await supabase.from('premarket_dashboard').select('*').order('trade_date', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data as Row | null }, { revalidateOnFocus: false })
+  const { data: liveRow } = useSWR<Row | null>(['premarket-dashboard', sessionDate], async () => {
+    const base = supabase.from('premarket_dashboard').select('*')
+    const { data, error } = sessionDate
+      ? await base.eq('trade_date', sessionDate).maybeSingle()
+      : await base.order('trade_date', { ascending: false }).limit(1).maybeSingle()
+    if (error) throw error
+    return data as Row | null
+  }, { revalidateOnFocus: false })
   const { data: historyData } = useSWR<HistoryExtras | null>('premarket-dashboard-history', async () => {
     const { data: dashboardRows, error } = await supabase.from('premarket_dashboard').select('*').order('trade_date', { ascending: false }).limit(15)
     if (error) throw error
@@ -1421,5 +1454,50 @@ export default function Dashboard() {
   const { data: postSummary } = useSWR<Row | null>(row.trade_date ? ['postmarket-summary', row.trade_date] : null, async () => { const { data, error } = await supabase.from('postmarket_summary').select('*').eq('trade_date', row.trade_date).order('trade_date', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data as Row | null }, { revalidateOnFocus: false })
   useEffect(() => { document.documentElement.classList.toggle('light', !dark) }, [dark])
   useEffect(() => { const updateClock = () => { const now = new Date(); const options = { timeZone: 'Asia/Kolkata' } as const; setLiveDate(new Intl.DateTimeFormat('en-IN', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)); setLiveDay(new Intl.DateTimeFormat('en-IN', { ...options, weekday: 'long' }).format(now)); setLiveTime(new Intl.DateTimeFormat('en-IN', { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(now)) }; updateClock(); const timer = window.setInterval(updateClock, 1000); return () => window.clearInterval(timer) }, [])
-  return <main className="app-shell"><header className="topbar"><button className="icon-button nav-toggle" onClick={() => setNavOpen(!navOpen)} aria-label={navOpen ? 'Hide session map' : 'Show session map'} aria-expanded={navOpen} aria-controls="session-map"><Menu size={18} /></button><div className="brand-mark"><BrandSymbol size={30} /><div><strong>MarketCue</strong></div></div><span className="topbar-date">{liveDay || row?.day_name || ''} {liveDate || row?.trade_date || ''} · {liveTime || '—'} IST</span><div className="topbar-meta"><FreshnessStamp state={sessionState.state} label={sessionState.label} capturedAt={capturedISO} /><button type="button" className="icon-button" onClick={() => setDark(!dark)} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'} aria-pressed={!dark}>{dark ? <Sun size={16} /> : <Moon size={16} />}</button>{!sessionLoading && (session ? <button type="button" className="topbar-toggle" onClick={() => signOut()}>Sign out</button> : <Link href="/login" className="topbar-toggle">Sign in</Link>)}</div></header><div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)} aria-current={phase === id ? 'page' : undefined}><span><strong>{label}</strong><small>{subtitle}</small></span></button>)}<div className="side-rule" /><div className="side-source"><span className="side-label">Data source</span><strong>NSE option chain</strong><small>{capturedLabel}</small></div></aside>{isMobile && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView row={row} /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} /> : phase === 'open' && row && row.gap_points_nifty != null ? <MarketOpenView row={row} capturedAt={(row.updated_at ?? null) as string | null} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} onSeeVerdict={() => setPhase('verdict')} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
+  // History already fetches the last 15 sessions on load, so the picker knows which dates
+  // exist without another request -- and stepping moves to the next PUBLISHED session rather
+  // than to the next calendar day, which would land on weekends and holidays.
+  const sessionDates = (historyData?.rows ?? [])
+    .map((r) => (typeof r.trade_date === 'string' ? r.trade_date : null))
+    .filter((d): d is string => d != null)
+  const latestDate = sessionDates[0] ?? null
+  const currentDate = sessionDate ?? latestDate
+  const currentIdx = currentDate ? sessionDates.indexOf(currentDate) : -1
+  // sessionDates is newest-first, so "older" is a higher index.
+  const olderDate = currentIdx >= 0 && currentIdx < sessionDates.length - 1 ? sessionDates[currentIdx + 1] : null
+  const newerDate = currentIdx > 0 ? sessionDates[currentIdx - 1] : null
+  const isArchived = sessionDate != null && latestDate != null && sessionDate !== latestDate
+  const sessionLabel = (d: string | null) => {
+    if (!d) return ''
+    const parsed = new Date(`${d}T00:00:00+05:30`)
+    if (Number.isNaN(parsed.getTime())) return d
+    return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short' }).format(parsed)
+  }
+  const sessionLabelLong = (d: string | null) => {
+    if (!d) return ''
+    const parsed = new Date(`${d}T00:00:00+05:30`)
+    if (Number.isNaN(parsed.getTime())) return d
+    return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'long', day: 'numeric', month: 'long' }).format(parsed)
+  }
+  const sessionsBack = isArchived && currentIdx >= 0 ? currentIdx : 0
+
+  return <main className="app-shell"><header className="topbar"><button className="icon-button nav-toggle" onClick={() => setNavOpen(!navOpen)} aria-label={navOpen ? 'Hide session map' : 'Show session map'} aria-expanded={navOpen} aria-controls="session-map"><Menu size={18} /></button><div className="brand-mark"><BrandSymbol size={30} /><div><strong>MarketCue</strong></div></div>{isArchived
+      ? <span className="topbar-date topbar-date-archived">{sessionLabelLong(currentDate)}</span>
+      : <span className="topbar-date">{liveDay || row?.day_name || ''} {liveDate || row?.trade_date || ''} · {liveTime || '—'} IST</span>}
+    <div className="session-picker" role="group" aria-label="Trading session">
+      <button type="button" onClick={() => olderDate && goToSession(olderDate)} disabled={!olderDate} aria-label="Previous session">‹</button>
+      <span className="session-picker-date">{sessionLabel(currentDate) || '—'}</span>
+      <button type="button" onClick={() => newerDate && goToSession(newerDate === latestDate ? null : newerDate)} disabled={!newerDate} aria-label="Next session">›</button>
+    </div>
+    {isArchived && <button type="button" className="session-today" onClick={() => goToSession(null)}>Today</button>}<div className="topbar-meta"><FreshnessStamp state={sessionState.state} label={sessionState.label} capturedAt={capturedISO} /><button type="button" className="icon-button" onClick={() => setDark(!dark)} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'} aria-pressed={!dark}>{dark ? <Sun size={16} /> : <Moon size={16} />}</button>{!sessionLoading && (session ? <button type="button" className="topbar-toggle" onClick={() => signOut()}>Sign out</button> : <Link href="/login" className="topbar-toggle">Sign in</Link>)}</div></header>
+    {isArchived && <div className="archive-bar" role="status">
+      <span className="archive-bar-tag">Archived session</span>
+      <span className="archive-bar-text">
+        Viewing <b>{sessionLabelLong(currentDate)}</b>
+        {sessionsBack > 0 && <> — {sessionsBack === 1 ? 'the previous session' : `${sessionsBack} sessions ago`}</>}.
+        {' '}Figures are as published that day and do not update.
+      </span>
+      <button type="button" className="archive-bar-exit" onClick={() => goToSession(null)}>Back to today</button>
+    </div>}
+    <div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)} aria-current={phase === id ? 'page' : undefined}><span><strong>{label}</strong><small>{subtitle}</small></span></button>)}<div className="side-rule" /><div className="side-source"><span className="side-label">Data source</span><strong>NSE option chain</strong><small>{capturedLabel}</small></div></aside>{isMobile && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView row={row} /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} /> : phase === 'open' && row && row.gap_points_nifty != null ? <MarketOpenView row={row} capturedAt={(row.updated_at ?? null) as string | null} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} onSeeVerdict={() => setPhase('verdict')} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
 }

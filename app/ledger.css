@@ -360,3 +360,101 @@
   height: 44px;
   transform: translate(-50%, -50%);
 }
+
+/* ---- 13 · session picker and archived mode -------------------------------
+   A dashboard showing Friday's recommendation that looks like today's is how
+   someone acts on a stale call. Archived mode is deliberately loud: a bar that
+   cannot be missed, and an --info accent that appears nowhere else in the
+   product, so the state registers before anything has been read. */
+.app-shell.app-shell .session-picker {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.app-shell.app-shell .session-picker button {
+  min-width: 34px;
+  min-height: 36px;
+  padding: 0 9px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: 500 15px var(--font-sans);
+  cursor: pointer;
+}
+.app-shell.app-shell .session-picker button:hover:not(:disabled) { color: var(--ink); background: var(--surface-2); }
+.app-shell.app-shell .session-picker button:disabled { color: var(--faint); opacity: .5; cursor: not-allowed; }
+.app-shell.app-shell .session-picker-date {
+  display: grid;
+  place-items: center;
+  min-width: 118px;
+  padding: 0 12px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  font: 500 var(--text-label) var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.app-shell.app-shell .session-today {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  font: 600 var(--text-label) var(--font-sans);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.app-shell.app-shell .session-today:hover { color: var(--ink); }
+.app-shell.app-shell .topbar-date-archived { color: var(--info); font-weight: 600; }
+
+.app-shell.app-shell .archive-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px clamp(18px, 4vw, 58px);
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid var(--info);
+  background: color-mix(in srgb, var(--info) 11%, var(--ground));
+}
+.app-shell.app-shell .archive-bar-tag {
+  font: 600 var(--text-label) var(--font-sans);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--info);
+}
+.app-shell.app-shell .archive-bar-text { font-size: var(--text-meta); color: var(--ink-2); }
+.app-shell.app-shell .archive-bar-text b { color: var(--ink); font-weight: 600; }
+.app-shell.app-shell .archive-bar-exit {
+  margin-left: auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--info) 45%, transparent);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--info);
+  font: 600 var(--text-label) var(--font-sans);
+  cursor: pointer;
+}
+.app-shell.app-shell .archive-bar-exit:hover { background: color-mix(in srgb, var(--info) 14%, transparent); }
+
+/* 44px is the floor, and these are new controls -- no reason to ship them under it. */
+.app-shell.app-shell .session-picker button,
+.app-shell.app-shell .session-today,
+.app-shell.app-shell .archive-bar-exit { min-height: 44px; }
+
+@media (max-width: 760px) {
+  /* The picker is too wide to share the topbar's single row at 375px -- it pushed the
+     theme toggle and sign-out past the right edge. It takes its own full-width row
+     underneath instead, and the date cell stretches to fill it. */
+  .app-shell.app-shell .topbar { flex-wrap: wrap; height: auto; padding-top: 8px; padding-bottom: 8px; row-gap: 8px; }
+  .app-shell.app-shell .session-picker { order: 10; flex: 1 1 100%; }
+  .app-shell.app-shell .session-picker-date { flex: 1; min-width: 0; }
+  .app-shell.app-shell .session-today { order: 11; }
+  .app-shell.app-shell .archive-bar-exit { margin-left: 0; }
+}
