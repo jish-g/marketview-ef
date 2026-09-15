@@ -5,7 +5,7 @@ import { fmt } from '@/lib/format'
 import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import useSWR from 'swr'
-import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Menu, Moon, Newspaper, Send, Sun, UserRound, X } from 'lucide-react'
+import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Menu, Moon, Newspaper, Send, Sun, X } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { createClient } from '@/lib/supabase/client'
@@ -334,22 +334,9 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
               <article className="landing-testimonial-card" key={author}>
                 <p className="landing-testimonial-quote">{quote}</p>
                 <div className="landing-testimonial-author">
-                  {/* A generic human silhouette, deliberately not a photograph -- a stock or
-                      generated face would assert that a specific person sat for it, which is a
-                      claim the quote itself cannot support. One neutral figure for everyone:
-                      there is no gender on these records, and guessing it from a first name
-                      would be inventing a detail about someone real. Decorative, so it is
-                      aria-hidden -- the author's name sits next to it as real text.
-
-                      Filled rather than lucide's default outline: at 22px in a 40px circle a
-                      2px stroke reads as a faint wireframe, not an avatar. Passing fill and
-                      stroke overrides the icon's own attributes, which its shapes inherit --
-                      the head circle fills solid, and the shoulder arc closes along its chord
-                      into a half-disc. Ink then spans 11.75px to 28.25px of the 40px circle,
-                      centred, so no nudge is needed. */}
-                  <span className="landing-testimonial-avatar" aria-hidden="true">
-                    <UserRound size={22} fill="currentColor" stroke="none" />
-                  </span>
+                  {/* No avatar mark at all. An initials monogram or a silhouette is a stand-in
+                      for a face, and nothing here can support a face: the name beside the quote
+                      is what identifies the author. */}
                   <div>
                     <strong>{author}</strong>
                     <span>{role} · {location}</span>
