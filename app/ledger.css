@@ -646,6 +646,85 @@
   }
 }
 
+/* ---- 17 · Journal log -----------------------------------------------------
+   The row was a single flex line carrying six things: date, "edited", a
+   five-part trade chip, a source badge, the note, and two buttons. The note
+   was the only child with flex:1, so the thing the user actually wrote was the
+   only element that got squeezed and ellipsised -- while a red chip took its
+   full width and wrapped, which is why rows changed height from one day to
+   the next.
+
+   Restacked: date and actions on the top line, the note at full width beneath
+   it, the trade as a quiet caption under that. Uniform height, and the note
+   is the largest thing in the row rather than the smallest. */
+.app-shell.app-shell .journal-log-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 6px 16px;
+  padding: 14px 0;
+}
+.app-shell.app-shell .journal-log-date {
+  grid-column: 1;
+  font: 600 var(--text-meta) var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.app-shell.app-shell .journal-log-edited {
+  font-style: normal;
+  font-weight: 400;
+  font-family: var(--font-sans);
+  color: var(--faint);
+}
+.app-shell.app-shell .journal-log-actions { grid-column: 2; grid-row: 1; display: flex; gap: 6px; align-items: center; }
+
+/* the note: full width, two lines, then it expands on request */
+.app-shell.app-shell .journal-log-text {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--text-body);
+  line-height: 1.6;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+.app-shell.app-shell .journal-log-entry:not(.journal-log-entry-expanded) .journal-log-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* the trade, demoted to a caption */
+.app-shell.app-shell .journal-log-context {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin-top: 2px;
+}
+.app-shell.app-shell .journal-line-trade { display: inline-flex; align-items: baseline; gap: 10px; }
+.app-shell.app-shell .journal-line-ctx { font-size: var(--text-label); color: var(--faint); }
+.app-shell.app-shell .journal-line-pnl {
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.app-shell.app-shell .journal-line-pnl.positive { color: var(--up); }
+.app-shell.app-shell .journal-line-pnl.negative { color: var(--down); }
+
+.app-shell.app-shell .journal-log-entry {
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
+  border-radius: 0;
+  background: none;
+  padding: 0;
+}
+.app-shell.app-shell .journal-log-entry-active { border-left: 0; box-shadow: inset 2px 0 0 var(--caution); padding-left: 14px; }
+
 /* ---- 18 · the prior-session recap -----------------------------------------
    The recap is three sentences of prose and was rendering at 12px -- that is
    --text-label, the smallest step in the scale, meant for uppercase tracked

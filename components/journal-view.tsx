@@ -78,6 +78,18 @@ function TradeChip({ trade }: { trade: Trade }) {
   </span>
 }
 
+// The log's own compact form of a trade: context muted, the figure carrying the colour.
+function TradeLine({ trade }: { trade: Trade }) {
+  const pnl = tradePnl(trade)
+  return <span className="journal-line-trade">
+    <span className="journal-line-ctx">
+      {trade.instrument} · {String(trade.strategy ?? 'No strategy')} · {outcomeLabel(trade).toLowerCase()}
+      {trade.source === 'manual' && ' · manual'}
+    </span>
+    {pnl != null && <span className={`journal-line-pnl ${pnl >= 0 ? 'positive' : 'negative'}`}>{fmt.pnl(pnl)}</span>}
+  </span>
+}
+
 function TradeDayCards({ trades }: { trades: Trade[] }) {
   if (trades.length === 0) return <span className="journal-trade-chip journal-chip-neutral">No trade</span>
   return <div className="journal-trade-cards">
@@ -278,13 +290,17 @@ export function JournalView() {
           const shots = entry.screenshot_urls ?? []
           return <article className={`journal-log-entry ${entry.trade_date === editingDate ? 'journal-log-entry-active' : ''} ${isExpanded ? 'journal-log-entry-expanded' : ''}`} key={entry.id}>
             <div className="journal-log-row">
+              {/* The note is what the user wrote and gets the room; the trade that day is
+                  context underneath it. Previously both competed on one flex line and the
+                  note was the only child that could be squeezed, so it was the only thing
+                  ellipsised while a five-part red chip took its full width. */}
               <span className="journal-log-date">{formatDateLabel(entry.trade_date)}{entry.updated_at && entry.updated_at !== entry.created_at && <em className="journal-log-edited"> · edited</em>}</span>
-              <span className="journal-trade-cards journal-trade-cards-compact">
-                {dayTrades.length === 0
-                  ? <span className="journal-trade-chip journal-chip-neutral">No trade</span>
-                  : dayTrades.map((trade) => <TradeChip key={String(trade.id)} trade={trade} />)}
-              </span>
               <p className="journal-log-text">{isExpanded || !isLong ? entry.entry_text : previewText(entry.entry_text)}</p>
+              <span className="journal-log-context">
+                {dayTrades.length === 0
+                  ? <span className="journal-line-ctx">No trade</span>
+                  : dayTrades.map((trade) => <TradeLine key={String(trade.id)} trade={trade} />)}
+              </span>
               <span className="journal-log-actions">
                 {shots.length > 0 && <span className="journal-log-shot-count"><ImagePlus size={11} /> {shots.length}</span>}
                 {isLong && (
