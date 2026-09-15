@@ -1307,14 +1307,18 @@ function MarketOpenView({ row, capturedAt }: { row: Row; capturedAt: string | nu
           {vix != null && <> VIX at {fmt.ratio(vix)} — {vixCondition(vix).toLowerCase()}.</>}
         </Banner>}
 
-    {/* Breadth is a reading of the whole market at the open, not an expected move and not an
-        instrument's own figure. It used to sit as the third card inside "Expected move",
-        where it was neither. It leads the screen on its own line instead. */}
-    <div className="open-breadth field-grid">
-      {row.advance_decline_ratio == null
-        ? <div className="field-card is-empty"><span>Advance / decline</span><strong className="field-empty-headline">Not published</strong><small className="field-empty-reason">NSE releases breadth after 09:20 IST.</small></div>
-        : <div className="field-card"><span>Advance / decline</span><strong>{value(row, 'advance_decline_ratio')}</strong><small>advances per decline</small></div>}
-    </div>
+    {/* Advance / decline is hidden for now, at request. Breadth is a reading of the whole
+        market at the open -- not an expected move and not an instrument's own figure -- so
+        when it comes back it belongs on its own line here, NOT as a third card inside
+        "Expected move", where it used to sit and was neither. Restore by uncommenting;
+        .open-breadth is still styled in ledger.css section 20.
+
+        <div className="open-breadth field-grid">
+          {row.advance_decline_ratio == null
+            ? <div className="field-card is-empty"><span>Advance / decline</span><strong className="field-empty-headline">Not published</strong><small className="field-empty-reason">NSE releases breadth after 09:20 IST.</small></div>
+            : <div className="field-card"><span>Advance / decline</span><strong>{value(row, 'advance_decline_ratio')}</strong><small>advances per decline</small></div>}
+        </div>
+    */}
 
     <OpenInstrument row={row} instrument="NIFTY" heading="Nifty 50" />
     <OpenInstrument row={row} instrument="SENSEX" heading="Sensex" />
