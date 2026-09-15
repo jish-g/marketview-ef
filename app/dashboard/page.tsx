@@ -7,18 +7,21 @@ import useSWR from 'swr'
 import { createClient } from '@/lib/supabase/client'
 import { TradeView } from '@/components/trade-view'
 import { JournalView } from '@/components/journal-view'
+import { ChartView } from '@/components/chart-view'
 import { useSession } from '@/hooks/use-session'
 import { fmt, freshness } from '@/lib/format'
 import { Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, CheckpointTimeline, Progress, PhaseAside, Label, Metric, Banner, TradeLevels, Card, Sparkline } from '@/components/ui/ds'
 import { useIsMobile } from '@/hooks/use-media-query'
-import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sun } from 'lucide-react'
+import { useChartColors } from '@/hooks/use-chart-colors'
+import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CandlestickChart, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sun } from 'lucide-react'
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 type Row = Record<string, string | number | boolean | null>
-type Phase = 'premarket' | 'open' | 'verdict' | 'mid' | 'post' | 'journal' | 'rules' | 'history' | 'trade'
+type Phase = 'premarket' | 'open' | 'verdict' | 'chart' | 'mid' | 'post' | 'journal' | 'rules' | 'history' | 'trade'
 const phases = [
   { id: 'premarket' as Phase, label: 'Pre-market', subtitle: 'Overnight setup', icon: Clock3 },
   { id: 'open' as Phase, label: 'Market open', subtitle: 'Opening auction', icon: Activity },
   { id: 'verdict' as Phase, label: 'Verdict', subtitle: 'Strategy selection', icon: CheckCircle2 },
+  { id: 'chart' as Phase, label: 'Chart', subtitle: 'Price action', icon: CandlestickChart },
   { id: 'mid' as Phase, label: 'Mid-market', subtitle: 'Intraday read', icon: Gauge },
   { id: 'trade' as Phase, label: 'Trade', subtitle: 'Live positions', icon: ArrowUp },
   { id: 'post' as Phase, label: 'Post-market', subtitle: 'Review & learn', icon: Layers3 },
@@ -529,37 +532,6 @@ function TargetStopCard({ instrument, calc, delta = 0.5 }: { instrument?: Instru
       </div>
     </div>
   </div>
-}
-
-// Token colours for the payoff chart. Recharts sets stroke and fill as SVG ATTRIBUTES, and
-// `var(--up)` does not resolve in an attribute -- which is why this chart shipped seven
-// hardcoded hexes that never changed with the theme, and why its buy/sell green and red
-// were a second pair sitting inches from .leg-badge's --up/--down. The values are read off
-// documentElement instead and re-read when the theme class flips, so the chart is finally
-// painted from the same palette as everything around it.
-const CHART_FALLBACK = { up: '#23b26a', down: '#e35f5f', caution: '#e2b660', info: '#9288d9', muted: '#c3c2b7', faint: '#9b9a8c', rule: '#444441' }
-function useChartColors() {
-  const [colors, setColors] = useState(CHART_FALLBACK)
-  useEffect(() => {
-    const read = () => {
-      const style = getComputedStyle(document.documentElement)
-      const pick = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback
-      setColors({
-        up: pick('--up', CHART_FALLBACK.up),
-        down: pick('--down', CHART_FALLBACK.down),
-        caution: pick('--caution-ink', CHART_FALLBACK.caution),
-        info: pick('--info', CHART_FALLBACK.info),
-        muted: pick('--muted', CHART_FALLBACK.muted),
-        faint: pick('--faint', CHART_FALLBACK.faint),
-        rule: pick('--border-strong', CHART_FALLBACK.rule),
-      })
-    }
-    read()
-    const observer = new MutationObserver(read)
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    return () => observer.disconnect()
-  }, [])
-  return colors
 }
 
 function PayoffChart({ legRows, atmNumber, strikeStep, isNetSeller, spotEstTarget, spotEstStop, spotAggressiveTarget, spotAggressiveStop, actualConservativeTarget, actualConservativeStop, actualAggressiveTarget, actualAggressiveStop, qty }: {
@@ -1723,5 +1695,5 @@ export default function Dashboard() {
       </span>
       <button type="button" className="archive-bar-exit" onClick={() => goToSession(null)}>Back to today</button>
     </div>}
-    <div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile === true && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)} aria-current={phase === id ? 'page' : undefined}><span><strong>{label}</strong><small>{subtitle}</small></span></button>)}<div className="side-rule" /><div className="side-source"><span className="side-label">Data source</span><strong>NSE option chain</strong><small>{capturedLabel}</small></div></aside>{isMobile === true && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView row={row} /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} agentCalls={agentCalls} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} agentCalls={agentCalls} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} agentCalls={agentCalls} /> : phase === 'open' && row && row.gap_points_nifty != null ? <MarketOpenView row={row} capturedAt={(row.updated_at ?? null) as string | null} agentCalls={agentCalls} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} onSeeVerdict={() => setPhase('verdict')} agentCalls={agentCalls} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
+    <div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile === true && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)} aria-current={phase === id ? 'page' : undefined}><span><strong>{label}</strong><small>{subtitle}</small></span></button>)}<div className="side-rule" /><div className="side-source"><span className="side-label">Data source</span><strong>NSE option chain</strong><small>{capturedLabel}</small></div></aside>{isMobile === true && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView row={row} /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} agentCalls={agentCalls} /> : phase === 'chart' ? <ChartView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} agentCalls={agentCalls} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} agentCalls={agentCalls} /> : phase === 'open' && row && row.gap_points_nifty != null ? <MarketOpenView row={row} capturedAt={(row.updated_at ?? null) as string | null} agentCalls={agentCalls} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} onSeeVerdict={() => setPhase('verdict')} agentCalls={agentCalls} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
 }

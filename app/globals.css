@@ -906,3 +906,67 @@ button, input { font: inherit; }
   .archive-hero-tiles { grid-template-columns: 1fr; }
   .trade-open-figures { grid-template-columns: 1fr; }
 }
+
+/* ------------------------------------------------------------------ Chart screen
+   The one screen whose content is a canvas. lightweight-charts sizes itself to its
+   container and paints its own background, so the frame here owns the box (border,
+   height, the overlay that covers it while there is nothing to draw) and the chart is
+   told background: transparent so --surface shows through and the theme toggle keeps
+   working without the canvas being repainted. */
+.chart-view { width: 100%; max-width: none; display: grid; gap: var(--s-4); }
+
+.chart-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-4); }
+
+/* Segmented control, shared by the instrument and range switches. Both are single-choice,
+   so they are buttons with aria-pressed rather than a select -- two or three options that
+   are always worth showing at a glance. */
+.chart-switch { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.chart-switch button {
+  padding: var(--s-2) var(--s-4); border: 0; background: var(--ground); color: var(--muted); cursor: pointer;
+  font: 600 var(--text-label) var(--font-sans); letter-spacing: var(--tracking-label); text-transform: uppercase;
+}
+.chart-switch button + button { border-left: 1px solid var(--border); }
+.chart-switch button:hover { color: var(--ink); }
+.chart-switch button.is-active { background: var(--surface); color: var(--ink); }
+
+.chart-last { display: inline-flex; align-items: baseline; gap: var(--s-2); margin-left: auto; }
+.chart-last span { color: var(--muted); font: 600 var(--text-label) var(--font-sans); letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.chart-last b { color: var(--ink); font-size: var(--text-value); font-variant-numeric: tabular-nums; }
+
+.chart-frame { position: relative; height: clamp(320px, 52vh, 560px); border: 1px solid var(--border); background: var(--surface); }
+.chart-canvas { position: absolute; inset: 0; }
+/* Sits over the canvas rather than replacing it: the chart is created once on mount and
+   keeps its pan and zoom across an empty stretch, a reload and a theme flip. */
+.chart-overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: var(--s-5); background: var(--surface); }
+.chart-overlay > * { max-width: 480px; }
+
+.chart-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3) var(--s-4); }
+.chart-legend-label { color: var(--muted); font: 600 var(--text-label) var(--font-sans); letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.chart-legend-item {
+  display: inline-flex; align-items: center; gap: var(--s-2); padding: 0; border: 0; background: none;
+  color: var(--ink); cursor: pointer; font: var(--text-label) var(--font-sans);
+}
+/* A hidden level is dimmed AND its swatch is hollowed out: the on/off state never rests on
+   opacity alone, same reason every band renders its word next to its colour (rule 8). */
+.chart-legend-item.is-off { color: var(--muted); }
+.chart-legend-swatch { width: 14px; height: 0; border-top: 2px solid var(--faint); }
+.chart-legend-item.is-off .chart-legend-swatch { border-top-style: dotted; opacity: .5; }
+/* Each swatch carries the pairing its price lines use: OI levels solid, pivots dashed,
+   max pain in --info, previous close in --faint. Support/resistance pairs are two colours
+   on one row, so the swatch shows the resistance half and the label names both. */
+.chart-legend-swatch.swatch-oi { border-top-color: var(--down); }
+.chart-legend-swatch.swatch-pivot { border-top-color: var(--down); border-top-style: dashed; }
+.chart-legend-swatch.swatch-maxpain { border-top-color: var(--info); border-top-style: dashed; }
+.chart-legend-swatch.swatch-prev { border-top-color: var(--faint); border-top-style: dashed; }
+
+.chart-read { margin: 0; color: var(--ink); font-size: var(--text-meta); line-height: 1.6; }
+.chart-note { margin: 0; max-width: 72ch; color: var(--muted); font-size: var(--text-label); line-height: 1.6; }
+
+@media (max-width: 760px) {
+  /* Three controls on one row is a wrap into a 60px-wide "Last" column on a phone. */
+  .chart-controls { flex-direction: column; align-items: stretch; }
+  .chart-switch { justify-content: stretch; }
+  .chart-switch button { flex: 1; text-align: center; }
+  .chart-last { margin-left: 0; }
+  .chart-frame { height: clamp(260px, 44vh, 380px); }
+}
