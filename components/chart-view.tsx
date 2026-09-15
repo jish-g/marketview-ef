@@ -10,7 +10,7 @@ import { fmt } from '@/lib/format'
 
 type Row = Record<string, string | number | boolean | null>
 type Instrument = 'NIFTY' | 'SENSEX'
-type Span = 'session' | 'week'
+type Span = 'session' | 'week' | 'month'
 type Bar = { time: UTCTimestamp; open: number; high: number; low: number; close: number }
 
 function todayIST() {
@@ -105,13 +105,15 @@ export function ChartView({ row }: { row: Row }) {
   const priceLinesRef = useRef<IPriceLine[]>([])
   const [chartReady, setChartReady] = useState(false)
 
-  // "week" widens to the calendar fortnight behind the session so a five-session backfill lands
-  // inside it whatever public holidays fall in the middle -- trade_date is a date, so a count of
-  // sessions cannot be expressed as a LIMIT without a distinct-day subquery.
+  // Each span widens to a calendar window behind the session, not a session count -- trade_date
+  // is a date, so "last N sessions" cannot be a LIMIT without a distinct-day subquery. The
+  // windows are padded past their nominal trading days so public holidays in the middle do not
+  // eat into the count: ~5 sessions in a fortnight, ~30 sessions in ~44 days.
   const fromDate = useMemo(() => {
     if (span === 'session') return tradeDate
+    const back = span === 'month' ? 44 : 13
     const d = new Date(`${tradeDate}T00:00:00Z`)
-    d.setUTCDate(d.getUTCDate() - 13)
+    d.setUTCDate(d.getUTCDate() - back)
     return d.toISOString().slice(0, 10)
   }, [span, tradeDate])
 
@@ -310,7 +312,7 @@ export function ChartView({ row }: { row: Row }) {
         ))}
       </div>
       <div className="chart-switch" role="group" aria-label="Range">
-        {([['session', 'This session'], ['week', 'Last 5 sessions']] as [Span, string][]).map(([s, label]) => (
+        {([['session', 'This session'], ['week', 'Last 5 sessions'], ['month', 'Last 30 sessions']] as [Span, string][]).map(([s, label]) => (
           <button key={s} type="button" className={span === s ? 'is-active' : ''} aria-pressed={span === s} onClick={() => setSpan(s)}>{label}</button>
         ))}
       </div>
