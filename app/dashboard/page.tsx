@@ -1257,7 +1257,9 @@ function PostMarketView({ row, postSummary, agentCalls }: { row: Row; postSummar
 // that is the 09:35 open view's job.
 function ThesisHero({ call, onSeeVerdict }: { call: AgentCall | null; onSeeVerdict: () => void }) {
   const regime = String(call?.agent_bias ?? '').toLowerCase()
-  const headline = REGIME_HEADLINE[regime] ?? (regime ? regime.replace(/_/g, ' ') : 'No clear regime yet')
+  // The agent writes its own <= 6-word headline; the regime map is only the fallback for rows
+  // written before that field existed.
+  const headline = agentRaw(call, 'headline') ?? REGIME_HEADLINE[regime] ?? (regime ? regime.replace(/_/g, ' ') : 'No clear regime yet')
   const rawFlags = call?.raw_output?.risk_flags
   const flags = Array.isArray(rawFlags) ? rawFlags.map((f) => String(f).trim()).filter(Boolean) : []
   return <div className="thesis-hero">
@@ -1456,6 +1458,15 @@ function PhaseView({ phase, row, historyData, onSeeVerdict, agentCalls }: { phas
   const priorDay = phase === 'premarket' && historyData
     ? historyData.rows.find((r) => String(r.trade_date) !== String(row?.trade_date)) ?? null
     : null
+  // The agent's own post-close read of the prior session (one row per instrument). When it
+  // exists it replaces the Haiku-phrased recap of the rule engine's day below.
+  const priorAgentRecap = priorDay ? (() => {
+    const rows = historyData?.agent[String(priorDay.trade_date)]
+    const blocks = (['NIFTY', 'SENSEX'] as const)
+      .map((instrument) => ({ instrument, call: agentFor(rows, 'post-close', instrument) }))
+      .filter((b): b is { instrument: 'NIFTY' | 'SENSEX'; call: AgentCall } => b.call != null)
+    return blocks.length > 0 ? blocks : null
+  })() : null
   const priorDayLines = priorDay ? (() => {
     const dateKey = String(priorDay.trade_date)
     const dayLabel = priorDay.day_name ? String(priorDay.day_name) : dateKey
@@ -1524,7 +1535,7 @@ function PhaseView({ phase, row, historyData, onSeeVerdict, agentCalls }: { phas
     <TargetStopCard instrument="NIFTY" calc={calculateVerdict(row, 'NIFTY')} />
     <TargetStopCard instrument="SENSEX" calc={calculateVerdict(row, 'SENSEX')} />
   </div> : null
-  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><div className="phase-head-aside"><FreshnessStamp state={headStamp.state} label={headStamp.label} capturedAt={(row?.updated_at ?? null) as string | null} /><ProvenanceBadge source="system" /></div></div>{phase === 'premarket' && row && onSeeVerdict && <div className="thesis-row"><ThesisHero call={agentFor(agentCalls, 'premarket', 'BOTH')} onSeeVerdict={onSeeVerdict} />{priorDayLines && priorDayLines.story && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p><p className="prior-session-line prior-session-story">{priorDayLines.story}</p></div>}</div>}<div className="metric-groups">{renderGroup('Common market data', common)}{openTargetCards}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div><Disclaimer capturedAt={fmt.timeIST((row?.updated_at ?? null) as string | null)} /></section>
+  return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><div className="phase-head-aside"><FreshnessStamp state={headStamp.state} label={headStamp.label} capturedAt={(row?.updated_at ?? null) as string | null} /><ProvenanceBadge source="system" /></div></div>{phase === 'premarket' && row && onSeeVerdict && <div className="thesis-row"><ThesisHero call={agentFor(agentCalls, 'premarket', 'BOTH')} onSeeVerdict={onSeeVerdict} />{priorDayLines && priorAgentRecap ? <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p>{priorAgentRecap.map(({ instrument, call }) => { const grade = GRADE_BADGE[String(call.grade ?? '').toLowerCase()]; return <div className="prior-session-block" key={instrument}><div className="prior-session-head"><span className="history-beat-label">{instrument === 'NIFTY' ? 'Nifty' : 'Sensex'}</span>{grade && <span className={`ds-badge ${grade.cls}`}>{grade.label}</span>}{call.agent_strategy && <span className="prior-session-strategy">{call.agent_strategy}</span>}</div>{call.reasoning && <p className="prior-session-line prior-session-story">{call.reasoning}</p>}</div> })}</div> : priorDayLines && priorDayLines.story && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p><p className="prior-session-line prior-session-story">{priorDayLines.story}</p></div>}</div>}<div className="metric-groups">{renderGroup('Common market data', common)}{openTargetCards}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div><Disclaimer capturedAt={fmt.timeIST((row?.updated_at ?? null) as string | null)} /></section>
 }
 export default function Dashboard() {
   const [phase, setPhase] = useState<Phase>('premarket'); const [dark, setDark] = useState(true); const [navOpen, setNavOpen] = useState(false); const [liveDate, setLiveDate] = useState(''); const [liveDay, setLiveDay] = useState(''); const [liveTime, setLiveTime] = useState('')

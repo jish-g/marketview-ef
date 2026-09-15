@@ -805,6 +805,13 @@
   color: var(--ink-2);
 }
 .app-shell.app-shell .prior-session-story { max-width: 46ch; }
+/* Agent post-close recap: one block per instrument, stacked. The head line carries the
+   instrument label, the grade badge and the strategy the agent had on; the post-mortem
+   follows as the usual recap paragraph. */
+.app-shell.app-shell .prior-session-block + .prior-session-block { margin-top: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--border); }
+.app-shell.app-shell .prior-session-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.app-shell.app-shell .prior-session-strategy { font-size: var(--text-meta); font-weight: 600; color: var(--ink); }
+.app-shell.app-shell .prior-session-block .prior-session-line { margin-top: var(--s-2); }
 
 /* globals.css collapses .thesis-row to one column below 900px, but that rule is a bare
    class and this layer's is (0,3,0) -- media queries carry no specificity of their own, so
