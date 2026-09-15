@@ -100,27 +100,85 @@ What the table cannot see and you can: an event on the calendar, a gap that open
 // ---------------------------------------------------------------------------------------------
 // Model call. Structured output via a forced tool call so the response is always parseable JSON.
 // ---------------------------------------------------------------------------------------------
-async function askModel(apiKey: string, system: string, user: unknown, schema: Record<string, unknown>) {
+type Limit = { words?: number; chars?: number; items?: number; itemWords?: number; sentences?: number };
+type Limits = Record<string, Limit>;
+
+// Length limits per field, from agent_instructions (the numbers are duplicated here so the check
+// is deterministic; the prose in the table is what the model reads).
+const LIMITS: Record<string, Limits> = {
+  premarket: { headline: { words: 6, chars: 40 }, note: { words: 55 }, watch: { words: 20 }, risk_flags: { items: 3, itemWords: 4 } },
+  open: { view: { words: 10, chars: 60 }, reasoning: { words: 55 }, invalidation: { words: 18 } },
+  mid: { reasoning: { words: 35 } },
+  "post-close": { reasoning: { words: 50 }, lesson: { words: 22 }, misleading_signal: { words: 4 } },
+};
+
+function wordCount(s: string) { return s.trim().split(/\s+/).filter(Boolean).length; }
+
+function checkLimits(output: Record<string, any>, limits: Limits): string[] {
+  const over: string[] = [];
+  for (const [field, lim] of Object.entries(limits)) {
+    const v = output[field];
+    if (v == null) continue;
+    if (Array.isArray(v)) {
+      if (lim.items != null && v.length > lim.items) over.push(`${field}: ${v.length} items / max ${lim.items}`);
+      if (lim.itemWords != null) for (const it of v) { const w = wordCount(String(it)); if (w > lim.itemWords) over.push(`${field} entry "${String(it).slice(0, 30)}": ${w} words / max ${lim.itemWords}`); }
+      continue;
+    }
+    const s = String(v);
+    if (lim.words != null) { const w = wordCount(s); if (w > lim.words) over.push(`${field}: ${w} words / max ${lim.words}`); }
+    if (lim.chars != null && s.length > lim.chars) over.push(`${field}: ${s.length} chars / max ${lim.chars}`);
+  }
+  return over;
+}
+
+// One structured call, then a length check. If a field runs past its slot the model gets ONE retry
+// that names the overrun; if it is still over, the answer is kept and the overrun is reported so it
+// lands in guardrail_applied rather than silently on screen.
+async function askModel(apiKey: string, system: string, user: unknown, schema: Record<string, unknown>, limits: Limits = {}) {
   const t0 = Date.now();
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 1200,
-      temperature: 0.3,
-      system,
-      tools: [{ name: "record_call", description: "Record the structured judgement.", input_schema: schema }],
-      tool_choice: { type: "tool", name: "record_call" },
-      messages: [{ role: "user", content: `Structured input (JSON):\n${JSON.stringify(user)}` }],
-    }),
-  });
-  if (!res.ok) throw new Error(`Anthropic ${res.status} ${await res.text()}`);
-  const json = await res.json();
-  const block = (json.content ?? []).find((c: any) => c.type === "tool_use");
-  if (!block) throw new Error("model returned no tool_use block");
-  return { output: block.input as Record<string, any>, latencyMs: Date.now() - t0 };
+  const call = async (messages: any[]) => {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+      body: JSON.stringify({
+        model: MODEL, max_tokens: 1200, temperature: 0.3, system,
+        tools: [{ name: "record_call", description: "Record the structured judgement.", input_schema: schema }],
+        tool_choice: { type: "tool", name: "record_call" },
+        messages,
+      }),
+    });
+    if (!res.ok) throw new Error(`Anthropic ${res.status} ${await res.text()}`);
+    const json = await res.json();
+    const block = (json.content ?? []).find((c: any) => c.type === "tool_use");
+    if (!block) throw new Error("model returned no tool_use block");
+    return { block, json };
+  };
+  const first = [{ role: "user", content: `Structured input (JSON):\n${JSON.stringify(user)}` }];
+  let { block, json } = await call(first);
+  let output = block.input as Record<string, any>;
+  let over = checkLimits(output, limits);
+  let retried = false;
+  if (over.length) {
+    retried = true;
+    const messages = [
+      ...first,
+      { role: "assistant", content: json.content },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: block.id, content: `Over the slot: ${over.join("; ")}. Rewrite the whole record within the limits. Same judgement, fewer words.` }] },
+    ];
+    const second = await call(messages);
+    const candidate = second.block.input as Record<string, any>;
+    const stillOver = checkLimits(candidate, limits);
+    if (stillOver.length <= over.length) { output = candidate; over = stillOver; }
+  }
+  return { output, latencyMs: Date.now() - t0, lengthNote: over.length ? `length: ${over.join("; ")}${retried ? " (after retry)" : ""}` : null };
+}
+
+// Rendering instructions live in agent_instructions and are read at call time, so wording changes
+// are a DB edit. The block that applies to all phases comes first, then the phase's own block.
+async function loadInstructions(admin: any, phase: string): Promise<string> {
+  const { data } = await admin.from("agent_instructions").select("body, applies_to, ordinal").eq("agent", "market-intelligence").eq("active", true).in("applies_to", ["all", phase]).order("ordinal");
+  return (data ?? []).map((r: any) => r.body).join("\n\n");
 }
 
 const SYSTEM_COMMON = `You are MarketCue's analyst for NIFTY and SENSEX options. You read the day's data and form the view.
@@ -230,17 +288,20 @@ Deno.serve(async (req: Request) => {
     const { data: pm } = await admin.from("premarket_dashboard").select("*").eq("trade_date", tradeDate).maybeSingle();
     if (!pm) return new Response(JSON.stringify({ ok: false, phase, error: `no premarket_dashboard row for ${tradeDate}` }), { status: 200 });
     const history = await recentHistory(admin, tradeDate);
+    const instructions = await loadInstructions(admin, phase);
+    const withInstructions = (system: string) => instructions ? `${system}\n\n${instructions}` : system;
 
     // ------------------------------------------------------------------ premarket
     if (phase === "premarket") {
       const input = { today: pick(pm, PREMARKET_KEYS), ...history };
       const schema = {
-        type: "object", required: ["regime", "watch", "risk_flags", "note"],
+        type: "object", required: ["headline", "regime", "watch", "risk_flags", "note"],
         properties: {
-          regime: { type: "string", enum: ["trend_up", "trend_down", "range", "event_driven", "unclear"] },
-          watch: { type: "string", description: "The two or three levels or signals that decide the day, in one or two sentences." },
-          risk_flags: { type: "array", items: { type: "string" }, description: "Short phrases. Empty if none." },
-          note: { type: "string", description: "At most 60 words a trader reads at 9:00 AM. Plain language, no strategy call, no score arithmetic." },
+          headline: { type: "string", description: "The read in at most 6 words and 40 characters, in the same voice as a view line: what today IS. No numbers, no strategy." },
+          regime: { type: "string", enum: ["trend_up", "trend_down", "range", "event_driven", "unclear"], description: "Classification tag for the scoreboard; not shown as the headline." },
+          watch: { type: "string", description: "One sentence, at most 20 words: the two or three levels that decide the day." },
+          risk_flags: { type: "array", items: { type: "string" }, description: "At most three entries, each 2-4 words, no sentence, no trailing full stop. Empty if none." },
+          note: { type: "string", description: "At most 55 words, 2-4 sentences: the setup a trader reads before the open. No strategy names, no score arithmetic." },
         },
       };
       const system = `${SYSTEM_COMMON}\n\nPhase: PRE-MARKET. The market has not opened; there is no spot, PCR, max pain or bias yet.
@@ -250,8 +311,8 @@ the 5-day average range, the prior sessions and any lesson from earlier grades.`
       if (!apiKey) { skipped.push("anthropic_api_key not in vault"); }
       else {
         try {
-          const { output, latencyMs } = await askModel(apiKey, system, input, schema);
-          await upsert({ instrument: "BOTH", reasoning: output.note, invalidation: output.watch, inputs: input, raw_output: output, latency_ms: latencyMs, agent_bias: output.regime, guardrail_applied: null });
+          const { output, latencyMs, lengthNote } = await askModel(apiKey, withInstructions(system), input, schema, LIMITS.premarket);
+          await upsert({ instrument: "BOTH", reasoning: output.note, invalidation: output.watch, inputs: input, raw_output: output, latency_ms: latencyMs, agent_bias: output.regime, guardrail_applied: lengthNote });
         } catch (e) { skipped.push(`premarket model: ${e}`); }
       }
     }
@@ -280,9 +341,9 @@ the 5-day average range, the prior sessions and any lesson from earlier grades.`
             iv_condition: { type: "string", enum: ["Cheap", "Normal", "Expensive"] },
             strategy: { type: "string", enum: [...STRATEGIES] },
             confidence: { type: "string", enum: ["high", "medium", "low"] },
-            view: { type: "string", description: "The view as a trader would say it out loud: ONE clause, at most 12 words, no numbers. This is the headline." },
-            reasoning: { type: "string", description: "At most 70 words, plain trader language. Name the two or three signals that drive the call and, if you departed from the playbook, which signal you weighed differently. Do NOT list scores, weights or arithmetic (+1, -2, 45%) -- those are shown separately." },
-            invalidation: { type: "string", description: "One sentence: the observable condition that would make this view wrong intraday (a level, a VIX move, an OI change)." },
+            view: { type: "string", description: "ONE clause, at most 10 words and 60 characters. No numbers, no semicolons, no 'and' joining two ideas. Say what the setup IS." },
+            reasoning: { type: "string", description: "At most 55 words, 3-4 sentences, plain trader language. Name the two or three signals that drive the call and, if you weighed one against the playbook, which. No scores, weights or arithmetic." },
+            invalidation: { type: "string", description: "One sentence, at most 18 words, ending in a full stop. The observable condition only; give the level plainly." },
             invalidation_level: { type: ["number", "null"], description: "The single spot level from the invalidation sentence, as a number. null only if the invalidation is not a price level." },
             invalidation_direction: { type: ["string", "null"], enum: ["above", "below", null], description: "The view is wrong if spot trades ABOVE or BELOW invalidation_level. null if no level." },
           },
@@ -298,12 +359,12 @@ walked in with, and the scoreboard to notice which reads have been working.`;
         if (!apiKey) { skipped.push("anthropic_api_key not in vault"); final = fallback(rule.bias, rule.strategy, "model_unavailable", input); }
         else {
           try {
-            const { output, latencyMs } = await askModel(apiKey, system, input, schema);
+            const { output, latencyMs, lengthNote } = await askModel(apiKey, withInstructions(system), input, schema, LIMITS.open);
             const g = applyRiskLimits(String(output.strategy), { vix, dte });
             final = {
               agent_strategy: g.strategy, agent_bias: output.bias, confidence: output.confidence,
               reasoning: `${output.view} ${output.reasoning}`.trim(), invalidation: output.invalidation,
-              agrees_with_rules: rule.strategy != null ? g.strategy === rule.strategy : null, guardrail_applied: g.guardrail,
+              agrees_with_rules: rule.strategy != null ? g.strategy === rule.strategy : null, guardrail_applied: [g.guardrail, lengthNote].filter(Boolean).join("; ") || null,
               inputs: input, raw_output: output, latency_ms: latencyMs,
             };
           } catch (e) { skipped.push(`${instrument} open model: ${e}`); final = fallback(rule.bias, rule.strategy, `model_error: ${String(e).slice(0, 120)}`, input); }
@@ -377,7 +438,7 @@ walked in with, and the scoreboard to notice which reads have been working.`;
             action: { type: "string", enum: ["hold", "adjust", "exit", "enter", "stay_out"] },
             strategy: { type: "string", enum: [...STRATEGIES], description: "The strategy that should be on after this action. Same as the live view for hold; No Trade for exit/stay_out; the new structure for enter/adjust." },
             confidence: { type: "string", enum: ["high", "medium", "low"] },
-            reasoning: { type: "string", description: "At most 45 words. State the invalidation result (state.invalidation_hit) as given -- do not re-derive it -- then the one thing that matters now. No score arithmetic." },
+            reasoning: { type: "string", description: "At most 35 words, 2 sentences. First: the invalidation result exactly as given in state.invalidation_hit. Second: the one thing that matters now. No score arithmetic." },
             invalidation: { type: ["string", "null"], description: "Required for enter or adjust: the new invalidation sentence. null otherwise." },
             invalidation_level: { type: ["number", "null"] },
             invalidation_direction: { type: ["string", "null"], enum: ["above", "below", null] },
@@ -397,12 +458,12 @@ reached. A bias flip on one checkpoint is not by itself a reason to exit; a flip
         if (!apiKey) { skipped.push("anthropic_api_key not in vault"); final = { ...fallback(rule.bias, rule.strategy, "model_unavailable", input), action: "hold" }; }
         else {
           try {
-            const { output, latencyMs } = await askModel(apiKey, system, input, schema);
+            const { output, latencyMs, lengthNote } = await askModel(apiKey, withInstructions(system), input, schema, LIMITS.mid);
             const g = applyRiskLimits(String(output.strategy), { vix, dte });
             // State rules, enforced in code after the model answers.
             let action: string = output.action;
             let strategy: Strategy = g.strategy;
-            const notes: string[] = g.guardrail ? [g.guardrail] : [];
+            const notes: string[] = [g.guardrail, lengthNote].filter((x): x is string => !!x);
             if (state !== "active" && (action === "hold" || action === "adjust" || action === "exit")) {
               action = "stay_out"; strategy = "No Trade"; notes.push(`view is ${state}: ${output.action} not allowed, coerced to stay_out`);
             }
@@ -455,9 +516,9 @@ reached. A bias flip on one checkpoint is not by itself a reason to exit; a flip
           properties: {
             grade: { type: "string", enum: ["right", "partial", "wrong", "no_call"], description: "Grade of the AGENT's morning call against what the day did and the paper trade outcome." },
             rules_grade: { type: "string", enum: ["right", "partial", "wrong", "no_call"], description: "Same grade for the RULE ENGINE's morning strategy." },
-            misleading_signal: { type: "string", description: "The one input that pointed the wrong way, or 'none'." },
-            lesson: { type: "string", description: "One sentence, at most 30 words, general enough to apply on a future day with a similar setup. This is fed into tomorrow's context." },
-            reasoning: { type: "string", description: "At most 60 words of post-mortem, plain language." },
+            misleading_signal: { type: "string", description: "The input name alone, 1-4 words, or exactly 'none'. Not a sentence." },
+            lesson: { type: "string", description: "ONE sentence, at most 22 words: the transferable rule, not today's story. Fed into tomorrow's context." },
+            reasoning: { type: "string", description: "At most 50 words, 3 sentences, plain language." },
           },
         };
         const system = `${SYSTEM_COMMON}\n\nPhase: POST-CLOSE. Grade your own morning view for ${instrument} (morning.my_view) honestly, and separately grade the rule engine's shadow answer (morning.rule_engine_shadow) the same way. 'right' means the direction and
@@ -468,12 +529,12 @@ The lesson must be about a pattern in the inputs, not about today's specific pri
 
         if (!apiKey) { skipped.push("anthropic_api_key not in vault"); continue; }
         try {
-          const { output, latencyMs } = await askModel(apiKey, system, input, schema);
+          const { output, latencyMs, lengthNote } = await askModel(apiKey, withInstructions(system), input, schema, LIMITS["post-close"]);
           await upsert({
             instrument, rule_bias: open?.rule_bias ?? pm[`market_bias_${s}`] ?? null, rule_strategy: open?.rule_strategy ?? pm[`suggested_strategy_${s}`] ?? null,
             agent_strategy: open?.agent_strategy ?? null, agent_bias: open?.agent_bias ?? null,
             grade: output.grade, misleading_signal: output.misleading_signal, lesson: output.lesson, reasoning: output.reasoning,
-            agrees_with_rules: open?.agrees_with_rules ?? null, guardrail_applied: null,
+            agrees_with_rules: open?.agrees_with_rules ?? null, guardrail_applied: lengthNote,
             inputs: input, raw_output: output, latency_ms: latencyMs,
           });
         } catch (e) { skipped.push(`${instrument} post-close model: ${e}`); }
