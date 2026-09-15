@@ -747,3 +747,49 @@
   color: var(--ink-2);
 }
 .app-shell.app-shell .prior-session-story { max-width: 46ch; }
+
+
+/* ---- 19 · expected open ---------------------------------------------------
+   Presentation only -- the figures are whatever the backend already writes.
+
+   The cell spent five lines on one value: a label that glossed itself in a
+   parenthetical, a percent, a points figure and the words "expected open" each
+   on their own line, then the derivation. And it took both tracks to do it, so
+   India VIX sat alone opposite with half a row of dead space.
+
+   It uses the row form the rest of the screen already uses: label left, figure
+   right. The derivation sits under the label in the left cell rather than
+   spanning, because it explains the label rather than the number. */
+.app-shell.app-shell .field-card-derived {
+  grid-column: auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.app-shell.app-shell .field-card-derived strong {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
+  white-space: nowrap;
+  font-size: var(--text-body);
+}
+/* The points figure rides alongside the percent instead of dropping below it. Both the em
+   and the span inside it have to be forced inline: the span renders as a block box, which
+   breaks the line whatever white-space says, and it sized the auto track to 79px. */
+.app-shell.app-shell .field-card-derived strong em.prior-day-pts,
+.app-shell.app-shell .field-card-derived strong em.prior-day-pts .nowrap {
+  display: inline;
+  white-space: nowrap;
+}
+.app-shell.app-shell .field-card-derived strong em.prior-day-pts {
+  margin-left: 8px;
+  font-style: normal;
+}
+/* the derivation reads as a sentence, so it takes the full width under the pair
+   rather than the 155px label column, where it wrapped to three lines */
+.app-shell.app-shell .field-card-derived .gift-raw-compare {
+  grid-column: 1 / -1;
+  margin-top: 3px;
+  font-size: var(--text-label);
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: left;
+}
