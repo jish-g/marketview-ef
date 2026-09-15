@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/client'
 const differentiators = [
   { icon: Gauge, title: 'Reads, not just reports', description: 'Weighted bias scoring from Gap, OI, PCR, and Max Pain — not a raw data dump.' },
   { icon: Clock3, title: 'Built for the full session', description: 'Pre-market call, Mid-market check, Post-close review — same logic every time.' },
-  { icon: BookOpen, title: 'Rules you can audit', description: 'Every recommendation traces to a documented scoring rule, not a black box.' },
+  { icon: BookOpen, title: 'A playbook you can audit', description: 'Every view starts from a published playbook of weights and thresholds, and says when it departs from it.' },
   { icon: CheckCircle2, title: 'One read, not six charts', description: 'Collapses the session into a single, explained read.' },
 ]
 
@@ -371,7 +371,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
         <div className="landing-closing-card">
           <div className="landing-closing-ctas">
             <Link href="/nifty-sensex-today" className="landing-cta-primary"><Newspaper size={15} /> Nifty and Sensex today</Link>
-            <Link href="/rules" className="landing-cta-secondary">Read the rules engine</Link>
+            <Link href="/rules" className="landing-cta-secondary">Read the playbook</Link>
           </div>
         </div>
       </section>
@@ -388,7 +388,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           <div className="landing-footer-col">
             <span>Product</span>
             <Link href="/nifty-sensex-today">Nifty and Sensex today</Link>
-            <Link href="/rules">Rules engine</Link>
+            <Link href="/rules">Playbook</Link>
             <Link href="/about">About</Link>
           </div>
           <div className="landing-footer-col">
