@@ -184,8 +184,21 @@ button, input { font: inherit; }
 @media (max-width: 560px) { .history-beats { grid-template-columns: 1fr; } .history-day-head { flex-direction: column; align-items: flex-start; } }
 .landing-shell { min-height: 100vh; background: var(--ground); color: var(--ink); font-family: var(--font-sans); }
 .landing-topbar { position: sticky; top: 0; z-index: 20; height: 68px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; background: color-mix(in srgb, var(--surface) 90%, transparent); backdrop-filter: saturate(140%) blur(8px); border-bottom: 1px solid var(--border); }
-.landing-shell .eyebrow { display: inline-flex; align-items: center; gap: 7px; color: var(--action); font: 700 var(--text-label) var(--font-sans); letter-spacing: .13em; text-transform: uppercase; }
-.landing-shell .eyebrow::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--action); flex: 0 0 auto; }
+/* ---- Marketing accent: --brand amber ----
+   In dark the landing page resolved to pure warm grey: --action aliases --ink, so every
+   "accent" (eyebrow dots, diff icons, hovers) rendered #f9f9f7, and --brand never appeared
+   at all -- .landing-headline-accent below is applied by no markup. The OG card meanwhile
+   IS amber, so the social preview and the page it opened did not match.
+
+   --brand is the design system's own marketing/link token (see COLOUR_MEANINGS in
+   app/design/specimen-client.tsx). It is applied here ONLY to non-text marks -- dots, icon
+   tiles, hover borders, underline colour -- and never to the primary CTA, which stays
+   high-contrast neutral per Rule 2 in marketing.css. Amber measures 6.42:1 on the dark
+   ground but only 4.01:1 on the light one, which is under the 4.5:1 floor for 12-13px text,
+   so accented TEXT would fail in light mode. Label and link text therefore stay --ink.
+   The --brand: never inside a data view rule keeps it out of the snapshot card. */
+.landing-shell .eyebrow { display: inline-flex; align-items: center; color: var(--action); font: 700 var(--text-label) var(--font-sans); letter-spacing: .13em; text-transform: uppercase; }
+.landing-shell .eyebrow::before { content: ''; display: inline-block; vertical-align: middle; width: 5px; height: 5px; margin-right: 7px; border-radius: 50%; background: var(--brand); flex: 0 0 auto; }
 
 .landing-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); align-items: center; gap: 56px; max-width: 1120px; margin: 0 auto; padding: clamp(48px, 8vw, 88px) 32px clamp(56px, 7vw, 80px); }
 .landing-hero-copy { display: grid; gap: 18px; max-width: 520px; }
@@ -242,13 +255,13 @@ button, input { font: inherit; }
 .landing-evergreen .landing-body-text { max-width: 680px; margin-bottom: 20px; }
 .landing-evergreen-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .landing-evergreen-link { display: block; padding: 14px 16px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-sm); color: var(--ink); font-size: var(--text-meta); font-weight: 600; text-decoration: none; }
-.landing-evergreen-link:hover { border-color: var(--action); color: var(--action); }
+.landing-evergreen-link:hover { border-color: var(--brand); color: var(--ink); }
 @media (max-width: 760px) { .landing-evergreen-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .landing-differentiators { max-width: 960px; margin: 0 auto; padding: clamp(60px, 8vw, 96px) 24px; }
 .landing-differentiators .eyebrow { display: block; margin-bottom: 20px; }
 .landing-diff-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .landing-diff-card { display: grid; gap: 10px; padding: 22px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); }
-.landing-diff-icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--action) 12%, transparent); color: var(--action); }
+.landing-diff-icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--brand) 12%, transparent); color: var(--brand); }
 .landing-diff-card strong { font-size: var(--text-meta); letter-spacing: -.01em; }
 .landing-diff-card p { margin: 0; color: var(--muted); font-size: var(--text-meta); line-height: 1.65; }
 
@@ -257,7 +270,7 @@ button, input { font: inherit; }
 .landing-how-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
 .landing-how-card { display: grid; gap: 8px; padding: 0 20px; position: relative; }
 .landing-how-card:not(:first-child) { border-left: 1px solid var(--border); }
-.landing-how-step { font: 700 var(--text-meta) var(--font-sans); color: color-mix(in srgb, var(--ink) 22%, transparent); letter-spacing: -.02em; }
+.landing-how-step { font: 700 var(--text-meta) var(--font-sans); color: var(--brand); letter-spacing: -.02em; }
 .landing-how-card strong { font-size: var(--text-meta); letter-spacing: -.01em; }
 .landing-how-card p { margin: 0; color: var(--muted); font-size: var(--text-meta); line-height: 1.65; }
 
@@ -283,7 +296,7 @@ button, input { font: inherit; }
 .landing-footer-col { display: flex; flex-direction: column; gap: 8px; }
 .landing-footer-col span { font-size: var(--text-label); color: var(--muted); font-weight: 600; letter-spacing: .04em; margin-bottom: 2px; }
 .landing-footer-col a { font-size: var(--text-meta); color: var(--ink); opacity: .8; text-decoration: none; }
-.landing-footer-col a:hover { opacity: 1; text-decoration: underline; }
+.landing-footer-col a:hover { opacity: 1; text-decoration: underline; text-decoration-color: var(--brand); text-underline-offset: 3px; }
 .landing-footer-bottom { max-width: 900px; margin: 32px auto 0; padding-top: 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; font-size: var(--text-label); color: var(--muted); }
 @media (max-width: 720px) { .landing-how-grid { grid-template-columns: 1fr; gap: 22px; } .landing-how-card:not(:first-child) { border-left: 0; border-top: 1px solid var(--border); padding-top: 22px; } .landing-testimonials-grid { grid-template-columns: 1fr; } .landing-footer-grid { grid-template-columns: 1fr 1fr; } .landing-snapshot-row { flex-wrap: wrap; } }
 @media (max-width: 640px) { .landing-topbar { padding: 0 16px; } .landing-shell .topbar-meta { gap: 10px; } .landing-diff-grid { grid-template-columns: 1fr; } .landing-differentiators { padding: 48px 18px; } .landing-section-inner { padding-left: 18px; padding-right: 18px; } }
