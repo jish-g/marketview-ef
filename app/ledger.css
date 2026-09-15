@@ -603,7 +603,16 @@
    children with ad-hoc margins; this gives that row a real one. */
 .app-shell.app-shell .topbar { gap: 14px; }
 .app-shell.app-shell .topbar > * { margin-left: 0; margin-right: 0; }
-.app-shell.app-shell .topbar-meta { margin-left: auto; }
+/* Everything after the brand travels together on the right: clock, picker, TODAY, then the
+   theme and session controls. Putting the auto margin on .topbar-meta instead left the
+   clock and picker stranded mid-bar, with the row reading as two separate groups. */
+.app-shell.app-shell .topbar-date,
+.app-shell.app-shell .topbar-date-archived { margin-left: auto; }
+/* globals.css also sets margin-left:auto on .topbar-meta. Two auto margins split the free
+   space between them, which is exactly the left-and-right reading -- clock and picker
+   stranded mid-bar, theme and sign-out pinned right. Only one auto margin may win, and it
+   is the one at the head of the group that should travel. */
+.app-shell.app-shell .topbar-meta { margin-left: 0; }
 
 /* 2 · The rule closing the screen header sat 18px under the title and 19px above the hero
    -- equidistant, so it read as the hero's top border rather than the title's baseline. A
