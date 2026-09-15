@@ -9,7 +9,7 @@ import { TradeView } from '@/components/trade-view'
 import { JournalView } from '@/components/journal-view'
 import { useSession } from '@/hooks/use-session'
 import { fmt, freshness } from '@/lib/format'
-import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, BiasAxis, CheckpointTimeline, Progress, PhaseAside, Label, Metric, Banner, TradeLevels, Card, Sparkline, type Checkpoint } from '@/components/ui/ds'
+import { Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, BiasAxis, CheckpointTimeline, Progress, PhaseAside, Label, Metric, Banner, TradeLevels, Card, Sparkline, type Checkpoint } from '@/components/ui/ds'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sun } from 'lucide-react'
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
@@ -854,7 +854,7 @@ function VerdictInstrument({ row, instrument }: { row: Row; instrument: Instrume
       </div>}
       {!hasAnyPremium && <p className="structure-line">Enter fill premiums above to compute actual target / stop-loss and book levels.</p>}
     </div>}
-    <div className="verdict-rationale"><span>Rationale</span><p>{marketBias.label} bias (score {fmt.score(marketBias.score)}) with {optionReadiness.ivCondition.toLowerCase()} IV and {optionReadiness.label.toLowerCase()} readiness; the framework recommends {strategyRec.recommendation.toLowerCase()}.</p><div className="verdict-breakdown"><ScoreBreakdown inputs={marketBias.components} caption={`Market bias inputs · weights for ${calc.dte} day${calc.dte === 1 ? '' : 's'} to expiry`} /></div><Disclaimer capturedAt={fmt.timeIST((row.updated_at ?? row.trade_date) as string | null)} /></div>
+    <Disclaimer capturedAt={fmt.timeIST((row.updated_at ?? row.trade_date) as string | null)} />
   </article>
 }
 function VerdictView({ row }: { row: Row }) {
