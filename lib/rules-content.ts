@@ -1,4 +1,4 @@
-// The rules-engine documentation content, shared between /rules (visible page)
+// The playbook content -- the rules the intelligence layer is trained on -- shared between /rules (visible page)
 // and /llms-full.txt (plain-text export) so the two can never drift apart.
 //
 // This documentation was rewritten to match the framework actually implemented in computeMarketBias /
@@ -39,5 +39,5 @@ export function rulesAsPlainText(): string {
 
   const formulaText = RULES_FORMULAS.map(([title, formula, note]) => `### ${title}\n${formula}\n${note}`).join('\n\n')
 
-  return `${sectionText}\n\n## 12. Predicted Open, Expected Move & Targets\n\n${formulaText}`
+  return `These are the weights and thresholds the MarketCue intelligence layer is trained on. The view it publishes each session starts here and departs only with a stated reason; see /how-it-works for how a day runs.\n\n${sectionText}\n\n## 12. Predicted Open, Expected Move & Targets\n\n${formulaText}`
 }

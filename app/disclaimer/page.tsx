@@ -59,7 +59,7 @@ export default function DisclaimerPage() {
 
           <section className="doc-section">
             <h2>How the readings are produced</h2>
-            <p className="doc-intro">Every recommendation traces to a published rule. The full scoring framework — the weights, the bands, and the thresholds — is documented on the <Link href="/rules">rules engine</Link> page, and the method is summarised on <Link href="/how-it-works">how it works</Link>.</p>
+            <p className="doc-intro">Every view starts from a published playbook — the weights, the bands, and the thresholds are documented on the <Link href="/rules">playbook</Link> page — and states when and why it departs from it. How a day runs is described on <Link href="/how-it-works">how it works</Link>.</p>
           </section>
         </div>
       </div>

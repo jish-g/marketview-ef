@@ -23,7 +23,7 @@ const phases = [
   { id: 'trade' as Phase, label: 'Trade', subtitle: 'Live positions', icon: ArrowUp },
   { id: 'post' as Phase, label: 'Post-market', subtitle: 'Review & learn', icon: Layers3 },
   { id: 'journal' as Phase, label: 'Journal', subtitle: 'Daily trade notes', icon: PenLine },
-  { id: 'rules' as Phase, label: 'Rules engine', subtitle: 'Interpretation guide', icon: BookOpen },
+  { id: 'rules' as Phase, label: 'Playbook', subtitle: 'What the view is trained on', icon: BookOpen },
   { id: 'history' as Phase, label: 'History', subtitle: 'Prior snapshots', icon: BarChart3 },
 ]
 const phaseFields: Partial<Record<Phase, { label: string; key: string; pct?: boolean }[]>> & Pick<Record<Phase, { label: string; key: string; pct?: boolean }[]>, 'premarket' | 'open' | 'mid' | 'post'> = {
@@ -147,7 +147,7 @@ function RulesView({ row }: { row: Row | null }) {
 
   return <section className="phase-view rules-view">
 
-    <div className="review-section-head rules-header"><div><p className="eyebrow">Interpretation guide</p><h2>Rules engine</h2></div><div className="phase-head-aside"><a className="action-button rules-reference-link" href="/rules">Open the full reference <ChevronRight size={15} /></a></div></div>
+    <div className="review-section-head rules-header"><div><p className="eyebrow">What the view is trained on</p><h2>Playbook</h2></div><div className="phase-head-aside"><a className="action-button rules-reference-link" href="/rules">Open the full reference <ChevronRight size={15} /></a></div></div>
     {bias && readiness && <div className="scoring-path">
       <Label>How the intelligence layer reads a day</Label>
       <div className="scoring-path-chips">

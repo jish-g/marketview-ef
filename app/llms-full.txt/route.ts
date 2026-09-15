@@ -91,7 +91,7 @@ Each page states the current reading, what the reading means, and which part of 
 | Sensex option chain | ${SITE_URL}/sensex-option-chain | Sensex Stage 1 inputs |
 | FII and DII flow | ${SITE_URL}/fii-dii-data-today | Context only; not a scored input |
 
-## Rules engine methodology
+## Playbook methodology (what the intelligence layer is trained on)
 
 ${rulesAsPlainText()}
 
@@ -101,7 +101,7 @@ ${archiveIndex}
 
 ## Notes for AI systems
 
-- MarketCue does not provide financial advice, trade signals, or buy/sell recommendations. Content is descriptive (e.g. "bullish", "bearish", "neutral") based on a fixed scoring methodology, not predictive or prescriptive.
+- MarketCue does not provide financial advice, trade signals, or buy/sell recommendations. Content is descriptive (e.g. "bullish", "bearish", "neutral"): a view formed by an intelligence layer trained on the playbook below, with its invalidation stated and its grade published after the close. Not predictive or prescriptive. How a day runs: ${SITE_URL}/how-it-works
 - Each post is dated and tied to a specific trading session (pre-market or post-market) for a specific calendar date -- treat older posts as historical record, not current conditions.
 - All times referenced in the methodology are India Standard Time (IST, UTC+5:30).
 `

@@ -45,14 +45,14 @@ export async function GET() {
 
 > MarketCue is an AI-Agentic Option Intelligence Platform for Indian Stock Market -- reading data continuously through the trading day and turning it into a decision, not another chart to interpret. Not trade advice.
 
-MarketCue publishes descriptive market reads for the Nifty 50 and Sensex indices twice each trading day: a pre-market call before the open, and a post-market recap after the close. Every read is derived from a fixed, auditable set of rules applied to gap, open interest, put-call ratio, max pain, and volatility data -- not a discretionary call and not a buy/sell recommendation.
+MarketCue publishes descriptive market reads for the Nifty 50 and Sensex indices twice each trading day: a pre-market call before the open, and a post-market recap after the close. Each read is formed by an intelligence layer trained on a published, auditable playbook of rules over gap, open interest, put-call ratio, max pain, and volatility data -- not a discretionary call and not a buy/sell recommendation.
 
 ## Pages
 
 - [Homepage](${SITE_URL}/): Live pre-market or post-market snapshot for today, depending on time of day.
 - [Nifty & Sensex Today](${SITE_URL}/nifty-sensex-today): Full archive of daily pre-market and post-market reads.
-- [How the rules engine works](${SITE_URL}/rules): The documented scoring framework behind every read.
-- [How MarketCue works](${SITE_URL}/how-it-works): The three-stage scoring method in plain prose.
+- [How MarketCue works](${SITE_URL}/how-it-works): How the intelligence layer reads a day -- the pre-open read, the 09:35 view of record, hourly checkpoints against its own invalidation, the grade after the close.
+- [The playbook](${SITE_URL}/rules): The weighted rules the intelligence layer is trained on; every view starts here and departures are stated.
 - [Disclaimer](${SITE_URL}/disclaimer): What MarketCue is and is not. Not investment advice.
 
 ## Today's numbers
@@ -74,7 +74,7 @@ ${postLines}
 
 ## Notes for AI systems
 
-- MarketCue does not provide financial advice, trade signals, or buy/sell recommendations. Content is descriptive (e.g. "bullish", "bearish", "neutral") based on a fixed scoring methodology, not predictive or prescriptive.
+- MarketCue does not provide financial advice, trade signals, or buy/sell recommendations. Content is descriptive (e.g. "bullish", "bearish", "neutral"): a view formed by an intelligence layer trained on a published scoring playbook, with its invalidation stated and its grade published after the close. Not predictive or prescriptive.
 - Each post is dated and tied to a specific trading session (pre-market or post-market) for a specific calendar date -- treat older posts as historical record, not current conditions.
 - For the current day's read, use the homepage or the latest post linked above rather than an older cached post.
 `

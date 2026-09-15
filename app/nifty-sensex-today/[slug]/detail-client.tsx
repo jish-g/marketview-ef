@@ -240,7 +240,7 @@ export default function NiftySensexTodayPostClient({ initialPost, initialMarketR
                   </li>
                 )}
                 <li><Link href="/nifty-sensex-today">All Nifty &amp; Sensex Today reads</Link></li>
-                <li><Link href="/rules">The MarketCue rules engine methodology</Link></li>
+                <li><Link href="/rules">The MarketCue playbook</Link></li>
                 {evergreenLink && <li><Link href={evergreenLink.href}>{evergreenLink.label}</Link></li>}
               </ul>
             </nav>
