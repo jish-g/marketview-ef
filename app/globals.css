@@ -695,9 +695,9 @@ button, input { font: inherit; }
   align-items: baseline;
 }
 .app-shell .group-heading h3 {
-  font-size: var(--text-body);
+  font-size: var(--text-value);
   font-weight: 600;
-  letter-spacing: -.01em;
+  letter-spacing: -.02em;
   text-transform: none;
   color: var(--ink);
 }

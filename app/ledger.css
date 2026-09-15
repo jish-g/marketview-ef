@@ -807,12 +807,8 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0 52px;
 }
-.app-shell.app-shell .open-instrument .group-heading h3 {
-  font-size: var(--text-meta);
-  font-weight: 600;
-  letter-spacing: -.01em;
-  color: var(--ink);
-}
+/* Market open's instrument headings take the shared .group-heading h3 treatment -- one
+   rule for every screen rather than a special case here. Size lives in globals.css. */
 .app-shell.app-shell .open-move { margin-top: 16px; }
 .app-shell.app-shell .open-move .section-title {
   display: block;
@@ -839,9 +835,12 @@
 .app-shell.app-shell .open-move-table thead th:first-child {
   text-align: left;
   font-weight: 400;
-  color: var(--ink-2);
   font-size: var(--text-meta);
 }
+/* the scenario names carry the accent so the two rows are identifiable at a glance.
+   --caution-ink rather than --caution: the darker token fails contrast on this ground. */
+.app-shell.app-shell .open-move-table th[scope="row"] { color: var(--caution-ink); }
+.app-shell.app-shell .open-move-table thead th:first-child { color: var(--muted); }
 .app-shell.app-shell .open-move-table thead th {
   font-size: var(--text-label);
   font-weight: 600;
