@@ -5,7 +5,7 @@ import { fmt } from '@/lib/format'
 import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import useSWR from 'swr'
-import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Menu, Moon, Newspaper, Send, Sun, UserRound, X } from 'lucide-react'
+import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Menu, Moon, Newspaper, Send, Sun, X } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { createClient } from '@/lib/supabase/client'
@@ -334,15 +334,9 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
               <article className="landing-testimonial-card" key={author}>
                 <p className="landing-testimonial-quote">{quote}</p>
                 <div className="landing-testimonial-author">
-                  {/* A generic human silhouette, deliberately not a photograph -- a stock or
-                      generated face would assert that a specific person sat for it, which is a
-                      claim the quote itself cannot support. One neutral figure for everyone:
-                      there is no gender on these records, and guessing it from a first name
-                      would be inventing a detail about someone real. Decorative, so it is
-                      aria-hidden -- the author's name sits next to it as real text. */}
-                  <span className="landing-testimonial-avatar" aria-hidden="true">
-                    <UserRound size={19} strokeWidth={1.75} />
-                  </span>
+                  {/* No avatar mark at all. An initials monogram or a silhouette is a stand-in
+                      for a face, and nothing here can support a face: the name beside the quote
+                      is what identifies the author. */}
                   <div>
                     <strong>{author}</strong>
                     <span>{role} · {location}</span>
