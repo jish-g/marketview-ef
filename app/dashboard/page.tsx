@@ -91,11 +91,16 @@ function value(row: Row | null, key: string, pct = false) { const v = row?.[key]
 function fmtTimeIST(v: any) { if (!v) return null; return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(v)) }
 // Colour for a signed change in value. The row-based tone() below reads a field; this takes
 // a number already in hand, for figures computed rather than read straight off the row.
+// Rule 1: --up/--down mark a signed change in value and nothing else. Levels, strikes,
+// expiry countdowns, volatility readings, averages and previous closes render in ink.
+// Everything outside this list stays ink no matter what sign its number happens to carry.
+const SIGNED_CHANGE_KEYS = /^(gap_points_|nifty_opening_points|prev_day_change_(pct|pts)_|day_change_pct_|india_vix_change_pct|gift_nifty_gap_(pct|pts)|post_day_change_pct_)/
+
 function signTone(n: number | null | undefined) {
   if (n == null || !Number.isFinite(Number(n)) || Number(n) === 0) return ''
   return Number(n) > 0 ? 'positive' : 'negative'
 }
-function tone(row: Row | null, key: string) { const n = Number(row?.[key]); return Number.isNaN(n) || n === 0 ? '' : n > 0 ? 'positive' : 'negative' }
+function tone(row: Row | null, key: string) { if (!SIGNED_CHANGE_KEYS.test(key)) return ''; const n = Number(row?.[key]); return Number.isNaN(n) || n === 0 ? '' : n > 0 ? 'positive' : 'negative' }
 function gapBandLabel(gapPct: number) { if (gapPct > 0.75) return 'Strong Gap Up'; if (gapPct >= 0.25) return 'Normal Gap Up'; if (gapPct >= -0.25) return 'Flat'; if (gapPct >= -0.75) return 'Normal Gap Down'; return 'Strong Gap Down' }
 function highImpactEvent(eventToday: string | null | undefined) { const text = String(eventToday ?? ''); if (!text.includes('(High')) return null; const match = text.match(/^(.*?)\s*\(High,\s*([^)]+)\)/); if (!match) return null; return { name: match[1].trim(), time: match[2].trim() } }
 
