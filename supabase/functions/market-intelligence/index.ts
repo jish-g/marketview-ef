@@ -271,7 +271,7 @@ the 5-day average range, the prior sessions and any lesson from earlier grades.`
           ...history,
         };
         const schema = {
-          type: "object", required: ["bias", "readiness", "iv_condition", "strategy", "confidence", "view", "reasoning", "invalidation"],
+          type: "object", required: ["bias", "readiness", "iv_condition", "strategy", "confidence", "view", "reasoning", "invalidation", "invalidation_level", "invalidation_direction"],
           properties: {
             bias: { type: "string", enum: ["Strong Bullish", "Bullish", "Neutral", "Bearish", "Strong Bearish"] },
             readiness: { type: "string", enum: ["Good to Buy", "Caution", "Avoid"] },
@@ -281,6 +281,8 @@ the 5-day average range, the prior sessions and any lesson from earlier grades.`
             view: { type: "string", description: "The view in one sentence, as a trader would say it. This is the headline." },
             reasoning: { type: "string", description: "2-4 sentences. Which two or three signals drive the call, and where you weighed a signal differently from the playbook's default and why." },
             invalidation: { type: "string", description: "One sentence: the observable condition that would make this view wrong intraday (a level, a VIX move, an OI change)." },
+            invalidation_level: { type: ["number", "null"], description: "The single spot level from the invalidation sentence, as a number. null only if the invalidation is not a price level." },
+            invalidation_direction: { type: ["string", "null"], enum: ["above", "below", null], description: "The view is wrong if spot trades ABOVE or BELOW invalidation_level. null if no level." },
           },
         };
         const system = `${SYSTEM_COMMON}\n\nPhase: MARKET OPEN (9:30 IST). Form the view of record for ${instrument} from today's data.
@@ -311,9 +313,10 @@ walked in with, and the scoreboard to notice which reads have been working.`;
     // ------------------------------------------------------------------ mid
     if (phase === "mid") {
       if (!checkpoint) return new Response(JSON.stringify({ ok: false, error: "mid phase needs checkpoint" }), { status: 400 });
-      const [{ data: mid }, { data: morning }, { data: trades }] = await Promise.all([
+      const [{ data: mid }, { data: morning }, { data: earlier }, { data: trades }] = await Promise.all([
         admin.from("midmarket_snapshot").select("*").eq("trade_date", tradeDate).eq("checkpoint", checkpoint).maybeSingle(),
-        admin.from("agent_calls").select("instrument, agent_strategy, agent_bias, confidence, reasoning, invalidation, rule_strategy").eq("trade_date", tradeDate).eq("phase", "open"),
+        admin.from("agent_calls").select("instrument, agent_strategy, agent_bias, confidence, reasoning, invalidation, rule_strategy, raw_output").eq("trade_date", tradeDate).eq("phase", "open"),
+        admin.from("agent_calls").select("instrument, checkpoint, action, agent_strategy, reasoning, invalidation, raw_output").eq("trade_date", tradeDate).eq("phase", "mid").lt("checkpoint", checkpoint).order("checkpoint"),
         admin.from("auto_trades").select("instrument, strategy, source, state, outcome, entry_premium, target_price_cons, stop_price_cons, target_price_aggr, stop_price_aggr, exit_reason").eq("trade_date", tradeDate),
       ]);
       if (!mid) return new Response(JSON.stringify({ ok: false, phase, error: `no midmarket_snapshot for ${tradeDate}/${checkpoint}` }), { status: 200 });
@@ -324,8 +327,37 @@ walked in with, and the scoreboard to notice which reads have been working.`;
         const call = (morning ?? []).find((m: any) => m.instrument === instrument) ?? null;
         const rule = shadow(mid, s, true);
         const dte = pm[`days_to_expiry_${s}`] != null ? Number(pm[`days_to_expiry_${s}`]) : null;
+
+        // State carried across checkpoints (this is what makes 10:30 -> 2:30 one continuous day rather
+        // than five cold reads). The view is "active" from the morning call until an exit; "exited"
+        // after an exit; "out" if the morning was No Trade. An "enter" at any checkpoint makes it
+        // active again with that checkpoint's invalidation as the live one.
+        const priorCps = (earlier ?? []).filter((c: any) => c.instrument === instrument);
+        let state: "active" | "exited" | "out" = call && call.agent_strategy && call.agent_strategy !== "No Trade" ? "active" : "out";
+        let live: { strategy: string | null; invalidation: string | null; level: number | null; direction: string | null } = {
+          strategy: call?.agent_strategy ?? null, invalidation: call?.invalidation ?? null,
+          level: call?.raw_output?.invalidation_level ?? null, direction: call?.raw_output?.invalidation_direction ?? null,
+        };
+        for (const c of priorCps) {
+          if (c.action === "exit") { state = "exited"; live = { ...live, strategy: "No Trade" }; }
+          else if (c.action === "enter") { state = "active"; live = { strategy: c.agent_strategy, invalidation: c.invalidation, level: c.raw_output?.invalidation_level ?? null, direction: c.raw_output?.invalidation_direction ?? null }; }
+          else if (c.action === "adjust") { live = { ...live, strategy: c.agent_strategy }; }
+        }
+        // Deterministic invalidation check: the code compares spot to the stored level so the model is
+        // told the answer instead of being asked to do the comparison in prose.
+        const spotNow = mid[`spot_${s}`] != null ? Number(mid[`spot_${s}`]) : null;
+        const invalidationHit = state === "active" && spotNow != null && live.level != null && live.direction
+          ? (live.direction === "above" ? spotNow > live.level : spotNow < live.level)
+          : null;
+
         const input = {
           instrument, checkpoint,
+          state: {
+            view: state, live_strategy: live.strategy,
+            invalidation: live.invalidation, invalidation_level: live.level, invalidation_direction: live.direction,
+            invalidation_hit: invalidationHit,
+            earlier_checkpoints_today: priorCps.map((c: any) => ({ checkpoint: c.checkpoint, action: c.action, strategy: c.agent_strategy })),
+          },
           now: {
             spot: mid[`spot_${s}`], intraday_change_pct: mid[`intraday_change_pct_${s}`],
             pcr: mid[`pcr_${s}_mid`], max_pain: mid[`max_pain_${s}_mid`], atm_iv: mid[`atm_iv_${s}_mid`],
@@ -341,19 +373,23 @@ walked in with, and the scoreboard to notice which reads have been working.`;
           type: "object", required: ["action", "strategy", "confidence", "reasoning"],
           properties: {
             action: { type: "string", enum: ["hold", "adjust", "exit", "enter", "stay_out"] },
-            strategy: { type: "string", enum: [...STRATEGIES], description: "The strategy that should be on after this action. Same as the morning call for hold; No Trade for exit/stay_out." },
+            strategy: { type: "string", enum: [...STRATEGIES], description: "The strategy that should be on after this action. Same as the live view for hold; No Trade for exit/stay_out; the new structure for enter/adjust." },
             confidence: { type: "string", enum: ["high", "medium", "low"] },
-            reasoning: { type: "string", description: "2-3 sentences. Say explicitly whether the morning call's invalidation condition has been met." },
-            invalidation: { type: "string" },
+            reasoning: { type: "string", description: "2-3 sentences. State the invalidation result (state.invalidation_hit) as given -- do not re-derive it." },
+            invalidation: { type: ["string", "null"], description: "Required for enter or adjust: the new invalidation sentence. null otherwise." },
+            invalidation_level: { type: ["number", "null"] },
+            invalidation_direction: { type: ["string", "null"], enum: ["above", "below", null] },
           },
         };
-        const system = `${SYSTEM_COMMON}\n\nPhase: MID-MARKET checkpoint ${checkpoint}. This is your own morning view for ${instrument} (morning.my_view); manage it, do not re-make it from scratch.
-First: has my_view.invalidation been hit by what you see in now? Then re-read the data with the playbook
-(intraday change is the gap input now) and look at the paper trade's state (running / locked_conservative / closed).
-hold = the thesis stands. adjust = same direction, change structure (for example naked -> spread because
-IV moved). exit = thesis broken or target reached; strategy becomes No Trade. enter = the morning was
-No Trade and a clean setup has appeared now. stay_out = the morning was No Trade and still nothing.
-A bias flip on one checkpoint is not by itself a reason to exit; a flip plus the invalidation level is.`;
+        const system = `${SYSTEM_COMMON}\n\nPhase: MID-MARKET checkpoint ${checkpoint} for ${instrument}. You are managing your own day, not re-making it.
+state.view tells you where you are: "active" (a view is on: state.live_strategy), "exited" (you already exited
+earlier today -- see earlier_checkpoints_today), or "out" (the morning was No Trade).
+state.invalidation_hit is computed for you from spot versus your stored level: true means your invalidation
+has been hit, false means it has not, null means the invalidation was not a price level and you judge it.
+Allowed actions by state: active -> hold, adjust, exit. exited or out -> stay_out, or enter only for a
+genuinely new setup with its own invalidation (never to resume the exited view).
+hold = the thesis stands. adjust = same direction, change structure. exit = thesis broken or target
+reached. A bias flip on one checkpoint is not by itself a reason to exit; a flip plus the invalidation is.`;
 
         let final: Record<string, unknown>;
         if (!apiKey) { skipped.push("anthropic_api_key not in vault"); final = { ...fallback(rule.bias, rule.strategy, "model_unavailable", input), action: "hold" }; }
@@ -361,10 +397,23 @@ A bias flip on one checkpoint is not by itself a reason to exit; a flip plus the
           try {
             const { output, latencyMs } = await askModel(apiKey, system, input, schema);
             const g = applyRiskLimits(String(output.strategy), { vix, dte });
+            // State rules, enforced in code after the model answers.
+            let action: string = output.action;
+            let strategy: Strategy = g.strategy;
+            const notes: string[] = g.guardrail ? [g.guardrail] : [];
+            if (state !== "active" && (action === "hold" || action === "adjust" || action === "exit")) {
+              action = "stay_out"; strategy = "No Trade"; notes.push(`view is ${state}: ${output.action} not allowed, coerced to stay_out`);
+            }
+            if (state === "active" && invalidationHit === true && action === "hold") {
+              action = "exit"; strategy = "No Trade"; notes.push(`invalidation level ${live.level} (${live.direction}) hit at spot ${spotNow}: hold coerced to exit`);
+            }
+            if (action === "exit" || action === "stay_out") strategy = "No Trade";
+            if (action === "hold") strategy = (live.strategy as Strategy) ?? strategy;
             final = {
-              action: output.action, agent_strategy: g.strategy, agent_bias: call?.agent_bias ?? null, confidence: output.confidence,
-              reasoning: output.reasoning, invalidation: output.invalidation ?? call?.invalidation ?? null,
-              agrees_with_rules: rule.strategy != null ? g.strategy === rule.strategy : null, guardrail_applied: g.guardrail,
+              action, agent_strategy: strategy, agent_bias: call?.agent_bias ?? null, confidence: output.confidence,
+              reasoning: output.reasoning,
+              invalidation: action === "enter" || action === "adjust" ? (output.invalidation ?? live.invalidation) : (action === "hold" ? live.invalidation : null),
+              agrees_with_rules: rule.strategy != null ? strategy === rule.strategy : null, guardrail_applied: notes.length ? notes.join("; ") : null,
               inputs: input, raw_output: output, latency_ms: latencyMs,
             };
           } catch (e) { skipped.push(`${instrument} mid model: ${e}`); final = { ...fallback(rule.bias, rule.strategy, `model_error: ${String(e).slice(0, 120)}`, input), action: "hold" }; }
