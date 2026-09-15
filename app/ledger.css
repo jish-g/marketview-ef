@@ -407,19 +407,6 @@
   color: var(--ink);
   white-space: nowrap;
 }
-.app-shell.app-shell .session-today {
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--muted);
-  font: 600 var(--text-label) var(--font-sans);
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-.app-shell.app-shell .session-today:hover { color: var(--ink); }
 .app-shell.app-shell .topbar-date-archived { color: var(--caution-ink); font-weight: 600; }
 
 .app-shell.app-shell .archive-bar {
@@ -458,7 +445,6 @@
 
 /* 44px is the floor, and these are new controls -- no reason to ship them under it. */
 .app-shell.app-shell .session-picker button,
-.app-shell.app-shell .session-today,
 .app-shell.app-shell .archive-bar-exit { min-height: 44px; }
 
 @media (max-width: 760px) {
@@ -468,8 +454,7 @@
   .app-shell.app-shell .topbar { flex-wrap: wrap; height: auto; padding-top: 8px; padding-bottom: 8px; row-gap: 8px; }
   .app-shell.app-shell .session-picker { order: 10; flex: 1 1 100%; }
   .app-shell.app-shell .session-picker-date { flex: 1; min-width: 0; }
-  .app-shell.app-shell .session-today { order: 11; }
-  .app-shell.app-shell .archive-bar-exit { margin-left: 0; }
+    .app-shell.app-shell .archive-bar-exit { margin-left: 0; }
 }
 
 

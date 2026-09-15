@@ -1623,7 +1623,10 @@ export default function Dashboard() {
       <span className="session-picker-date">{sessionLabel(currentDate) || '—'}</span>
       <button type="button" onClick={() => newerDate && goToSession(newerDate === latestDate ? null : newerDate)} disabled={!newerDate} aria-label="Next session">›</button>
     </div>
-    {isArchived && <button type="button" className="session-today" onClick={() => goToSession(null)}>Today</button>}<div className="topbar-meta">{/* The freshness stamp lived here and in every screen's own header, saying the same thing twice on one view. The screen-level one is kept -- it sits beside the read it qualifies, which is where it means something. */}<button type="button" className="icon-button" onClick={() => setDark(!dark)} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'} aria-pressed={!dark}>{dark ? <Sun size={16} /> : <Moon size={16} />}</button>{!sessionLoading && (session ? <button type="button" className="topbar-toggle" onClick={() => signOut()}>Sign out</button> : <Link href="/login" className="topbar-toggle">Sign in</Link>)}</div></header>
+    {/* The topbar's TODAY button is gone. It only ever appeared when archived -- exactly when
+        the archive bar below is also showing its "Back to today" -- so the two rendered
+        together and did the same thing. The bar's is the one to keep: it sits inside the
+        state it exits. */}<div className="topbar-meta">{/* The freshness stamp lived here and in every screen's own header, saying the same thing twice on one view. The screen-level one is kept -- it sits beside the read it qualifies, which is where it means something. */}<button type="button" className="icon-button" onClick={() => setDark(!dark)} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'} aria-pressed={!dark}>{dark ? <Sun size={16} /> : <Moon size={16} />}</button>{!sessionLoading && (session ? <button type="button" className="topbar-toggle" onClick={() => signOut()}>Sign out</button> : <Link href="/login" className="topbar-toggle">Sign in</Link>)}</div></header>
     {isArchived && <div className="archive-bar" role="status">
       <span className="archive-bar-tag">Archived session</span>
       <span className="archive-bar-text">
