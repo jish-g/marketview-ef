@@ -1,4 +1,6 @@
 // market-data-sync
+// v25: entry phase logs the agent's view of record from agent_calls instead of the rule engine's
+// Stage 3 answer (the rule engine stays as the agent's reference only).
 // v23: per-request timeout on all Upstox calls; open phase stamps updated_at.
 // Phases: premarket | open | mid | post-close | post-fii | entry | poll | blog
 // v11: blog phase now publishes one combined Nifty+Sensex post per session, not two.
@@ -659,15 +661,27 @@ Deno.serve(async (req: Request) => {
           const prevClose = q?.ohlc?.close;
           if (open == null || !prevClose) { skipped.push(`${label} entry: no open/prevClose yet, deferring to poll phase`); continue; }
 
-          const gapPct = +(((open - prevClose) / prevClose) * 100).toFixed(3);
-          const { label: biasLabel } = computeMarketBiasV(gapPct, d.pcr ?? 0, d.oiSupportChange, d.oiResistanceChange, d.spot, d.maxPain, d.dte);
-          const readiness = computeOptionReadinessV(vixVal, d.atmIV ?? vixVal, d.dte);
-          const rec = computeStrategyRecommendationV(biasLabel, readiness.ivCondition, vixVal, d.dte);
-          const mapped = mapRecommendationToStrategyV(rec.recommendation);
+          // v25: the paper trade logs the AGENT's view of record (agent_calls, phase "open"), not the
+          // rule engine's Stage 3 answer. The rule engine keeps running as the agent's reference;
+          // everything user-facing -- this ledger included -- follows the agent. If the agent has not
+          // written today's view yet (its cron fires a few minutes after the 9:30 data phase), this
+          // phase skips and the next poll cycle does not retry it: the entry cron is scheduled after
+          // the agent's, so a miss here means the agent itself skipped or failed, and the day gets no
+          // system trade rather than a rule-engine one.
+          const { data: agentView } = await admin
+            .from("agent_calls")
+            .select("agent_strategy, agent_bias, confidence")
+            .eq("trade_date", tradeDate)
+            .eq("phase", "open")
+            .eq("instrument", instrument)
+            .maybeSingle();
+          if (!agentView?.agent_strategy) { results[label] = { skipped: "no agent view of record for today yet" }; skipped.push(`${label} entry: agent_calls has no open-phase row for ${tradeDate}`); continue; }
+          const biasLabel = (agentView.agent_bias ?? "Neutral") as BiasLabel;
+          const mapped = mapRecommendationToStrategyV(agentView.agent_strategy);
 
-          if (mapped.noTrade || mapped.strategy === "No Trade") { results[label] = { skipped: "No Trade recommended today" }; continue; }
+          if (mapped.noTrade || mapped.strategy === "No Trade") { results[label] = { skipped: `agent view is ${agentView.agent_strategy} today` }; continue; }
 
-          const side: SideT = mapped.side ?? (biasLabel === "Bearish" ? "Put" : "Call");
+          const side: SideT = mapped.side ?? (biasLabel === "Bearish" || biasLabel === "Strong Bearish" ? "Put" : "Call");
           const legs = legsForStrategyV(mapped.strategy, biasLabel, side);
           const strikeStep = STRIKE_STEP[instrument];
           const atmSpot = roundedStrikeV(d.spot, strikeStep);

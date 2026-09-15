@@ -134,7 +134,9 @@ Fixed limits (enforced after you answer): only these strategies exist: ${STRATEG
 VIX above 22 forbids any premium-buying strategy. DTE of 1 or less forbids naked options.
 
 Conduct: never invent a number; every figure you cite must appear in the input. Prefer No Trade over a
-low-conviction call. Plain sentences, no bullet points, no headers -- this text is shown to traders as-is.`;
+low-conviction call. Plain sentences, no bullet points, no headers -- this text is shown to traders as-is.
+Length is part of the job: a trader reads the headline in two seconds and the reasoning in fifteen. Keep
+score arithmetic out of the prose; the dashboard shows bias, readiness and IV condition beside your words.`;
 
 // ---------------------------------------------------------------------------------------------
 // Shared context builders
@@ -238,7 +240,7 @@ Deno.serve(async (req: Request) => {
           regime: { type: "string", enum: ["trend_up", "trend_down", "range", "event_driven", "unclear"] },
           watch: { type: "string", description: "The two or three levels or signals that decide the day, in one or two sentences." },
           risk_flags: { type: "array", items: { type: "string" }, description: "Short phrases. Empty if none." },
-          note: { type: "string", description: "2-3 sentences a trader reads at 9:00 AM. No strategy call." },
+          note: { type: "string", description: "At most 60 words a trader reads at 9:00 AM. Plain language, no strategy call, no score arithmetic." },
         },
       };
       const system = `${SYSTEM_COMMON}\n\nPhase: PRE-MARKET. The market has not opened; there is no spot, PCR, max pain or bias yet.
@@ -278,8 +280,8 @@ the 5-day average range, the prior sessions and any lesson from earlier grades.`
             iv_condition: { type: "string", enum: ["Cheap", "Normal", "Expensive"] },
             strategy: { type: "string", enum: [...STRATEGIES] },
             confidence: { type: "string", enum: ["high", "medium", "low"] },
-            view: { type: "string", description: "The view in one sentence, as a trader would say it. This is the headline." },
-            reasoning: { type: "string", description: "2-4 sentences. Which two or three signals drive the call, and where you weighed a signal differently from the playbook's default and why." },
+            view: { type: "string", description: "The view as a trader would say it out loud: ONE clause, at most 12 words, no numbers. This is the headline." },
+            reasoning: { type: "string", description: "At most 70 words, plain trader language. Name the two or three signals that drive the call and, if you departed from the playbook, which signal you weighed differently. Do NOT list scores, weights or arithmetic (+1, -2, 45%) -- those are shown separately." },
             invalidation: { type: "string", description: "One sentence: the observable condition that would make this view wrong intraday (a level, a VIX move, an OI change)." },
             invalidation_level: { type: ["number", "null"], description: "The single spot level from the invalidation sentence, as a number. null only if the invalidation is not a price level." },
             invalidation_direction: { type: ["string", "null"], enum: ["above", "below", null], description: "The view is wrong if spot trades ABOVE or BELOW invalidation_level. null if no level." },
@@ -375,7 +377,7 @@ walked in with, and the scoreboard to notice which reads have been working.`;
             action: { type: "string", enum: ["hold", "adjust", "exit", "enter", "stay_out"] },
             strategy: { type: "string", enum: [...STRATEGIES], description: "The strategy that should be on after this action. Same as the live view for hold; No Trade for exit/stay_out; the new structure for enter/adjust." },
             confidence: { type: "string", enum: ["high", "medium", "low"] },
-            reasoning: { type: "string", description: "2-3 sentences. State the invalidation result (state.invalidation_hit) as given -- do not re-derive it." },
+            reasoning: { type: "string", description: "At most 45 words. State the invalidation result (state.invalidation_hit) as given -- do not re-derive it -- then the one thing that matters now. No score arithmetic." },
             invalidation: { type: ["string", "null"], description: "Required for enter or adjust: the new invalidation sentence. null otherwise." },
             invalidation_level: { type: ["number", "null"] },
             invalidation_direction: { type: ["string", "null"], enum: ["above", "below", null] },
@@ -454,8 +456,8 @@ reached. A bias flip on one checkpoint is not by itself a reason to exit; a flip
             grade: { type: "string", enum: ["right", "partial", "wrong", "no_call"], description: "Grade of the AGENT's morning call against what the day did and the paper trade outcome." },
             rules_grade: { type: "string", enum: ["right", "partial", "wrong", "no_call"], description: "Same grade for the RULE ENGINE's morning strategy." },
             misleading_signal: { type: "string", description: "The one input that pointed the wrong way, or 'none'." },
-            lesson: { type: "string", description: "One sentence, general enough to apply on a future day with a similar setup. This is fed into tomorrow's context." },
-            reasoning: { type: "string", description: "2-3 sentences of post-mortem." },
+            lesson: { type: "string", description: "One sentence, at most 30 words, general enough to apply on a future day with a similar setup. This is fed into tomorrow's context." },
+            reasoning: { type: "string", description: "At most 60 words of post-mortem, plain language." },
           },
         };
         const system = `${SYSTEM_COMMON}\n\nPhase: POST-CLOSE. Grade your own morning view for ${instrument} (morning.my_view) honestly, and separately grade the rule engine's shadow answer (morning.rule_engine_shadow) the same way. 'right' means the direction and
