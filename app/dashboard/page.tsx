@@ -344,6 +344,15 @@ function breadthDirection(raw: string | number | boolean | null | undefined) { c
 const midRemapKeys: Record<string, string> = { atm_iv_nifty_mid: 'atm_iv_nifty', atm_iv_sensex_mid: 'atm_iv_sensex', pcr_nifty_mid: 'pcr_nifty', pcr_sensex_mid: 'pcr_sensex', max_pain_nifty_mid: 'max_pain_nifty', max_pain_sensex_mid: 'max_pain_sensex', atm_straddle_price_nifty_mid: 'atm_straddle_price_nifty', atm_straddle_price_sensex_mid: 'atm_straddle_price_sensex', atm_straddle_delta_nifty_mid: 'atm_straddle_delta_nifty', atm_straddle_delta_sensex_mid: 'atm_straddle_delta_sensex', atm_straddle_theta_nifty_mid: 'atm_straddle_theta_nifty', atm_straddle_theta_sensex_mid: 'atm_straddle_theta_sensex', advance_decline_ratio_mid: 'advance_decline_ratio' }
 function buildMidRow(row: Row, mid: Row): Row { const overlay: Row = {}; for (const [midKey, targetKey] of Object.entries(midRemapKeys)) { if (mid[midKey] !== null && mid[midKey] !== undefined) overlay[targetKey] = mid[midKey] }; return { ...row, ...overlay, spot_nifty: mid.spot_nifty ?? null, spot_sensex: mid.spot_sensex ?? null, intraday_change_pct_nifty: mid.intraday_change_pct_nifty ?? null, intraday_change_pct_sensex: mid.intraday_change_pct_sensex ?? null } }
 function resolveAtmSpot(row: Row, instrument: Instrument): number { const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'; const direct = num(row, `spot_${suffix}`); if (direct) return direct; const prev = num(row, `prev_close_${suffix}`); const gapPoints = num(row, `gap_points_${suffix}`); if (prev && gapPoints) return prev + gapPoints; return prev }
+// Intl's short month is "Sept" under en-GB and varies by ICU version; a trading UI wants
+// three letters every month so the date column does not jump. Fixed table, no surprises.
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+function navDate(d: Date) {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'long', day: '2-digit', month: 'numeric', year: 'numeric' }).formatToParts(d)
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? ''
+  return `${get('weekday')} ${get('day')}-${MON[Number(get('month')) - 1]}-${get('year')}`
+}
+
 export function calculateVerdict(row: Row, instrument: Instrument) { const n = instrument === 'NIFTY'; const suffix = n ? 'nifty' : 'sensex'; const prev = num(row, `prev_close_${suffix}`); const open = n ? num(row, 'nifty_opening_points') : 0; const gapPct = n ? num(row, 'gift_nifty_gap_pct') : num(row, 'gap_points_sensex') / prev * 100; const predicted = num(row, 'gift_nifty_gap_pct') / 100 * num(row, 'prev_close_nifty'); const difference = open - predicted; const pcr = num(row, `pcr_${suffix}`); const iv = num(row, `atm_iv_${suffix}`); const vix = num(row, 'india_vix'); const support = num(row, `oi_support_${suffix}`); const resistance = num(row, `oi_resistance_${suffix}`); const maxPain = num(row, `max_pain_${suffix}`); const oiChangeSupport = String(row[`oi_change_support_${suffix}`] ?? ''); const oiChangeResistance = String(row[`oi_change_resistance_${suffix}`] ?? ''); const adRatio = advanceDeclineRatio(row); let bullVotes = 0; let bearVotes = 0; const giftGap = num(row, 'gift_nifty_gap_pct'); if (giftGap > 0) bullVotes++; if (giftGap < 0) bearVotes++; if (pcr > 1.3) bullVotes++; if (pcr < 0.8) bearVotes++; if (oiChangeSupport === 'Addition') bullVotes++; if (oiChangeSupport === 'Unwinding') bearVotes++; if (oiChangeResistance === 'Unwinding') bullVotes++; if (oiChangeResistance === 'Addition') bearVotes++; if (adRatio !== null && adRatio > 1.5) bullVotes++; if (adRatio !== null && adRatio < 0.7) bearVotes++; const bias = bullVotes > bearVotes ? 'Bullish' : bearVotes > bullVotes ? 'Bearish' : 'Neutral'; const ivRead = iv - vix > 2 ? 'IV rich' : 'IV fair'; const range = Math.abs(gapPct) <= 0.75; const strategy = range && ivRead === 'IV fair' ? 'Iron Condor' : !range && ivRead === 'IV rich' ? (bias === 'Bullish' ? 'Debit Call Spread' : bias === 'Bearish' ? 'Debit Put Spread' : 'Iron Condor') : range && ivRead === 'IV rich' ? 'Credit Spread' : bias === 'Bullish' ? 'Naked Call' : bias === 'Bearish' ? 'Naked Put' : 'Iron Condor'; const straddle = num(row, `atm_straddle_price_${suffix}`); const dte = num(row, `days_to_expiry_${suffix}`); const avgMove5d = num(row, `avg_move_5d_${suffix}`); const estimateA = straddle / Math.sqrt(Math.max(dte, 1)); const estimateB = avgMove5d; const conservative = Math.min(estimateA, estimateB); const aggressive = Math.max(estimateA, estimateB); const target = conservative * 0.6; const stop = conservative * 0.3; const aggressiveTarget = aggressive * 0.6; const aggressiveStop = aggressive * 0.3; const strike: Strike = vix < 11 ? 'ATM' : vix <= 14 ? 'ITM1' : 'ITM2'; return { gapPct, prev, open, predicted, difference, pcr, iv, vix, support, resistance, maxPain, bias, ivRead, strategy, straddle, conservative, aggressive, target, stop, aggressiveTarget, aggressiveStop, strike, dte, oiSupport: oiChangeSupport || 'Not available', oiResistance: oiChangeResistance || 'Not available', chartSupport: num(row, `chart_support_${suffix}`), chartResistance: num(row, `chart_resistance_${suffix}`) } }
 // Raw (non-defaulted) numeric read of a premarket_dashboard column — returns null when the source field is
 // missing so callers can omit a reasoning line rather than fabricating a value from a 0 default.
@@ -1445,7 +1454,6 @@ export default function Dashboard() {
     if (day === 'Sat' || day === 'Sun') return false
     return hhmm >= '09:15' && hhmm <= '15:30'
   })()
-  const sessionState = freshness(capturedISO, marketOpen)
   // All of today's mid-market checkpoints (10:30/11:30/12:30/1:30/2:30 IST, or the legacy
   // single '1245' row for historical days before the 5-checkpoint schedule started), ordered
   // earliest-first so the timeline UI can just .map() them left-to-right / top-to-bottom.
@@ -1458,7 +1466,7 @@ export default function Dashboard() {
   }, { revalidateOnFocus: false })
   const { data: postSummary } = useSWR<Row | null>(row.trade_date ? ['postmarket-summary', row.trade_date] : null, async () => { const { data, error } = await supabase.from('postmarket_summary').select('*').eq('trade_date', row.trade_date).order('trade_date', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data as Row | null }, { revalidateOnFocus: false })
   useEffect(() => { document.documentElement.classList.toggle('light', !dark) }, [dark])
-  useEffect(() => { const updateClock = () => { const now = new Date(); const options = { timeZone: 'Asia/Kolkata' } as const; setLiveDate(new Intl.DateTimeFormat('en-IN', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)); setLiveDay(new Intl.DateTimeFormat('en-IN', { ...options, weekday: 'long' }).format(now)); setLiveTime(new Intl.DateTimeFormat('en-IN', { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(now)) }; updateClock(); const timer = window.setInterval(updateClock, 1000); return () => window.clearInterval(timer) }, [])
+  useEffect(() => { const updateClock = () => { const now = new Date(); const options = { timeZone: 'Asia/Kolkata' } as const; setLiveDate(navDate(now)); setLiveDay(new Intl.DateTimeFormat('en-IN', { ...options, weekday: 'long' }).format(now)); setLiveTime(new Intl.DateTimeFormat('en-IN', { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(now)) }; updateClock(); const timer = window.setInterval(updateClock, 1000); return () => window.clearInterval(timer) }, [])
   // History already fetches the last 15 sessions on load, so the picker knows which dates
   // exist without another request -- and stepping moves to the next PUBLISHED session rather
   // than to the next calendar day, which would land on weekends and holidays.
@@ -1472,29 +1480,35 @@ export default function Dashboard() {
   const olderDate = currentIdx >= 0 && currentIdx < sessionDates.length - 1 ? sessionDates[currentIdx + 1] : null
   const newerDate = currentIdx > 0 ? sessionDates[currentIdx - 1] : null
   const isArchived = sessionDate != null && latestDate != null && sessionDate !== latestDate
+  // The picker's compact form of the same date: "Tue 15-Sep". Same month table as navDate,
+  // so the two never disagree about how September is spelled.
   const sessionLabel = (d: string | null) => {
     if (!d) return ''
     const parsed = new Date(`${d}T00:00:00+05:30`)
     if (Number.isNaN(parsed.getTime())) return d
-    return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short' }).format(parsed)
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'numeric' }).formatToParts(parsed)
+    const get = (t: string) => parts.find((x) => x.type === t)?.value ?? ''
+    return `${get('weekday')} ${get('day')}-${MON[Number(get('month')) - 1]}`
   }
+  // "Tuesday 15-Sep-2026" -- the same shape the live clock uses, so the topbar reads
+  // identically whether you are on today or on an archived session.
   const sessionLabelLong = (d: string | null) => {
     if (!d) return ''
     const parsed = new Date(`${d}T00:00:00+05:30`)
     if (Number.isNaN(parsed.getTime())) return d
-    return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'long', day: 'numeric', month: 'long' }).format(parsed)
+    return navDate(parsed)
   }
   const sessionsBack = isArchived && currentIdx >= 0 ? currentIdx : 0
 
   return <main className="app-shell"><header className="topbar"><button className="icon-button nav-toggle" onClick={() => setNavOpen(!navOpen)} aria-label={navOpen ? 'Hide session map' : 'Show session map'} aria-expanded={navOpen} aria-controls="session-map"><Menu size={18} /></button><div className="brand-mark"><BrandSymbol size={30} /><div><strong>MarketCue</strong></div></div>{isArchived
       ? <span className="topbar-date topbar-date-archived">{sessionLabelLong(currentDate)}</span>
-      : <span className="topbar-date">{liveDay || row?.day_name || ''} {liveDate || row?.trade_date || ''} · {liveTime || '—'} IST</span>}
+      : <span className="topbar-date">{liveDate || row?.trade_date || ''} · {liveTime || '—'} IST</span>}
     <div className="session-picker" role="group" aria-label="Trading session">
       <button type="button" onClick={() => olderDate && goToSession(olderDate)} disabled={!olderDate} aria-label="Previous session">‹</button>
       <span className="session-picker-date">{sessionLabel(currentDate) || '—'}</span>
       <button type="button" onClick={() => newerDate && goToSession(newerDate === latestDate ? null : newerDate)} disabled={!newerDate} aria-label="Next session">›</button>
     </div>
-    {isArchived && <button type="button" className="session-today" onClick={() => goToSession(null)}>Today</button>}<div className="topbar-meta"><FreshnessStamp state={sessionState.state} label={sessionState.label} capturedAt={capturedISO} /><button type="button" className="icon-button" onClick={() => setDark(!dark)} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'} aria-pressed={!dark}>{dark ? <Sun size={16} /> : <Moon size={16} />}</button>{!sessionLoading && (session ? <button type="button" className="topbar-toggle" onClick={() => signOut()}>Sign out</button> : <Link href="/login" className="topbar-toggle">Sign in</Link>)}</div></header>
+    {isArchived && <button type="button" className="session-today" onClick={() => goToSession(null)}>Today</button>}<div className="topbar-meta">{/* The freshness stamp lived here and in every screen's own header, saying the same thing twice on one view. The screen-level one is kept -- it sits beside the read it qualifies, which is where it means something. */}<button type="button" className="icon-button" onClick={() => setDark(!dark)} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'} aria-pressed={!dark}>{dark ? <Sun size={16} /> : <Moon size={16} />}</button>{!sessionLoading && (session ? <button type="button" className="topbar-toggle" onClick={() => signOut()}>Sign out</button> : <Link href="/login" className="topbar-toggle">Sign in</Link>)}</div></header>
     {isArchived && <div className="archive-bar" role="status">
       <span className="archive-bar-tag">Archived session</span>
       <span className="archive-bar-text">
