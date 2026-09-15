@@ -660,3 +660,26 @@
     padding-top: 24px;
   }
 }
+
+/* ---- 18 · the prior-session recap -----------------------------------------
+   The recap is three sentences of prose and was rendering at 12px -- that is
+   --text-label, the smallest step in the scale, meant for uppercase tracked
+   labels rather than paragraphs. (.prior-session-line asks for --text-meta;
+   something upstream was winning, so this states it at the layer's own
+   specificity rather than leaving it to the cascade.)
+
+   --text-body is the size prose takes under an answer everywhere else --
+   Verdict's note, Post-market's, Mid-market's. It stays inside the hierarchy;
+   it just stops being two steps below where prose belongs.
+
+   The column widens slightly with it. At 1.25fr the recap had 279px, which is
+   about 32 characters a line at 15px -- too narrow to read comfortably. 1.1fr
+   gives it enough for a sensible measure without taking the lead from the
+   thesis beside it. */
+.app-shell.app-shell .thesis-row { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--s-6); }
+.app-shell.app-shell .prior-session-line {
+  font-size: var(--text-body);
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.app-shell.app-shell .prior-session-story { max-width: 46ch; }
