@@ -484,6 +484,14 @@
      theme toggle and sign-out past the right edge. It takes its own full-width row
      underneath instead, and the date cell stretches to fill it. */
   .app-shell.app-shell .topbar { flex-wrap: wrap; height: auto; padding-top: 8px; padding-bottom: 8px; row-gap: 8px; }
+  /* Once it wraps the bar is two 44px rows plus the row-gap and its own padding, not the
+     68px the shell assumes everywhere else. The drawer offset, the backdrop inset and the
+     workspace height all read --topbar-h, so correcting it here corrects all three: the
+     drawer used to start 44px too high, covering the session picker, and the workspace
+     carried 44px of dead scroll under every screen. Written as the arithmetic rather than
+     as 112px so it stays legible against the row floors above -- it is not a measurement,
+     and a third row would need this line changed with it. */
+  .app-shell.app-shell { --topbar-h: calc((2 * 44px) + 8px + 16px); }
   .app-shell.app-shell .session-picker { order: 10; flex: 1 1 100%; }
   .app-shell.app-shell .session-picker-date { flex: 1; min-width: 0; }
     .app-shell.app-shell .archive-bar-exit { margin-left: 0; }
@@ -797,6 +805,15 @@
   color: var(--ink-2);
 }
 .app-shell.app-shell .prior-session-story { max-width: 46ch; }
+
+/* globals.css collapses .thesis-row to one column below 900px, but that rule is a bare
+   class and this layer's is (0,3,0) -- media queries carry no specificity of their own, so
+   the two-column hero won at every width. On a 360px screen that left ~150px a column for
+   the answer and the recap beside it. Same failure the row-form block above documents;
+   the collapse has to be restated at this layer's specificity to land. */
+@media (max-width: 900px) {
+  .app-shell.app-shell .thesis-row { grid-template-columns: 1fr; }
+}
 
 
 /* ---- 19 · expected open ---------------------------------------------------

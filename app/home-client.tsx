@@ -93,7 +93,9 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
   const [menuOpen, setMenuOpen] = useState(false)
   const isMobile = useIsMobile()
   // The header links do not fit beside the brand on a phone, so below the breakpoint they move into a drawer.
-  useEffect(() => { if (!isMobile) setMenuOpen(false) }, [isMobile])
+  // Explicitly false, not falsy: isMobile is null until measured, and closing the menu on that
+  // pass would be acting on an answer we do not have yet.
+  useEffect(() => { if (isMobile === false) setMenuOpen(false) }, [isMobile])
   const { session, loading, signOut } = useSession()
   useEffect(() => { document.documentElement.classList.toggle('light', !dark) }, [dark])
   const supabase = createClient()
@@ -187,7 +189,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           </button>
         </div>
       </header>
-      {isMobile && menuOpen && <button type="button" className="landing-nav-backdrop" aria-label="Close menu" onClick={() => setMenuOpen(false)} />}
+      {isMobile === true && menuOpen && <button type="button" className="landing-nav-backdrop" aria-label="Close menu" onClick={() => setMenuOpen(false)} />}
 
       <section className="landing-hero">
         <div className="landing-hero-copy">

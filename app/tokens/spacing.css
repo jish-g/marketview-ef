@@ -7,6 +7,10 @@
   --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px; --s-12: 48px;
 
   --sidebar-w: 248px;
-  --topbar-h: 64px;
+  /* The real height of every topbar in the app (.topbar, .landing-topbar,
+     .blog-index-topbar, .rules-doc-topbar all set 68px). This said 64px while nothing
+     read it, so the number was free to be wrong; the dashboard shell now derives from
+     it and the drawer offsets have to match the bar they sit under. */
+  --topbar-h: 68px;
   --measure: 74ch;
 }
