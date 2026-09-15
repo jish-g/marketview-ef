@@ -275,6 +275,42 @@ export function TradeLevels({ variant, targetPts, stopPts, targetRupees, stopRup
   )
 }
 
+/* --------------------------------------------------------- Sparkline */
+
+// Five readings across a session are a shape, and as five separate strings that shape is
+// invisible. This draws the series at a size that sits inline with text -- it is not a chart
+// and carries no axis; the figures beside it do the reading. Nulls are gaps, not zeroes: a
+// checkpoint that never reported must not pull the line to the floor.
+export function Sparkline({ values, width = 96, height = 26, endTone }: {
+  values: (number | null)[]
+  width?: number
+  height?: number
+  endTone?: 'up' | 'down' | 'caution' | 'neutral'
+}) {
+  const points = values.map((v, i) => ({ v, i })).filter((p): p is { v: number; i: number } => p.v != null && Number.isFinite(p.v))
+  if (points.length < 2) return null
+
+  const pad = 4
+  const lo = Math.min(...points.map((p) => p.v))
+  const hi = Math.max(...points.map((p) => p.v))
+  // A flat series would divide by zero; draw it down the middle instead.
+  const span = hi - lo || 1
+  const x = (i: number) => pad + (i / Math.max(values.length - 1, 1)) * (width - pad * 2)
+  const y = (v: number) => height - pad - ((v - lo) / span) * (height - pad * 2)
+
+  const d = points.map((p) => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')
+  const last = points[points.length - 1]
+  const toneVar = endTone === 'up' ? 'var(--up)' : endTone === 'down' ? 'var(--down)' : endTone === 'caution' ? 'var(--caution-ink)' : 'var(--ink-2)'
+
+  return (
+    <svg className="ds-spark" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img"
+         aria-label={`Trend across ${points.length} checkpoints, ending at ${last.v.toFixed(2)}`}>
+      <polyline points={d} fill="none" stroke="var(--faint)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={x(last.i)} cy={y(last.v)} r="2.6" fill={toneVar} />
+    </svg>
+  )
+}
+
 /* -------------------------------------------------- CheckpointTimeline */
 
 export type Checkpoint = {

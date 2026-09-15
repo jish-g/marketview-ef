@@ -9,7 +9,7 @@ import { TradeView } from '@/components/trade-view'
 import { JournalView } from '@/components/journal-view'
 import { useSession } from '@/hooks/use-session'
 import { fmt, freshness } from '@/lib/format'
-import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, BiasAxis, CheckpointTimeline, Progress, PhaseAside, Label, Metric, Banner, TradeLevels, Card, type Checkpoint } from '@/components/ui/ds'
+import { ScoreBreakdown, Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, BiasAxis, CheckpointTimeline, Progress, PhaseAside, Label, Metric, Banner, TradeLevels, Card, Sparkline, type Checkpoint } from '@/components/ui/ds'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CheckCircle2, ChevronRight, Clock3, Gauge, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sun } from 'lucide-react'
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
@@ -926,6 +926,54 @@ function MidCheckpointRowPending({ label }: { label: string }) {
 
 // One instrument's full day at a glance: all 5 checkpoints stacked, expanded by default (no
 // tap-to-expand) so the whole session is visible in one compact column.
+// The screen answers one question: did the morning call survive the day? It should say so
+// in a sentence, in the place every other screen puts its answer, rather than leaving the
+// reader to infer it from ten rows. Built only from what the checkpoints already report --
+// which instrument shifted, when, and to what -- so nothing is asserted that is not in the
+// data.
+function MidAnswer({ byId }: { byId: Map<string, Row> }) {
+  const read = (instrument: Instrument) => {
+    const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
+    const name = instrument === 'NIFTY' ? 'Nifty' : 'Sensex'
+    let band: string | null = null
+    let shiftAt: string | null = null
+    let shiftTo: string | null = null
+    let seen = 0
+    for (const slot of CHECKPOINT_SLOTS) {
+      const cp = byId.get(slot.id)
+      if (!cp) continue
+      seen += 1
+      const b = cp[`market_bias_${suffix}_mid`]
+      if (b != null) band = String(b)
+      if (Boolean(cp[`bias_shifted_${suffix}`]) || Boolean(cp[`strategy_shifted_${suffix}`])) {
+        shiftAt = slot.label
+        shiftTo = b != null ? String(b).toLowerCase() : null
+      }
+    }
+    return { name, band, shiftAt, shiftTo, seen }
+  }
+  const a = read('NIFTY')
+  const b = read('SENSEX')
+  if (a.seen === 0 && b.seen === 0) return null
+
+  const clause = (r: ReturnType<typeof read>) =>
+    r.seen === 0 ? `${r.name} has not reported yet`
+      : r.shiftAt ? `${r.name} turned ${r.shiftTo ?? 'a new band'} at ${r.shiftAt}`
+      : `${r.name} held ${(r.band ?? 'its band').toLowerCase()} all day`
+  const moved = a.shiftAt || b.shiftAt
+  const total = a.seen + b.seen
+  const shifts = (a.shiftAt ? 1 : 0) + (b.shiftAt ? 1 : 0)
+
+  return <div className={`mid-answer ${moved ? 'is-moved' : ''}`}>
+    <Label tone={moved ? 'caution' : undefined}>Where the read stands</Label>
+    <p className="mid-answer-line">{clause(a)}. {clause(b)}.</p>
+    <p className="mid-answer-sub">
+      {total - shifts} of {total} checkpoint{total === 1 ? '' : 's'} came back unchanged.
+      {moved ? ' Only the shift above changed what the framework recommends.' : ' The morning call stood for the whole session.'}
+    </p>
+  </div>
+}
+
 function MidInstrumentColumn({ instrument, byId, nowMin }: { instrument: Instrument; byId: Map<string, Row>; nowMin: number }) {
   const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
   // Spec §3: five checkpoint rows through CheckpointTimeline. A checkpoint whose bias moved
@@ -965,9 +1013,75 @@ function MidInstrumentColumn({ instrument, byId, nowMin }: { instrument: Instrum
     }
   })
 
-  return <div className="mid-instrument-col">
-    <p className="mid-instrument-col-label">{instrument === 'NIFTY' ? 'Nifty' : 'Sensex'}</p>
-    <CheckpointTimeline rows={rows} />
+  // The five readings as a series, for the drift line. Nulls stay null -- a checkpoint that
+  // never reported is a gap, not a zero.
+  const series = CHECKPOINT_SLOTS.map((slot) => {
+    const v = byId.get(slot.id)?.[`intraday_change_pct_${suffix}`]
+    return v != null && Number.isFinite(Number(v)) ? Number(v) : null
+  })
+  const seen = series.filter((v): v is number => v != null)
+  const first = seen[0] ?? null
+  const last = seen.length ? seen[seen.length - 1] : null
+  const drift = first != null && last != null ? last - first : null
+
+  const captured = rows.filter((r) => r.badge !== 'overdue' && r.badge !== 'scheduled')
+  const shifts = captured.filter((r) => r.shifted)
+  const held = captured.filter((r) => !r.shifted)
+  const pending = rows.filter((r) => r.badge === 'overdue' || r.badge === 'scheduled')
+  const band = captured.length ? String(captured[captured.length - 1].badge).split(' · ')[0] : null
+
+  const name = instrument === 'NIFTY' ? 'Nifty' : 'Sensex'
+
+  return <div className="mid-track">
+    <div className="mid-track-head">
+      <span className="mid-track-inst">{name}</span>
+      <span className={`mid-track-verdict ${shifts.length ? 'is-moved' : ''}`}>
+        {captured.length === 0
+          ? 'No checkpoint yet'
+          : shifts.length
+            ? `${held.length} held · ${shifts.length} shift${shifts.length === 1 ? '' : 's'}`
+            : `${held.length} of ${CHECKPOINT_SLOTS.length} held${band ? ` · ${band.toLowerCase()}` : ''}`}
+      </span>
+    </div>
+
+    {seen.length >= 2 && <div className="mid-drift">
+      <Sparkline values={series} endTone={shifts.length ? 'caution' : drift != null && drift > 0 ? 'up' : drift != null && drift < 0 ? 'down' : 'neutral'} />
+      <span className="mid-drift-ends">{fmt.pct(first)} → <b>{fmt.pct(last)}</b></span>
+      {drift != null && <span className={`mid-drift-delta ${drift > 0 ? 'positive' : drift < 0 ? 'negative' : ''}`}>{fmt.pct(drift)}</span>}
+    </div>}
+
+    {/* The one thing that happened, at full weight. */}
+    {shifts.map((r) => <div className="mid-event" key={r.time}>
+      <span className="mid-event-time">{r.time}<small>IST</small></span>
+      <span>
+        <span className="mid-event-head">{r.headline}</span>
+        {r.note && <span className="mid-event-from">{r.note}</span>}
+        <span className="mid-event-evidence">{r.detail}</span>
+      </span>
+    </div>)}
+
+    {shifts.length === 0 && captured.length > 0 && <p className="mid-quiet">
+      <b>No band crossed.</b> The morning call stood for {captured.length === CHECKPOINT_SLOTS.length ? 'the whole session' : `all ${captured.length} checkpoints so far`}.
+    </p>}
+
+    {/* The non-events, folded but not hidden. */}
+    {held.length > 0 && <details className="mid-held">
+      <summary>
+        <span className="mid-held-chev" aria-hidden="true">›</span>
+        {held.length === CHECKPOINT_SLOTS.length ? `All ${held.length} checkpoints unchanged` : `${held.length} earlier checkpoint${held.length === 1 ? '' : 's'}, unchanged`}
+        <span className="mid-held-range">{held[0].time} – {held[held.length - 1].time}</span>
+      </summary>
+      <div className="mid-held-rows">
+        {held.map((r) => <div className="mid-held-row" key={r.time}>
+          <span className="mid-held-time">{r.time}</span>
+          <span className="mid-held-detail">{r.detail}</span>
+        </div>)}
+      </div>
+    </details>}
+
+    {pending.length > 0 && <p className="mid-pending">
+      {pending.length} checkpoint{pending.length === 1 ? '' : 's'} still to report — {pending.map((r) => r.time).join(', ')} IST.
+    </p>}
   </div>
 }
 
@@ -984,6 +1098,7 @@ function MidMarketView({ row, midCheckpoints }: { row: Row; midCheckpoints: Row[
 
   return <section className="phase-view special-view mid-checkpoint-view">
     <div className="review-section-head"><div><p className="eyebrow">Open → Mid checkpoints · today</p><h2>Mid-market</h2></div><PhaseAside capturedAt={(midCheckpoints?.[midCheckpoints.length - 1]?.created_at ?? row?.updated_at ?? null) as string | null} /></div>
+    <MidAnswer byId={byId} />
     <div className="mid-instrument-grid">
       <MidInstrumentColumn instrument="NIFTY" byId={byId} nowMin={nowMin} />
       <MidInstrumentColumn instrument="SENSEX" byId={byId} nowMin={nowMin} />

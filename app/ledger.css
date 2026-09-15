@@ -504,3 +504,74 @@
 
 /* the caution reading on the GIFT gap stays amber, as the reference has it */
 .app-shell.app-shell .field-card em.predicted-gap { color: var(--caution-ink); }
+
+/* ---- 14 · mid-market ------------------------------------------------------
+   Ten rows at equal weight, nine of them non-events, is why this screen read
+   as a white sheet. The answer leads; the drift is a shape; the shift is the
+   only thing at full weight; the unchanged checkpoints fold away but stay
+   reachable. Nothing is hidden -- it is ranked. */
+.app-shell.app-shell .mid-answer { border-left: 2px solid var(--border-strong); padding: 2px 0 2px 18px; margin-top: 18px; }
+.app-shell.app-shell .mid-answer.is-moved { border-left-color: var(--caution); }
+.app-shell.app-shell .mid-answer-line {
+  margin: 7px 0 0; max-width: 58ch;
+  font-size: var(--text-value-sm); font-weight: 600; line-height: 1.35; letter-spacing: -.02em;
+}
+.app-shell.app-shell .mid-answer-sub { margin: 9px 0 0; max-width: 62ch; color: var(--ink-2); font-size: var(--text-meta); line-height: 1.6; }
+
+.app-shell.app-shell .mid-instrument-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 48px; margin-top: 22px; }
+.app-shell.app-shell .mid-track { min-width: 0; }
+.app-shell.app-shell .mid-track-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding-bottom: 9px; border-bottom: 1px solid var(--border);
+}
+.app-shell.app-shell .mid-track-inst { font-size: var(--text-meta); font-weight: 600; }
+.app-shell.app-shell .mid-track-verdict {
+  font: 600 var(--text-label) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--faint);
+}
+.app-shell.app-shell .mid-track-verdict.is-moved { color: var(--caution-ink); }
+
+.app-shell.app-shell .mid-drift {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0 10px; border-bottom: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
+}
+.app-shell.app-shell .ds-spark { display: block; flex: 0 0 auto; }
+.app-shell.app-shell .mid-drift-ends { font-family: var(--font-mono); font-size: var(--text-meta); font-variant-numeric: tabular-nums; color: var(--muted); }
+.app-shell.app-shell .mid-drift-ends b { color: var(--ink); font-weight: 500; }
+.app-shell.app-shell .mid-drift-delta { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-meta); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.app-shell.app-shell .mid-event {
+  display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
+}
+.app-shell.app-shell .mid-event-time { font: 600 var(--text-meta) var(--font-mono); color: var(--caution-ink); text-align: right; font-variant-numeric: tabular-nums; }
+.app-shell.app-shell .mid-event-time small { display: block; font-size: var(--text-label); font-weight: 400; color: var(--faint); }
+.app-shell.app-shell .mid-event-head { display: block; font-size: var(--text-body); font-weight: 600; color: var(--ink); }
+.app-shell.app-shell .mid-event-from { display: block; margin-top: 4px; font-size: var(--text-meta); color: var(--caution-ink); }
+.app-shell.app-shell .mid-event-evidence { display: block; margin-top: 4px; font-family: var(--font-mono); font-size: var(--text-label); color: var(--muted); }
+
+.app-shell.app-shell .mid-quiet {
+  margin: 0; padding: 12px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
+  font-size: var(--text-meta); color: var(--muted);
+}
+.app-shell.app-shell .mid-quiet b { color: var(--ink-2); font-weight: 500; }
+
+.app-shell.app-shell .mid-held { border-bottom: 1px solid color-mix(in srgb, var(--border) 62%, transparent); }
+.app-shell.app-shell .mid-held > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px;
+  padding: 12px 0; min-height: 44px; font-size: var(--text-meta); color: var(--muted);
+}
+.app-shell.app-shell .mid-held > summary::-webkit-details-marker { display: none; }
+.app-shell.app-shell .mid-held > summary:hover { color: var(--ink-2); }
+.app-shell.app-shell .mid-held-chev { width: 12px; font-family: var(--font-mono); font-size: var(--text-label); color: var(--faint); }
+.app-shell.app-shell .mid-held[open] .mid-held-chev { transform: rotate(90deg); }
+.app-shell.app-shell .mid-held-range { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-label); color: var(--faint); font-variant-numeric: tabular-nums; }
+.app-shell.app-shell .mid-held-rows { padding: 0 0 10px 22px; }
+.app-shell.app-shell .mid-held-row { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px; padding: 5px 0; font-size: var(--text-label); color: var(--faint); }
+.app-shell.app-shell .mid-held-time { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.app-shell.app-shell .mid-held-detail { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.app-shell.app-shell .mid-pending { margin: 12px 0 0; font-size: var(--text-label); color: var(--faint); }
+
+@media (max-width: 860px) {
+  .app-shell.app-shell .mid-instrument-grid { grid-template-columns: 1fr; gap: 26px; }
+}
