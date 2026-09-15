@@ -44,7 +44,7 @@ export default function HowItWorksPage() {
         </Link>
         <Link href="/" className="back-link">Back to MarketCue</Link>
       </header>
-      <div className="rules-doc-layout">
+      <div className="rules-doc-layout rules-doc-layout--single">
         <div className="rules-doc-content">
           <div className="doc-hero">
             <p className="eyebrow">Method</p>
