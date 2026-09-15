@@ -1318,9 +1318,9 @@ function MarketOpenView({ row, capturedAt }: { row: Row; capturedAt: string | nu
     <div className="market-open-move">
       <span className="section-title">Expected move</span>
       <div className="market-open-move-grid">
-        <TradeLevels variant="conservative" heading="Nifty · conservative" total={fmt.ptsAbs(calc.conservative)}
+        <TradeLevels variant="conservative" heading="Conservative" total={fmt.ptsAbs(calc.conservative)}
           targetPts={calc.target} stopPts={calc.stop} targetRupees={calc.target * 0.5} stopRupees={calc.stop * 0.5} />
-        <TradeLevels variant="aggressive" heading="Nifty · aggressive" total={fmt.ptsAbs(calc.aggressive)}
+        <TradeLevels variant="aggressive" heading="Aggressive" total={fmt.ptsAbs(calc.aggressive)}
           targetPts={calc.aggressiveTarget} stopPts={calc.aggressiveStop} targetRupees={calc.aggressiveTarget * 0.5} stopRupees={calc.aggressiveStop * 0.5} />
         {row.advance_decline_ratio == null
           ? <EmptyState label="Advance / decline" headline="Not published" reason="NSE releases breadth after 09:20 IST." />

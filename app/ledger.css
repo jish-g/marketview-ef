@@ -518,11 +518,14 @@
    reachable. Nothing is hidden -- it is ranked. */
 .app-shell.app-shell .mid-answer { border-left: 2px solid var(--border-strong); padding: 2px 0 2px 18px; margin-top: 18px; }
 .app-shell.app-shell .mid-answer.is-moved { border-left-color: var(--caution); }
+/* The answer step is 30px on every screen; this was 20px, which made Mid-market read as a
+   lesser page. The prose under an answer is --text-body, as Verdict and Post-market set it;
+   this was --text-meta. Both were inconsistencies I introduced. */
 .app-shell.app-shell .mid-answer-line {
   margin: 7px 0 0; max-width: 58ch;
-  font-size: var(--text-value-sm); font-weight: 600; line-height: 1.35; letter-spacing: -.02em;
+  font-size: var(--text-answer); font-weight: 600; line-height: 1.2; letter-spacing: -.035em;
 }
-.app-shell.app-shell .mid-answer-sub { margin: 9px 0 0; max-width: 62ch; color: var(--ink-2); font-size: var(--text-meta); line-height: 1.6; }
+.app-shell.app-shell .mid-answer-sub { margin: 11px 0 0; max-width: 62ch; color: var(--ink-2); font-size: var(--text-body); line-height: 1.6; }
 
 .app-shell.app-shell .mid-instrument-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 48px; margin-top: 22px; }
 .app-shell.app-shell .mid-track { min-width: 0; }
@@ -581,3 +584,29 @@
 @media (max-width: 860px) {
   .app-shell.app-shell .mid-instrument-grid { grid-template-columns: 1fr; gap: 26px; }
 }
+
+
+/* ---- 15 · spacing, retuned for unboxed content ----------------------------
+   These gaps were set when every one of these children had a border and a
+   fill: 8-12px reads as separation between two outlined cards, and as nothing
+   at all between two bare columns. Unboxing in #84 left them behind.
+
+   The ledger's own two-column sections already use 48-52px; these now match
+   that scale rather than the card scale they were built against. */
+.app-shell.app-shell .market-open-move-grid { gap: 0 40px; }
+.app-shell.app-shell .close-grid { gap: 0 40px; }
+.app-shell.app-shell .rule-grid { gap: 26px 40px; }
+.app-shell.app-shell .formula-grid { gap: 20px 40px; }
+
+/* 1 · The session picker and TODAY were flush -- measured 0px between them, so the two
+   controls read as one four-part widget. The topbar sets no gap at all and spaces its
+   children with ad-hoc margins; this gives that row a real one. */
+.app-shell.app-shell .topbar { gap: 14px; }
+.app-shell.app-shell .topbar > * { margin-left: 0; margin-right: 0; }
+.app-shell.app-shell .topbar-meta { margin-left: auto; }
+
+/* 2 · The rule closing the screen header sat 18px under the title and 19px above the hero
+   -- equidistant, so it read as the hero's top border rather than the title's baseline. A
+   divider belongs to the thing above it. */
+.app-shell.app-shell .review-section-head { padding-bottom: 12px; }
+.app-shell.app-shell .review-section-head + * { margin-top: 26px; }
