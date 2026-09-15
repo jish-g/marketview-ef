@@ -486,7 +486,7 @@
 .app-shell.app-shell .field-card strong.positive,
 .app-shell.app-shell .field-card strong .positive,
 .app-shell.app-shell .close-card strong.positive,
-.app-shell.app-shell .verdict-card .positive { color: var(--caution-ink); }
+.app-shell.app-shell .verdict-card .positive { color: var(--up); }
 
 .app-shell.app-shell .field-card strong.negative,
 .app-shell.app-shell .field-card strong .negative,
@@ -497,12 +497,12 @@
    not the strike they sit under, so they keep their colour while the level
    above them stays ink. */
 .app-shell.app-shell .field-card .oi-action.is-strengthening,
-.app-shell.app-shell .field-card small.positive { color: var(--caution-ink); }
+.app-shell.app-shell .field-card small.positive { color: var(--up); }
 .app-shell.app-shell .field-card .oi-action.is-capping,
 .app-shell.app-shell .field-card small.negative { color: var(--down); }
 
 /* the trailing points figure follows its percentage rather than going muted */
-.app-shell.app-shell .field-card strong.positive em.prior-day-pts { color: color-mix(in srgb, var(--caution-ink) 78%, var(--ink-2)); }
+.app-shell.app-shell .field-card strong.positive em.prior-day-pts { color: color-mix(in srgb, var(--up) 78%, var(--ink-2)); }
 .app-shell.app-shell .field-card strong.negative em.prior-day-pts { color: color-mix(in srgb, var(--down) 78%, var(--ink-2)); }
 
 /* the caution reading on the GIFT gap stays amber, as the reference has it */
