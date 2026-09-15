@@ -1,0 +1,279 @@
+/* ============================================================
+   LEDGER TREATMENT
+   ------------------------------------------------------------
+   The dashboard's visual register: hairlines and alignment carry separation,
+   figures are the subject of the page, and the answer leads behind a single
+   accent rule. Replaces the card grid; see the prototype this was taken from.
+
+   Scope note, deliberately: this is a LAYER. It overrides the card families
+   rather than rewriting them, because the component consolidation (audit F-09)
+   has not happened yet and rewriting 500 class names across nine screens in one
+   change is not reviewable. It lives in one file so it can be deleted in one
+   step, and so the eventual consolidation has a single place to absorb.
+
+   The colour tokens are untouched. Every value below comes from the existing
+   dark palette; nothing here introduces a hue.
+   ============================================================ */
+
+.app-shell {
+  --led-hair: color-mix(in srgb, var(--border) 62%, transparent);
+  --led-rule: var(--border);
+}
+
+/* ---- 1 · unbox ------------------------------------------------------------
+   Border, fill and radius each say "separate object". Spent on everything,
+   they say nothing. The only surviving surface is the answer's accent rule. */
+.app-shell .field-card,
+.app-shell .verdict-card,
+.app-shell .close-card,
+.app-shell .ds-card,
+.app-shell .ds-metric,
+.app-shell .flow-card,
+.app-shell .trade-open-card,
+.app-shell .position-calculator,
+.app-shell .rule-table,
+.app-shell .payoff-chart-card,
+.app-shell .verdict-editable {
+  border: 0;
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 0;
+  padding: 0;
+}
+
+/* stacked siblings get a hairline instead of an outline */
+.app-shell .field-grid > .field-card,
+.app-shell .close-grid > .close-card,
+.app-shell .metric-groups .ds-card {
+  padding: 9px 0;
+  border-top: 1px solid var(--led-hair);
+}
+
+/* ---- 2 · labels -----------------------------------------------------------
+   12px is the floor the spec sets and it is kept. The institutional read comes
+   from tracking and weight rather than from going smaller. */
+.app-shell .field-card > span,
+.app-shell .ds-label,
+.app-shell .eyebrow,
+.app-shell .history-beat-label,
+.app-shell .close-card > span,
+.app-shell .section-title {
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---- 3 · figures ----------------------------------------------------------
+   Monospaced and tabular so columns compare by eye without being read. */
+.app-shell .field-card strong,
+.app-shell .close-card strong,
+.app-shell .ds-metric__value,
+.app-shell .verdict-value,
+.app-shell .track-move,
+.app-shell .move-total,
+.app-shell .history-close-pill,
+.app-shell .ds-num,
+.app-shell .num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+
+/* ---- 4 · rows -------------------------------------------------------------
+   The label sits above its figure rather than beside it. A horizontal
+   label/figure row was tried first and is wrong here: these grids hold prose
+   as often as numbers ("No RBI, inflation or earnings event today"), and a
+   right-aligned figure column has nowhere to put a sentence. The ledger
+   quality comes from the hairline and the shared baseline, not from forcing
+   two columns into a 225px track. */
+.app-shell .field-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  justify-content: flex-start;
+}
+.app-shell .field-card > span {
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.app-shell .field-card strong {
+  margin-top: 0;
+  font-size: var(--text-value);
+  line-height: 1.25;
+}
+.app-shell .field-card strong em {
+  font-size: var(--text-label);
+  color: var(--muted);
+  letter-spacing: 0;
+}
+.app-shell .field-card small {
+  font-size: var(--text-label);
+  color: var(--muted);
+}
+
+/* ---- 5 · the answer -------------------------------------------------------
+   One 2px rule, no fill. The only accented element on any screen. */
+.app-shell .thesis-hero,
+.app-shell .verdict-answer-main,
+.app-shell .post-hero {
+  border: 0;
+  border-left: 2px solid var(--caution);
+  border-radius: 0;
+  background: none;
+  padding: 2px 0 2px 20px;
+}
+.app-shell .verdict-banner {
+  border: 0;
+  border-left: 2px solid var(--info);
+  border-radius: 0;
+  background: none;
+  padding: 2px 0 2px 20px;
+}
+.app-shell .verdict-bullish { border-left-color: var(--up); }
+.app-shell .verdict-bearish { border-left-color: var(--down); }
+.app-shell .verdict-neutral { border-left-color: var(--caution); }
+
+/* ---- 6 · tables -----------------------------------------------------------
+   Already real tables; they just stop being boxed and start being ruled. */
+.app-shell .rule-table-head,
+.app-shell .rule-table-labels,
+.app-shell .rule-table-row {
+  padding-left: 0;
+  padding-right: 0;
+  background: none;
+}
+.app-shell .rule-table-row { border-top: 1px solid var(--led-hair); }
+.app-shell .trade-log-table,
+.app-shell .archive-table { border: 0; border-radius: 0; }
+.app-shell .trade-log-table th,
+.app-shell .archive-table-head { background: none; }
+.app-shell .trade-log-table th,
+.app-shell .trade-log-table td { padding-left: 0; }
+.app-shell .trade-log-table td.num { padding-left: 18px; }
+
+/* ---- 7 · section rhythm ---------------------------------------------------
+   Sections divide with a rule rather than with a gap between two boxes. */
+.app-shell .metric-group + .metric-group,
+.app-shell .phase-view > .market-open-move,
+.app-shell .post-carry,
+.app-shell .post-secondary {
+  border-top: 1px solid var(--led-rule);
+  padding-top: 18px;
+  margin-top: 4px;
+}
+.app-shell .market-open-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 34px;
+  border-top: 1px solid var(--led-rule);
+  border-bottom: 1px solid var(--led-rule);
+  padding: 11px 0;
+}
+.app-shell .market-open-tiles .ds-metric {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+.app-shell .market-open-tiles .ds-metric__value { font-size: var(--text-meta); font-weight: 600; }
+.app-shell .market-open-tiles .ds-metric__sub { display: none; }
+
+/* ---- 8 · history ----------------------------------------------------------
+   The day card was already unboxed in #82; this takes the outline too. */
+.app-shell .history-day-card {
+  border: 0;
+  border-top: 1px solid var(--led-rule);
+  border-radius: 0;
+  background: none;
+  padding: 16px 0;
+}
+
+@media (max-width: 760px) {
+  .app-shell .field-grid { grid-template-columns: 1fr; gap: 0; }
+}
+
+/* ---- 9 · badges, pills and strips ----------------------------------------
+   A pill is a container too. In the prototype state is carried by a glyph and
+   a colour on plain text, which is why the history rows read as a list rather
+   than a wall of chips. Form controls and the tooltip keep their surfaces --
+   an input that does not look inset is a usability problem, not a style one. */
+.app-shell .ds-badge,
+.app-shell .history-close-pill,
+.app-shell .trade-status,
+.app-shell .source-badge {
+  border: 0;
+  background: none;
+  border-radius: 0;
+  padding: 0;
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.app-shell .ds-badge--up, .app-shell .history-close-pill.positive { color: var(--up); }
+.app-shell .ds-badge--down, .app-shell .history-close-pill.negative { color: var(--down); }
+.app-shell .ds-badge--caution { color: var(--caution-ink); }
+.app-shell .ds-badge--neutral, .app-shell .ds-badge--outline { color: var(--muted); }
+.app-shell .history-close-pill { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+
+/* the verdict's score pair becomes two ledger rows */
+.app-shell .verdict-score-card {
+  border: 0;
+  border-top: 1px solid var(--led-hair);
+  background: none;
+  border-radius: 0;
+  padding: 13px 0;
+}
+
+/* strips rule top and bottom instead of filling */
+.app-shell .sync-strip,
+.app-shell .strategy-strip,
+.app-shell .scoring-path,
+.app-shell .verdict-rationale {
+  border: 0;
+  border-top: 1px solid var(--led-rule);
+  border-bottom: 1px solid var(--led-rule);
+  background: none;
+  border-radius: 0;
+  padding: 12px 0;
+}
+.app-shell .strategy-strip + .strategy-strip,
+.app-shell .scoring-path + * { border-top: 0; }
+
+/* ---- 10 · the last four ---------------------------------------------------
+   What stays boxed after this is only what must be: buttons, the select, the
+   journal textarea and the hover tooltip. A control that does not look like a
+   control is a usability bug, and the tooltip needs a surface to sit above the
+   page. Everything else is now ruled. */
+.app-shell .ds-banner {
+  border: 0;
+  border-left: 2px solid var(--info);
+  border-radius: 0;
+  background: none;
+  padding: 2px 0 2px 20px;
+}
+.app-shell .ds-banner--caution { border-left-color: var(--caution); }
+.app-shell .ds-banner--blocking { border-left-color: var(--down); }
+
+.app-shell .outcome-badge,
+.app-shell .journal-trade-chip {
+  border: 0;
+  background: none;
+  border-radius: 0;
+  padding: 0;
+}
+.app-shell .outcome-badge { border-top: 1px solid var(--led-hair); padding-top: 9px; }
+
+/* the empty-state cell reads as absence, not as a dashed container */
+.app-shell .field-card.is-empty,
+.app-shell .ds-card--empty {
+  border: 0;
+  border-top: 1px solid var(--led-hair);
+  border-radius: 0;
+  background: none;
+}
