@@ -339,9 +339,16 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
                       claim the quote itself cannot support. One neutral figure for everyone:
                       there is no gender on these records, and guessing it from a first name
                       would be inventing a detail about someone real. Decorative, so it is
-                      aria-hidden -- the author's name sits next to it as real text. */}
+                      aria-hidden -- the author's name sits next to it as real text.
+
+                      Filled rather than lucide's default outline: at 22px in a 40px circle a
+                      2px stroke reads as a faint wireframe, not an avatar. Passing fill and
+                      stroke overrides the icon's own attributes, which its shapes inherit --
+                      the head circle fills solid, and the shoulder arc closes along its chord
+                      into a half-disc. Ink then spans 11.75px to 28.25px of the 40px circle,
+                      centred, so no nudge is needed. */}
                   <span className="landing-testimonial-avatar" aria-hidden="true">
-                    <UserRound size={19} strokeWidth={1.75} />
+                    <UserRound size={22} fill="currentColor" stroke="none" />
                   </span>
                   <div>
                     <strong>{author}</strong>
