@@ -205,7 +205,7 @@
 /* ---- 7 · section rhythm ---------------------------------------------------
    Sections divide with a rule rather than with a gap between two boxes. */
 .app-shell.app-shell .metric-group + .metric-group,
-.app-shell.app-shell .phase-view > .market-open-move,
+.app-shell.app-shell .phase-view > .open-instrument,
 .app-shell.app-shell .post-carry,
 .app-shell.app-shell .post-secondary {
   border-top: 1px solid var(--led-rule);
@@ -578,7 +578,6 @@
 
    The ledger's own two-column sections already use 48-52px; these now match
    that scale rather than the card scale they were built against. */
-.app-shell.app-shell .market-open-move-grid { gap: 0 40px; }
 .app-shell.app-shell .close-grid { gap: 0 40px; }
 .app-shell.app-shell .rule-grid { gap: 26px 40px; }
 .app-shell.app-shell .formula-grid { gap: 20px 40px; }
@@ -792,4 +791,87 @@
   line-height: 1.5;
   color: var(--muted);
   text-align: left;
+}
+
+/* ---- 20 · market open: both instruments ------------------------------------
+   Two problems in one block. Sensex was absent from this screen while every other
+   screen carries it, and "Expected move" held three unlike things in one row --
+   Conservative, Aggressive, and Advance/decline, which is breadth and belongs to
+   neither. The two scenarios were also visually identical, each with its total
+   floating far right of its label while the rows under it aligned to another edge.
+
+   Now: breadth leads on its own line, each instrument gets a block, and the
+   scenarios are a table so Move, Target and Stop form columns that align. */
+.app-shell.app-shell .open-breadth {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 52px;
+}
+.app-shell.app-shell .open-instrument .group-heading h3 {
+  font-size: var(--text-meta);
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: var(--ink);
+}
+.app-shell.app-shell .open-move { margin-top: 16px; }
+.app-shell.app-shell .open-move .section-title {
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* capped rather than full-bleed: across the whole content width the four columns
+   drift so far apart that a row stops reading as one row */
+.app-shell.app-shell .open-move-table {
+  width: 100%;
+  max-width: 680px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.app-shell.app-shell .open-move-table th,
+.app-shell.app-shell .open-move-table td {
+  padding: 8px 0;
+  text-align: right;
+  white-space: nowrap;
+  border-top: 1px solid var(--led-hair);
+}
+/* the scenario name is the row's subject, so it keeps the left edge */
+.app-shell.app-shell .open-move-table th[scope="row"],
+.app-shell.app-shell .open-move-table thead th:first-child {
+  text-align: left;
+  font-weight: 400;
+  color: var(--ink-2);
+  font-size: var(--text-meta);
+}
+.app-shell.app-shell .open-move-table thead th {
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-top: 0;
+  padding-top: 0;
+}
+.app-shell.app-shell .open-move-table td {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+}
+/* the rupee figure rides with its own points figure rather than taking a column of
+   its own -- it is the same quantity priced differently, not a separate reading */
+.app-shell.app-shell .open-move-table td em {
+  font-style: normal;
+  font-size: var(--text-label);
+  color: var(--muted);
+  margin-left: 7px;
+}
+.app-shell.app-shell .open-move-note,
+.app-shell.app-shell .open-move-empty {
+  margin: 8px 0 0;
+  font-size: var(--text-label);
+  color: var(--faint);
+}
+
+@media (max-width: 720px) {
+  .app-shell.app-shell .open-breadth { grid-template-columns: 1fr; }
+  .app-shell.app-shell .open-move-table thead th:nth-child(2),
+  .app-shell.app-shell .open-move-table td:nth-child(2) { display: none; }
 }

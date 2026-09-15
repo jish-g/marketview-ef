@@ -1273,7 +1273,6 @@ function ThesisHero({ row, onSeeVerdict }: { row: Row; onSeeVerdict: () => void 
    Every figure here already existed on the row or came out of calculateVerdict. Nothing is
    computed that was not computed before -- this is presentation only. */
 function MarketOpenView({ row, capturedAt }: { row: Row; capturedAt: string | null }) {
-  const calc = calculateVerdict(row, 'NIFTY')
   const gapPts = row.gap_points_nifty != null ? Number(row.gap_points_nifty) : null
   const prevClose = row.prev_close_nifty != null ? Number(row.prev_close_nifty) : null
   const gapPct = gapPts != null && prevClose ? (gapPts / prevClose) * 100 : null
@@ -1308,27 +1307,80 @@ function MarketOpenView({ row, capturedAt }: { row: Row; capturedAt: string | nu
           {vix != null && <> VIX at {fmt.ratio(vix)} — {vixCondition(vix).toLowerCase()}.</>}
         </Banner>}
 
-    <div className="market-open-tiles">
-      <Metric label="Opening points" value={<span className={tone(row, 'gap_points_nifty')}>{value(row, 'gap_points_nifty')}</span>} sub={gapPct != null ? `${fmt.pct(gapPct)} vs prev close` : 'Previous close not recorded'} />
-      <Metric label="Previous close" value={value(row, 'prev_close_nifty')} sub="Prior session" />
-      <Metric label="ATM IV" value={value(row, 'atm_iv_nifty')} sub={vix != null ? `vs VIX ${fmt.ratio(vix)}` : 'India VIX not recorded'} />
-      <Metric label="Straddle" value={value(row, 'atm_straddle_price_nifty')} sub="pts, ATM straddle" />
+    {/* Breadth is a reading of the whole market at the open, not an expected move and not an
+        instrument's own figure. It used to sit as the third card inside "Expected move",
+        where it was neither. It leads the screen on its own line instead. */}
+    <div className="open-breadth field-grid">
+      {row.advance_decline_ratio == null
+        ? <div className="field-card is-empty"><span>Advance / decline</span><strong className="field-empty-headline">Not published</strong><small className="field-empty-reason">NSE releases breadth after 09:20 IST.</small></div>
+        : <div className="field-card"><span>Advance / decline</span><strong>{value(row, 'advance_decline_ratio')}</strong><small>advances per decline</small></div>}
     </div>
 
-    <div className="market-open-move">
-      <span className="section-title">Expected move</span>
-      <div className="market-open-move-grid">
-        <TradeLevels variant="conservative" heading="Conservative" total={fmt.ptsAbs(calc.conservative)}
-          targetPts={calc.target} stopPts={calc.stop} targetRupees={calc.target * 0.5} stopRupees={calc.stop * 0.5} />
-        <TradeLevels variant="aggressive" heading="Aggressive" total={fmt.ptsAbs(calc.aggressive)}
-          targetPts={calc.aggressiveTarget} stopPts={calc.aggressiveStop} targetRupees={calc.aggressiveTarget * 0.5} stopRupees={calc.aggressiveStop * 0.5} />
-        {row.advance_decline_ratio == null
-          ? <EmptyState label="Advance / decline" headline="Not published" reason="NSE releases breadth after 09:20 IST." />
-          : <Metric label="Advance / decline" value={value(row, 'advance_decline_ratio')} sub="advances per decline" />}
-      </div>
-    </div>
+    <OpenInstrument row={row} instrument="NIFTY" heading="Nifty 50" />
+    <OpenInstrument row={row} instrument="SENSEX" heading="Sensex" />
 
     <Disclaimer capturedAt={fmt.timeIST(capturedAt)} />
+  </section>
+}
+
+/* One instrument's open: the four figures it reported, then its expected move.
+   Sensex was absent from this screen entirely while Pre-market, Verdict and Post-market all
+   carry both -- every field it needs was already populated and calculateVerdict already takes
+   'SENSEX'. Nothing here computes anything the other screens do not already compute. */
+function OpenInstrument({ row, instrument, heading }: { row: Row; instrument: Instrument; heading: string }) {
+  const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
+  const calc = calculateVerdict(row, instrument)
+  const gapKey = `gap_points_${suffix}`
+  const gapPts = row[gapKey] != null ? Number(row[gapKey]) : null
+  const prevClose = row[`prev_close_${suffix}`] != null ? Number(row[`prev_close_${suffix}`]) : null
+  const gapPct = gapPts != null && prevClose ? (gapPts / prevClose) * 100 : null
+  const vix = row.india_vix != null ? Number(row.india_vix) : null
+  // The move estimates come off the straddle and the 5-day average. Without both, the table
+  // would print a confident 0.0 pts rather than saying it does not know.
+  const hasMove = row[`atm_straddle_price_${suffix}`] != null && row[`avg_move_5d_${suffix}`] != null
+
+  const scenarios = [
+    { name: 'Conservative', move: calc.conservative, target: calc.target, stop: calc.stop },
+    { name: 'Aggressive', move: calc.aggressive, target: calc.aggressiveTarget, stop: calc.aggressiveStop },
+  ]
+
+  return <section className="metric-group open-instrument">
+    <div className="group-heading"><h3>{heading} — at the open</h3></div>
+
+    <div className="field-grid">
+      <div className="field-card"><span>Opening points</span><strong className={tone(row, gapKey)}>{value(row, gapKey)}</strong><small>{gapPct != null ? `${fmt.pct(gapPct)} vs prev close` : 'Previous close not recorded'}</small></div>
+      <div className="field-card"><span>Previous close</span><strong>{value(row, `prev_close_${suffix}`)}</strong></div>
+      <div className="field-card"><span>ATM IV</span><strong>{value(row, `atm_iv_${suffix}`)}</strong><small>{vix != null ? `vs VIX ${fmt.ratio(vix)}` : 'India VIX not recorded'}</small></div>
+      <div className="field-card"><span>ATM straddle</span><strong>{value(row, `atm_straddle_price_${suffix}`)}</strong><small>pts</small></div>
+    </div>
+
+    {/* Conservative and Aggressive were two identical cards side by side, each with its total
+        floating far right of its label and points and rupees colliding in the rows. As a table
+        the four figures form real columns you can run an eye down. */}
+    <div className="open-move">
+      <span className="section-title">Expected move</span>
+      {hasMove
+        ? <table className="open-move-table">
+            <thead>
+              <tr>
+                <th scope="col">Scenario</th>
+                <th scope="col">Move</th>
+                <th scope="col">Target</th>
+                <th scope="col">Stop-loss</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scenarios.map((s) => <tr key={s.name}>
+                <th scope="row">{s.name}</th>
+                <td><span className="num">{fmt.ptsAbs(s.move)}</span></td>
+                <td><span className="num positive">{fmt.pts(Math.abs(s.target))}</span> <em>{fmt.rupees(s.target * 0.5)}</em></td>
+                <td><span className="num negative">{fmt.pts(-Math.abs(s.stop))}</span> <em>{fmt.rupees(s.stop * 0.5)}</em></td>
+              </tr>)}
+            </tbody>
+          </table>
+        : <p className="open-move-empty">No straddle or 5-day average recorded for {heading} this session, so no move is estimated.</p>}
+      {hasMove && <p className="open-move-note">Rupee figures are per lot at 0.5 delta.</p>}
+    </div>
   </section>
 }
 
