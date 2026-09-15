@@ -363,9 +363,16 @@
 
 /* ---- 13 · session picker and archived mode -------------------------------
    A dashboard showing Friday's recommendation that looks like today's is how
-   someone acts on a stale call. Archived mode is deliberately loud: a bar that
-   cannot be missed, and an --info accent that appears nowhere else in the
-   product, so the state registers before anything has been read. */
+   someone acts on a stale call, so archived mode is deliberately loud: a bar
+   that cannot be missed, and an accent that carries across the topbar, the bar
+   and the exit button, so the state registers before anything is read.
+
+   The accent is --up, by request. Worth knowing what that costs: --up otherwise
+   means "this value rose", and spending it on a chrome state is the same class
+   of overload the audit raises as F-01. It is milder here -- the archive bar is
+   not a figure, so nothing green in it can be misread as a number going up --
+   but green now means two things in the product. --info was chosen originally
+   because it meant nothing else. One line to switch back if it reads wrong. */
 .app-shell.app-shell .session-picker {
   display: inline-flex;
   align-items: stretch;
@@ -410,7 +417,7 @@
   cursor: pointer;
 }
 .app-shell.app-shell .session-today:hover { color: var(--ink); }
-.app-shell.app-shell .topbar-date-archived { color: var(--info); font-weight: 600; }
+.app-shell.app-shell .topbar-date-archived { color: var(--up); font-weight: 600; }
 
 .app-shell.app-shell .archive-bar {
   display: flex;
@@ -419,14 +426,17 @@
   gap: 8px 14px;
   padding: 10px clamp(18px, 4vw, 58px);
   border-bottom: 1px solid var(--border);
-  border-left: 3px solid var(--info);
-  background: color-mix(in srgb, var(--info) 11%, var(--ground));
+  border-left: 3px solid var(--up);
+  /* 6%, not 11%. The green sits on its own tint, so a heavier wash darkens the ground
+     under light-mode's #137a4b and drops it to 4.28:1 -- under the floor, in the theme the
+     screenshot was taken in. At 6% it measures 4.60:1 light and 6.19:1 dark. */
+  background: color-mix(in srgb, var(--up) 6%, var(--ground));
 }
 .app-shell.app-shell .archive-bar-tag {
   font: 600 var(--text-label) var(--font-sans);
   letter-spacing: .14em;
   text-transform: uppercase;
-  color: var(--info);
+  color: var(--up);
 }
 .app-shell.app-shell .archive-bar-text { font-size: var(--text-meta); color: var(--ink-2); }
 .app-shell.app-shell .archive-bar-text b { color: var(--ink); font-weight: 600; }
@@ -434,14 +444,14 @@
   margin-left: auto;
   min-height: 36px;
   padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--info) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--up) 45%, transparent);
   border-radius: var(--radius-sm);
   background: none;
-  color: var(--info);
+  color: var(--up);
   font: 600 var(--text-label) var(--font-sans);
   cursor: pointer;
 }
-.app-shell.app-shell .archive-bar-exit:hover { background: color-mix(in srgb, var(--info) 14%, transparent); }
+.app-shell.app-shell .archive-bar-exit:hover { background: color-mix(in srgb, var(--up) 14%, transparent); }
 
 /* 44px is the floor, and these are new controls -- no reason to ship them under it. */
 .app-shell.app-shell .session-picker button,
