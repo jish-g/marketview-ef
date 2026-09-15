@@ -610,3 +610,44 @@
    divider belongs to the thing above it. */
 .app-shell.app-shell .review-section-head { padding-bottom: 12px; }
 .app-shell.app-shell .review-section-head + * { margin-top: 26px; }
+
+/* ---- 16 · Trade · separating the two instruments --------------------------
+   The two instrument columns sat 14px apart with no border between them --
+   fine when each was a bordered card, wrong once #84 unboxed them. Their legs,
+   premiums and targets then aligned horizontally across the gap, so
+   "BUY Call (hedge) 23850" and "BUY Call (hedge) 75700" read as one row. The
+   risk is not density, it is that the layout invites reading a Nifty strike
+   against a Sensex premium.
+
+   A hairline between them, and the instrument name given enough weight to
+   anchor its own column. */
+.app-shell.app-shell .trade-grid { gap: 0 40px; }
+.app-shell.app-shell .trade-grid > * + * {
+  border-left: 1px solid var(--border);
+  padding-left: 40px;
+}
+.app-shell.app-shell .trade-grid .verdict-instrument-head {
+  align-items: baseline;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.app-shell.app-shell .trade-grid .verdict-instrument-head h3 {
+  font-size: var(--text-value-sm);
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+/* the strike is the figure most at risk of being read against the wrong
+   instrument, so it holds the right edge of its own column */
+.app-shell.app-shell .trade-grid .leg-row { gap: 10px; }
+.app-shell.app-shell .trade-grid .trade-strike { margin-left: auto; }
+
+@media (max-width: 860px) {
+  .app-shell.app-shell .trade-grid { gap: 28px 0; }
+  .app-shell.app-shell .trade-grid > * + * {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+  }
+}
