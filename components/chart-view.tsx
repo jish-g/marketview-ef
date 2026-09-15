@@ -10,28 +10,17 @@ import { fmt } from '@/lib/format'
 
 type Row = Record<string, string | number | boolean | null>
 type Instrument = 'NIFTY' | 'SENSEX'
-type Span = 'session' | 'week'
+type Span = 'session' | 'history'
 type Bar = { time: UTCTimestamp; open: number; high: number; low: number; close: number }
 
 function todayIST() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 }
 
-// Candle timestamps are true UTC epoch seconds, and lightweight-charts renders a timestamp as
-// UTC. Rather than shifting the data by 19800s (the usual trick, which makes every value in the
-// table a lie about what it is), the axis and crosshair are formatted through Intl in
-// Asia/Kolkata. The numbers stay honest; only the labels are localised.
 const IST_TIME = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false })
 const IST_DAY = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' })
 const IST_FULL = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
 
-// Levels the chart may draw. Every one of these is an index price, which is the only kind of
-// number that belongs on an index price axis.
-//
-// The verdict's target and stop are deliberately absent: those are option PREMIUM points
-// (conservative x 0.6 and x 0.3 of the expected move, captured on a position), not levels the
-// spot is expected to reach. Drawing them here would put a number on the price axis that the
-// index has no relationship to.
 type LevelKey = 'oi' | 'pivot' | 'maxpain' | 'prev'
 const LEVEL_GROUPS: { key: LevelKey; label: string }[] = [
   { key: 'oi', label: 'OI support / resistance' },
@@ -61,8 +50,6 @@ function levelsFor(row: Row, instrument: Instrument): LevelDef[] {
   return defs.filter((d): d is LevelDef => d != null)
 }
 
-// The chart's own read of the session, in words, so the screen answers a question rather than
-// only drawing a picture. Nothing here is asserted that is not in the bars themselves.
 function sessionRead(bars: Bar[], levels: LevelDef[]): string | null {
   if (bars.length < 2) return null
   const first = bars[0]
@@ -73,13 +60,8 @@ function sessionRead(bars: Bar[], levels: LevelDef[]): string | null {
   const flat = Math.abs(changePct) <= 0.05
   const support = levels.find((l) => l.group === 'oi' && l.tone === 'up')
   const resistance = levels.find((l) => l.group === 'oi' && l.tone === 'down')
-
-  // fmt.pct is always signed, so the sign does the work a colour alone must never do (rule 8) --
-  // no "Up"/"Down" word in front of it, which would only repeat the glyph.
   const parts: string[] = []
-  parts.push(flat
-    ? `Flat on the session at ${fmt.level(last.close)}`
-    : `${fmt.pct(changePct)} on the session at ${fmt.level(last.close)}`)
+  parts.push(flat ? `Flat on the session at ${fmt.level(last.close)}` : `${fmt.pct(changePct)} on the session at ${fmt.level(last.close)}`)
   parts.push(`range ${fmt.level(low)}–${fmt.level(high)}`)
   if (resistance && high >= resistance.value) parts.push(`tagged OI resistance at ${fmt.level(resistance.value)}`)
   else if (support && low <= support.value) parts.push(`tagged OI support at ${fmt.level(support.value)}`)
@@ -89,7 +71,7 @@ function sessionRead(bars: Bar[], levels: LevelDef[]): string | null {
 
 export function ChartView({ row }: { row: Row }) {
   const [instrument, setInstrument] = useState<Instrument>('NIFTY')
-  const [span, setSpan] = useState<Span>('session')
+  const [span, setSpan] = useState<Span>('history')
   const [hidden, setHidden] = useState<Set<LevelKey>>(() => new Set<LevelKey>(['prev']))
   const [bars, setBars] = useState<Bar[]>([])
 
@@ -105,47 +87,56 @@ export function ChartView({ row }: { row: Row }) {
   const priceLinesRef = useRef<IPriceLine[]>([])
   const [chartReady, setChartReady] = useState(false)
 
-  // "week" widens to the calendar fortnight behind the session so a five-session backfill lands
-  // inside it whatever public holidays fall in the middle -- trade_date is a date, so a count of
-  // sessions cannot be expressed as a LIMIT without a distinct-day subquery.
+  // Fetch enough calendar days to reliably contain 30 trading sessions, then trim to the
+  // latest 30 distinct trade dates. Holidays and weekends therefore do not shorten the chart.
   const fromDate = useMemo(() => {
     if (span === 'session') return tradeDate
     const d = new Date(`${tradeDate}T00:00:00Z`)
-    d.setUTCDate(d.getUTCDate() - 13)
+    d.setUTCDate(d.getUTCDate() - 60)
     return d.toISOString().slice(0, 10)
   }, [span, tradeDate])
 
   const { data: fetched, error, isLoading } = useSWR<Bar[]>(
-    ['index-candles', instrument, fromDate, tradeDate],
+    ['index-candles', instrument, fromDate, tradeDate, span],
     async () => {
       const { data, error: queryError } = await supabase
         .from('index_candles')
-        .select('bucket, open, high, low, close')
+        .select('bucket, trade_date, open, high, low, close')
         .eq('instrument', instrument)
         .gte('trade_date', fromDate)
         .lte('trade_date', tradeDate)
         .order('bucket', { ascending: true })
       if (queryError) throw queryError
-      return ((data ?? []) as Row[]).map((c) => ({
-        time: Math.floor(new Date(String(c.bucket)).getTime() / 1000) as UTCTimestamp,
-        open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
-      }))
+
+      const mapped = ((data ?? []) as Row[]).map((c) => ({
+        tradeDate: String(c.trade_date ?? ''),
+        bar: {
+          time: Math.floor(new Date(String(c.bucket)).getTime() / 1000) as UTCTimestamp,
+          open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
+        } satisfies Bar,
+      })).filter(({ bar }) => [bar.open, bar.high, bar.low, bar.close].every(Number.isFinite))
+
+      if (span === 'session') return mapped.filter(({ tradeDate: d }) => d === tradeDate).map(({ bar }) => bar)
+
+      const dates = Array.from(new Set(mapped.map(({ tradeDate: d }) => d).filter(Boolean))).sort().slice(-30)
+      const keep = new Set(dates)
+      return mapped.filter(({ tradeDate: d }) => keep.has(d)).map(({ bar }) => bar)
     },
     { revalidateOnFocus: false },
   )
 
   useEffect(() => { setBars(fetched ?? []) }, [fetched])
 
-  // Realtime, not a second poll: index-candle-sync already pulls Kite once a minute, and this
-  // pushes the row it writes straight to the open chart. Only for a live session -- a pinned
-  // past session cannot gain bars.
+  // Live updates are enabled only for the current trading date. Historical sessions remain fixed.
+  // The existing index-candle-sync writes one-minute Kite candles into Supabase, and Realtime
+  // delivers those inserts/updates directly to this chart.
   useEffect(() => {
     if (!isToday) return
     const channel = supabase
       .channel(`index-candles-${instrument}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'index_candles', filter: `instrument=eq.${instrument}` }, (payload) => {
         const next = payload.new as Row | null
-        if (!next?.bucket) return
+        if (!next?.bucket || String(next.trade_date ?? '') !== tradeDate) return
         const bar: Bar = {
           time: Math.floor(new Date(String(next.bucket)).getTime() / 1000) as UTCTimestamp,
           open: Number(next.open), high: Number(next.high), low: Number(next.low), close: Number(next.close),
@@ -162,11 +153,8 @@ export function ChartView({ row }: { row: Row }) {
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [supabase, instrument, isToday])
+  }, [supabase, instrument, isToday, tradeDate])
 
-  // Chart creation. lightweight-charts touches document/canvas on construction, so the library
-  // is imported inside the effect: it never runs during the server render, and it lands in its
-  // own chunk that only the Chart screen pulls.
   useEffect(() => {
     let disposed = false
     let chart: IChartApi | null = null
@@ -188,9 +176,7 @@ export function ChartView({ row }: { row: Row }) {
           borderColor: colors.rule,
           timeVisible: true,
           secondsVisible: false,
-          // TickMarkType: Year 0, Month 1, DayOfMonth 2, Time 3, TimeWithSeconds 4.
-          tickMarkFormatter: (time: number, tickMarkType: number) =>
-            tickMarkType <= 2 ? IST_DAY.format(new Date(time * 1000)) : IST_TIME.format(new Date(time * 1000)),
+          tickMarkFormatter: (time: number, tickMarkType: number) => tickMarkType <= 2 ? IST_DAY.format(new Date(time * 1000)) : IST_TIME.format(new Date(time * 1000)),
         },
         localization: { timeFormatter: (time: number) => `${IST_FULL.format(new Date(time * 1000))} IST` },
       })
@@ -222,21 +208,14 @@ export function ChartView({ row }: { row: Row }) {
       setChartReady(false)
       chart?.remove()
     }
-    // Colours are applied by their own effect below; re-creating the whole chart on a theme
-    // flip would throw away the viewer's pan and zoom.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Data.
   useEffect(() => {
     if (!chartReady || !seriesRef.current) return
     seriesRef.current.setData(bars)
   }, [bars, chartReady])
 
-  // Fit the view once per series identity, and only once its bars have actually arrived: the
-  // fetch is async, so fitting the moment the instrument changes would fit an empty chart and
-  // then leave the real data unfitted. Keyed rather than run on every `bars` change because a
-  // refit each minute would yank the axis out from under someone who had zoomed in.
   const fitKeyRef = useRef('')
   useEffect(() => {
     if (!chartReady || !chartRef.current || bars.length === 0) return
@@ -246,7 +225,6 @@ export function ChartView({ row }: { row: Row }) {
     chartRef.current.timeScale().fitContent()
   }, [bars, chartReady, instrument, span, tradeDate])
 
-  // Theme.
   useEffect(() => {
     if (!chartReady || !chartRef.current || !seriesRef.current) return
     chartRef.current.applyOptions({
@@ -262,7 +240,6 @@ export function ChartView({ row }: { row: Row }) {
     })
   }, [colors, chartReady])
 
-  // Levels.
   useEffect(() => {
     const series = seriesRef.current
     if (!chartReady || !series) return
@@ -295,7 +272,7 @@ export function ChartView({ row }: { row: Row }) {
   return <section className="phase-view chart-view">
     <div className="review-section-head">
       <div>
-        <p className="eyebrow">Price action · {isToday ? 'UPDATES EVERY MINUTE' : `SESSION ${tradeDate}`}</p>
+        <p className="eyebrow">Price action · {isToday ? 'LIVE FROM KITE' : `HISTORY THROUGH ${tradeDate}`}</p>
         <h2>Chart</h2>
       </div>
       <PhaseAside capturedAt={lastBar ? new Date(lastBar.time * 1000).toISOString() : null} />
@@ -310,32 +287,26 @@ export function ChartView({ row }: { row: Row }) {
         ))}
       </div>
       <div className="chart-switch" role="group" aria-label="Range">
-        {([['session', 'This session'], ['week', 'Last 5 sessions']] as [Span, string][]).map(([s, label]) => (
+        {([['history', '30 trading days'], ['session', 'This session']] as [Span, string][]).map(([s, label]) => (
           <button key={s} type="button" className={span === s ? 'is-active' : ''} aria-pressed={span === s} onClick={() => setSpan(s)}>{label}</button>
         ))}
       </div>
-      {lastBar && <span className="chart-last">
-        <span>Last</span><b>{fmt.level(lastBar.close)}</b>
-      </span>}
+      {lastBar && <span className="chart-last"><span>Last</span><b>{fmt.level(lastBar.close)}</b></span>}
     </div>
 
     <div className="chart-frame">
-      {/* The canvas is always mounted so the chart is never torn down and rebuilt between
-          states; the overlay sits on top of it while there is nothing to draw. */}
       <div className="chart-canvas" ref={containerRef} />
       {(isLoading || error || bars.length === 0) && <div className="chart-overlay">
-        {/* A fixed height, not 100%: the overlay centres its child in a grid, where a
-            percentage height has no resolved container height to be a percentage of. */}
         {isLoading
           ? <Skeleton width={480} height={180} />
           : error
-            ? <EmptyState label="Chart" headline="Candles could not be loaded" reason="The request to Supabase failed. The series is unchanged; reopening this screen retries." />
+            ? <EmptyState label="Chart" headline="Candles could not be loaded" reason="The request to Supabase failed. Reopening this screen retries." />
             : <EmptyState
               label="Chart"
-              headline={isToday ? 'No candles recorded for this session yet' : 'No candles on record for this session'}
+              headline={isToday ? 'No live candles recorded yet' : 'No candles on record'}
               reason={isToday
-                ? 'Bars are written once a minute from 9:15 AM IST. Before the first one lands — or on a day the Kite login has not run — there is nothing to draw.'
-                : 'This session pre-dates the candle history, or the sync did not run that day.'} />}
+                ? 'Live one-minute candles appear once the market sync writes the first bar.'
+                : 'The selected history is not present in the candle table.'} />}
       </div>}
     </div>
 
@@ -351,9 +322,8 @@ export function ChartView({ row }: { row: Row }) {
     {read && <p className="chart-read">{read}</p>}
 
     <p className="chart-note">
-      One-minute candles for the index spot, from Zerodha Kite Connect. Levels are the same
-      figures the Verdict screen reads — option-premium targets are not shown here, because they
-      are not index prices.
+      One-minute index spot candles from Zerodha Kite Connect. The chart keeps the latest 30 trading
+      sessions for historical context and receives the current session live through Supabase Realtime.
     </p>
 
     <Disclaimer source="Zerodha Kite Connect" capturedAt={lastBar ? fmt.timeIST(new Date(lastBar.time * 1000).toISOString()) : null} />
