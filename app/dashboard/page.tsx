@@ -684,9 +684,6 @@ function VerdictInstrument({ row, instrument, agentOpen }: { row: Row; instrumen
   const mappedStrategy = useMemo(() => mapRecommendationToStrategy(agentStrategyName), [agentStrategyName])
   const agentBias = agentBiasWord(agentOpen?.agent_bias)
   const agentView = agentRaw(agentOpen, 'view')
-  const invalidationLevelRaw = agentRaw(agentOpen, 'invalidation_level')
-  const invalidationLevel = invalidationLevelRaw != null && Number.isFinite(Number(invalidationLevelRaw)) ? Number(invalidationLevelRaw) : null
-  const invalidationDirection = agentRaw(agentOpen, 'invalidation_direction')
   const autoStrategy = mappedStrategy.strategy
   const isNoTrade = mappedStrategy.noTrade
   const [strategy, setStrategy] = useState<StrategyChoice>(autoStrategy)
@@ -852,20 +849,11 @@ function VerdictInstrument({ row, instrument, agentOpen }: { row: Row; instrumen
           {/* The strategy is the answer; the one-line view sits under it, then the reasoning with the view prefix stripped. */}
           <strong className={`verdict-answer-value ${strategyAnswerTone(agentOpen.agent_strategy)}`}>{agentStrategyName}</strong>
           {agentView && <p className="verdict-answer-view">{agentView}</p>}
-          {agentOpen.confidence && <div className="agent-badges"><span className="ds-badge ds-badge--outline">Confidence {agentOpen.confidence}</span></div>}
+          {(agentOpen.confidence || agentOpen.guardrail_applied) && <div className="agent-badges">{agentOpen.confidence && <span className="ds-badge ds-badge--outline">Confidence {agentOpen.confidence}</span>}{agentOpen.guardrail_applied && <span className="ds-badge ds-badge--caution agent-guardrail">Risk limit applied: {agentOpen.guardrail_applied}</span>}</div>}
           <p className="verdict-answer-note">{stripManualHint(stripViewPrefix(agentOpen.reasoning, agentView), isNoTrade)}</p>
           {agentOpen.invalidation && <p className="agent-wrong-if">Wrong if — {agentOpen.invalidation}</p>}
         </> : <p className="verdict-answer-note">View of record lands at 09:35 IST.</p>}
       </div>
-      {agentOpen && <div className="agent-ledger">
-        <Label>How it was read</Label>
-        <div className="field-card"><span>Bias</span><strong>{agentOpen.agent_bias ?? 'Not stated'}</strong></div>
-        <div className="field-card"><span>Readiness</span><strong>{agentRaw(agentOpen, 'readiness') ?? 'Not stated'}</strong></div>
-        <div className="field-card"><span>IV</span><strong>{agentRaw(agentOpen, 'iv_condition') ?? 'Not stated'}</strong></div>
-        {calc.dte > 0 && <div className="field-card"><span>Days to expiry</span><strong>{calc.dte} day{calc.dte === 1 ? '' : 's'}</strong></div>}
-        {invalidationLevel != null && <div className="field-card"><span>Invalidation level</span><strong>{fmt.level(invalidationLevel)}{invalidationDirection ? ` ${invalidationDirection}` : ''}</strong></div>}
-        {agentOpen.guardrail_applied && <span className="ds-badge ds-badge--caution agent-guardrail">Risk limit applied: {agentOpen.guardrail_applied}</span>}
-      </div>}
     </div>
     <div className="verdict-card verdict-strategy-summary">
       <div className="verdict-strategy-box">
