@@ -14,12 +14,10 @@
 // exchange's own OHLC, so a wick between two polls is not lost.
 //
 // THE DAILY TOKEN
-// Kite access tokens expire every morning and are re-minted by an interactive login -- the same
-// manual step gift-nifty-fetch already depends on at 08:45. This function inherits it rather than
-// adding a second one. Before that login has happened, Kite answers 403/TokenException; this
-// function then writes nothing and returns ok:false with reason "kite_session_missing" (HTTP 200,
-// so a minutely pg_cron job does not fill the logs with failures). The chart shows the gap in
-// words, exactly as the pre-market gap fields already do when the same login has not run.
+// Kite access tokens expire every morning and are re-minted by the existing interactive login.
+// The token is already persisted in kite_session, which is the shared session source used by the
+// rest of the Kite pipeline. This function reads that session instead of maintaining a second
+// Vault copy that could drift from the token refreshed by the daily login.
 //
 // Modes (POST body { mode, days? }, same x-cron-secret as market-data-sync):
 //   session    every minute 09:15-15:30 IST -> today's bars from 09:15 to now. No-ops off-session.
@@ -29,11 +27,9 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const KITE_BASE = "https://api.kite.trade";
 
-// Vault secret names. If gift-nifty-fetch already stores the Kite credentials under different
-// names, change these to match rather than adding a second copy -- two stored copies of one
-// daily token drift apart the first time a login only refreshes one of them.
+// API key and cron secret remain in Vault. The daily access token lives in kite_session because
+// the interactive login refreshes that row each morning.
 const KITE_API_KEY_SECRET = "kite_api_key";
-const KITE_ACCESS_TOKEN_SECRET = "kite_access_token";
 
 // Instrument tokens from Kite's instruments dump (https://api.kite.trade/instruments). Index
 // spots, so the candles carry no meaningful volume -- the chart does not draw any.
@@ -188,9 +184,23 @@ Deno.serve(async (req: Request) => {
   }
 
   const { data: apiKey } = await admin.rpc("get_vault_secret", { secret_name: KITE_API_KEY_SECRET });
-  const { data: accessToken } = await admin.rpc("get_vault_secret", { secret_name: KITE_ACCESS_TOKEN_SECRET });
-  if (!apiKey || !accessToken) {
-    return new Response(JSON.stringify({ ok: false, mode, reason: "kite_session_missing", detail: "kite_api_key / kite_access_token not in vault" }), { status: 200 });
+
+  // Reuse the token produced by the existing daily Kite login. This is intentionally read from
+  // the table rather than Vault: kite_session is the source of truth that gets refreshed each day.
+  const { data: sessionRow, error: sessionError } = await admin
+    .from("kite_session")
+    .select("access_token, updated_at")
+    .eq("id", true)
+    .maybeSingle();
+
+  const accessToken = sessionRow?.access_token;
+  if (sessionError || !apiKey || !accessToken) {
+    return new Response(JSON.stringify({
+      ok: false,
+      mode,
+      reason: "kite_session_missing",
+      detail: sessionError ? `kite_session read failed: ${sessionError.message}` : "daily Kite session is not available",
+    }), { status: 200 });
   }
 
   const today = todayIST();
