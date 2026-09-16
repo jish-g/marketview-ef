@@ -96,6 +96,28 @@ function sessionsBackIST(days: number): string {
   return todayIST(d);
 }
 
+// Backfill windows. One Kite request per window per instrument, each written before the next is
+// fetched, so memory stays bounded however long the range is: a single 30-session request holds
+// ~11k candles plus the diff against the table, which is past the Edge Function limit.
+// Windows are consecutive calendar spans of SLICE_SESSIONS weekdays, oldest first.
+const SLICE_SESSIONS = 5;
+
+function backfillWindows(days: number, to: string): { from: string; to: string }[] {
+  const windows: { from: string; to: string }[] = [];
+  let upper = to;
+  for (let back = 0; back < days; back += SLICE_SESSIONS) {
+    const span = Math.min(SLICE_SESSIONS, days - back);
+    const lowerDate = sessionsBackIST(back + span);
+    const lower = kiteStamp(lowerDate, "09:15:00");
+    windows.push({ from: lower, to: upper });
+    // Next window ends the evening before this one starts, so no minute is fetched twice.
+    const prev = new Date(`${lowerDate}T00:00:00Z`);
+    prev.setUTCDate(prev.getUTCDate() - 1);
+    upper = kiteStamp(prev.toISOString().slice(0, 10), "15:30:00");
+  }
+  return windows.reverse();
+}
+
 // ---------------------------------------------------------------------------------------------
 // Kite historical fetch. Returns null (rather than throwing) when the day's login has not
 // happened, so the caller can report that distinctly from a genuine fault.
@@ -177,7 +199,7 @@ Deno.serve(async (req: Request) => {
   let body: { mode?: string; days?: number } = {};
   try { body = await req.json(); } catch { /* no body -> session mode */ }
   const mode = body.mode === "backfill" ? "backfill" : "session";
-  const days = Math.min(Math.max(Number(body.days ?? 5), 1), 30);
+  const days = Math.min(Math.max(Number(body.days ?? 5), 1), 45);
 
   if (mode === "session" && !withinSessionIST()) {
     return new Response(JSON.stringify({ ok: true, mode, skipped: "outside market hours" }), { status: 200 });
@@ -214,12 +236,19 @@ Deno.serve(async (req: Request) => {
   const skipped: string[] = [];
   let tokenMissing = false;
 
-  for (const { instrument, token } of INSTRUMENTS) {
-    const result = await fetchCandles(instrument, token, from, to, String(apiKey), String(accessToken));
+  const windows = mode === "backfill" ? backfillWindows(days, to) : [{ from, to }];
+
+  for (const { instrument, token } of INSTRUMENTS) for (const w of windows) {
+    if (tokenMissing) break;
+    const result = await fetchCandles(instrument, token, w.from, w.to, String(apiKey), String(accessToken));
 
     if ("tokenMissing" in result) { tokenMissing = true; skipped.push(`${instrument}: Kite session not established for today`); continue; }
     if ("error" in result) { skipped.push(`${instrument}: ${result.error}`); continue; }
-    if (result.candles.length === 0) { skipped.push(`${instrument}: no candles in range (market holiday, or session not open yet)`); continue; }
+    if (result.candles.length === 0) {
+      // Expected for a window that is all holidays, or session mode before the first bar.
+      if (mode === "session") skipped.push(`${instrument}: no candles in range (market holiday, or session not open yet)`);
+      continue;
+    }
 
     const first = result.candles[0].bucket;
     const last = result.candles[result.candles.length - 1].bucket;
@@ -235,19 +264,20 @@ Deno.serve(async (req: Request) => {
     for (const r of (existingRows ?? []) as Candle[]) existing.set(`${r.instrument}|${new Date(r.bucket).toISOString()}`, r);
 
     const rows = changedRows(result.candles, existing);
-    if (rows.length === 0) { written[instrument] = 0; continue; }
+    if (rows.length === 0) { written[instrument] = written[instrument] ?? 0; continue; }
 
     const { error: writeError } = await admin
       .from("index_candles")
       .upsert(rows.map((r) => ({ ...r, updated_at: new Date().toISOString() })), { onConflict: "instrument,bucket" });
     if (writeError) { skipped.push(`${instrument}: upsert: ${writeError.message}`); continue; }
-    written[instrument] = rows.length;
+    written[instrument] = (written[instrument] ?? 0) + rows.length;
   }
 
   return new Response(JSON.stringify({
     ok: !tokenMissing,
     mode,
     range: { from, to },
+    ...(mode === "backfill" ? { windows: windows.length } : {}),
     written,
     ...(tokenMissing ? { reason: "kite_session_missing" } : {}),
     ...(skipped.length ? { skipped } : {}),
