@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { createClient } from '@/lib/supabase/client'
-import { Disclaimer, EmptyState, Skeleton } from '@/components/ui/ds'
+import { DeltaValue, Disclaimer, EmptyState, Skeleton } from '@/components/ui/ds'
 
 // GlobalCue/News: the Global View. Reads the newest global_context row (calculated by the
 // deterministic engine in supabase/functions/global-context-sync/intelligence), the latest market_snapshots
@@ -19,7 +19,11 @@ type ContextRow = {
   confidence: 'High' | 'Medium' | 'Low'; confidence_detail: { coverage?: number; oldestInputMin?: number | null; note?: string }
   global_drivers: Driver[]; india_drivers: Driver[]; channels: string[]; counterforces: string[]
   what_is_driving: string[]; explanation: string
+  measured?: Measured | null; asset_stats?: AssetStat[]
 }
+type AssetStat = { asset: string; label: string; group: string; sessions: number; ret5: number | null; ret20: number | null; vol20: number | null; z: number | null }
+type Measured = { correlation20: number | null; beta20: number | null; pairs: number; relPerf20: number | null; niftyRet20: number | null; spxRet20: number | null; label: string; reading: string }
+type EventRow = { id: number; event_time: string; updated_at: string; category: string; title: string; summary: string; affected_assets: string[]; market_direction: string; global_relevance: number; india_relevance: number; confidence: number; india_impact: string; sources: { type: string; source: string; detail?: string }[]; evidence: { z?: number } }
 type SnapshotRow = { asset: string; label: string; cue_group: string; price: number; change_pct: number | null; source_ts: string; ingested_at: string }
 type NewsRow = { url: string; source: string; title: string; published_at: string | null }
 
@@ -80,18 +84,19 @@ export function GlobalCuesView() {
   const today = todayIST()
 
   const { data, error, isLoading } = useSWR(['global-context', today], async () => {
-    const [ctx, snaps, news] = await Promise.all([
+    const [ctx, snaps, news, events] = await Promise.all([
       supabase.from('global_context').select('*').order('calculated_at', { ascending: false }).limit(1).maybeSingle(),
       // Latest row per asset: pull the newest 200 and de-duplicate client-side, which keeps this a
       // single indexed query instead of a DISTINCT ON the anon role cannot run through PostgREST.
       supabase.from('market_snapshots').select('asset, label, cue_group, price, change_pct, source_ts, ingested_at').order('source_ts', { ascending: false }).limit(200),
       supabase.from('market_news').select('url, source, title, published_at').eq('trade_date', today).order('published_at', { ascending: false, nullsFirst: false }).limit(12),
+      supabase.from('market_events').select('*').eq('status', 'active').gte('event_time', new Date(Date.now() - 36 * 3600_000).toISOString()).order('india_relevance', { ascending: false }).order('event_time', { ascending: false }).limit(8),
     ])
     if (ctx.error) throw ctx.error
     const seen = new Set<string>()
     const latest: SnapshotRow[] = []
     for (const r of (snaps.data ?? []) as SnapshotRow[]) { if (!seen.has(r.asset)) { seen.add(r.asset); latest.push(r) } }
-    return { ctx: (ctx.data as ContextRow | null) ?? null, snaps: latest, news: (news.data ?? []) as NewsRow[] }
+    return { ctx: (ctx.data as ContextRow | null) ?? null, snaps: latest, news: (news.data ?? []) as NewsRow[], events: (events.data ?? []) as EventRow[] }
   }, { revalidateOnFocus: true, refreshInterval: 60_000 })
 
   const ctx = data?.ctx ?? null
@@ -145,7 +150,33 @@ export function GlobalCuesView() {
           <div className="group-heading"><h3>India drivers</h3></div>
           {ctx.india_drivers.length ? <DriverGrid drivers={ctx.india_drivers} /> : <p className="chart-note">No India-side inputs were available for this run.</p>}
         </section>
+
+        <section className="metric-group">
+          <div className="group-heading"><h3>India vs global, measured</h3></div>
+          {ctx.measured && ctx.measured.correlation20 != null ? <div className="field-grid measured-grid">
+            <div className="field-card"><span>20-day correlation with prior US session</span><strong><em className={`ds-badge ds-badge--${ctx.measured.label === 'Strong' ? 'down' : ctx.measured.label === 'Moderate' ? 'caution' : 'neutral'}`}>{ctx.measured.label}</em> {ctx.measured.correlation20.toFixed(2)}</strong><small>beta {ctx.measured.beta20?.toFixed(2) ?? 'n/a'} over {ctx.measured.pairs} sessions</small></div>
+            <div className="field-card"><span>Nifty vs S&amp;P 500, 20 days</span><strong>{ctx.measured.relPerf20 != null ? <DeltaValue value={ctx.measured.relPerf20} showArrow /> : 'n/a'}</strong><small>Nifty {fmtPct(ctx.measured.niftyRet20)} · S&amp;P {fmtPct(ctx.measured.spxRet20)}</small></div>
+            <div className="field-card measured-reading"><span>Reading</span><small>{ctx.measured.reading}</small></div>
+          </div> : <p className="chart-note">{ctx.measured?.reading ?? 'History is still being collected; correlation appears after enough sessions are stored.'}</p>}
+        </section>
       </>}
+
+    <section className="metric-group">
+      <div className="group-heading"><h3>Significant moves</h3></div>
+      {!data?.events.length
+        ? <p className="chart-note">No instrument has moved beyond its usual daily range in the last 36 hours. Moves are flagged when a change exceeds a configurable multiple of that instrument&apos;s own 20-day volatility.</p>
+        : <div className="events-grid">{data.events.map((e) => <article className={`event-card event-card--${e.market_direction}`} key={e.id}>
+          <header><strong>{e.title}</strong><span className={`ds-badge ${e.market_direction === 'risk_off' ? 'ds-badge--down' : e.market_direction === 'risk_on' ? 'ds-badge--up' : 'ds-badge--neutral'}`}>{e.market_direction === 'risk_off' ? 'Risk-off' : e.market_direction === 'risk_on' ? 'Risk-on' : 'Neutral'}</span></header>
+          <p className="event-what"><b>What happened.</b> {e.summary}</p>
+          <p className="event-why"><b>Why it matters for India.</b> {e.india_impact || 'Driver unclear.'}</p>
+          <footer>
+            <span>India relevance <b>{Math.round(Number(e.india_relevance) * 100)}%</b></span>
+            <span>Confidence <b>{Math.round(Number(e.confidence) * 100)}%</b></span>
+            <span>{ago(e.updated_at, now)}</span>
+            <span className="event-source">{(e.sources ?? []).map((s) => s.source).join(', ') || 'quant'}</span>
+          </footer>
+        </article>)}</div>}
+    </section>
 
     {data && data.snaps.length > 0 && <section className="metric-group">
       <div className="group-heading"><h3>Market basket</h3></div>
@@ -155,12 +186,12 @@ export function GlobalCuesView() {
           if (!rows.length) return null
           return <div className="basket-group" key={g.key}>
             <span className="history-beat-label">{g.label}</span>
-            {rows.map((s) => <div className="basket-row" key={s.asset}>
+            {rows.map((s) => { const st = ctx?.asset_stats?.find((a) => a.asset === s.asset); return <div className="basket-row" key={s.asset}>
               <span className="basket-label">{s.label}</span>
               <b className="ds-num">{fmtPrice(s.asset, Number(s.price))}</b>
               <em className={`ds-badge ds-badge--${pctTone(s.change_pct == null ? null : Number(s.change_pct))}`}>{fmtPct(s.change_pct == null ? null : Number(s.change_pct))}</em>
-              <small title={`Quote time ${IST_DAY.format(new Date(s.source_ts))} IST · fetched ${ago(s.ingested_at, now)}`}>{ago(s.source_ts, now)}</small>
-            </div>)}
+              <small title={`Quote time ${IST_DAY.format(new Date(s.source_ts))} IST · fetched ${ago(s.ingested_at, now)}`}>{ago(s.source_ts, now)}{st?.ret20 != null ? ` · 20d ${fmtPct(st.ret20)}` : ''}{st?.z != null && Math.abs(st.z) >= 1.5 ? ` · ${Math.abs(st.z).toFixed(1)}σ` : ''}</small>
+            </div> })}
           </div>
         })}
       </div>
@@ -172,7 +203,7 @@ export function GlobalCuesView() {
         : !data?.news.length
           ? <p className="chart-note">No headlines on record for today. Pulled from Economic Times, Livemint and NDTV Profit at 08:30 and 09:05 IST.</p>
           : <ul className="news-list">{data.news.map((n) => <li key={n.url}><a href={n.url} target="_blank" rel="noopener noreferrer">{n.title}</a><small>{n.source}{n.published_at ? ` · ${IST_CLOCK.format(new Date(n.published_at))} IST` : ''}</small></li>)}</ul>}
-      <p className="chart-note">Raw feed for now. Event clustering and the explanation of which headlines map to which move arrive in the next phase.</p>
+      <p className="chart-note">Raw feed for now. Linking headlines to the significant moves above arrives in the next phase.</p>
     </section>
 
     <p className="chart-note">

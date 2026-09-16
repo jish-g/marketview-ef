@@ -11,6 +11,7 @@ import {
   REGIME_RULES, TRANSMISSION, VIX_LEVEL,
   type Band, type Regime, type Tone,
 } from "./config.ts";
+import type { Measured } from "./analytics.ts";
 
 export type Quote = { symbol: string; last: number; changePct: number | null; sourceTs: string | null };
 
@@ -32,6 +33,7 @@ export type Transmission = {
   tone: Tone;
   channels: string[];      // evidence that transmission is active
   counterforces: string[]; // India-specific factors pushing the other way
+  measured: string | null; // one-line reading of the 20-day correlation, when history allows
 };
 
 export type ContextResult = {
@@ -143,16 +145,24 @@ export function scoreGlobal(quotes: Quote[]): { score: number; band: Band; tone:
 }
 
 // ------------------------------------------------------------------------------- india
-export function scoreIndia(quotes: Quote[], india: IndiaInputs): { score: number; band: Band; tone: Tone; drivers: Driver[]; components: Record<string, number | null> } {
+const IST_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
+
+export function scoreIndia(quotes: Quote[], india: IndiaInputs, now = new Date()): { score: number; band: Band; tone: Tone; drivers: Driver[]; components: Record<string, number | null> } {
   const q = quoteMap(quotes);
   const C = INDIA_COMPONENTS;
   const comp: Record<string, number | null> = {};
   const readings: Record<string, string> = {};
+  const todayIST = IST_DAY.format(now);
 
+  // An Indian index quote stamped before today's session is yesterday's close change: say so,
+  // rather than presenting it as today's move next to a live Nifty.
   const idx = (sym: string, key: keyof typeof C, label: string) => {
     const v = q.get(sym);
     comp[key] = v?.changePct == null ? null : clamp(v.changePct / C[key].scale);
-    if (v?.changePct != null) readings[key] = `${label} ${pct(v.changePct)} at ${v.last.toFixed(0)}`;
+    if (v?.changePct != null) {
+      const stale = v.sourceTs != null && IST_DAY.format(new Date(v.sourceTs)) !== todayIST;
+      readings[key] = `${label} ${pct(v.changePct)} at ${v.last.toFixed(0)}${stale ? " (last session)" : ""}`;
+    }
   };
   idx("^NSEI", "nifty", "Nifty 50");
   idx("^BSESN", "sensex", "Sensex");
@@ -197,7 +207,7 @@ function buildDrivers(comp: Record<string, number | null>, weights: Record<strin
 }
 
 // ------------------------------------------------------------------------ transmission
-export function assessTransmission(g: { score: number; components: Record<string, number | null> }, i: { score: number; components: Record<string, number | null> }): Transmission {
+export function assessTransmission(g: { score: number; components: Record<string, number | null> }, i: { score: number; components: Record<string, number | null> }, measured?: Measured | null): Transmission {
   const channels: string[] = [];
   const counterforces: string[] = [];
   const gc = g.components, ic = i.components;
@@ -232,7 +242,15 @@ export function assessTransmission(g: { score: number; components: Record<string
   else if (iAbs >= gAbs * TRANSMISSION.moderateRatio) { label = channels.length ? "Moderate global influence" : "India moving in line with global markets"; tone = "caution"; }
   else { label = "Limited global influence"; tone = "neutral"; }
 
-  return { label, tone, channels, counterforces };
+  // Measured history refines the day's read: a strong 20-day correlation upgrades an aligned
+  // "Moderate" to "Strong"; a weak one downgrades a channel-less "Strong" to "Moderate".
+  if (measured?.correlation20 != null && same && gAbs >= QUIET && iAbs >= QUIET) {
+    if (measured.label === "Strong" && measured.correlation20 > 0 && label === "Moderate global influence") { label = "Strong global influence"; tone = g.score < 0 ? "down" : "up"; }
+    if (measured.label === "Weak" && label === "Strong global influence" && channels.length === 0) { label = "Moderate global influence"; tone = "caution"; }
+    if (measured.label === "Strong" && measured.correlation20 > 0 && label === "India moving in line with global markets") { label = "Moderate global influence"; tone = "caution"; }
+  }
+
+  return { label, tone, channels, counterforces, measured: measured?.reading ?? null };
 }
 
 // ------------------------------------------------------------------------------ regime
@@ -310,10 +328,10 @@ export function assessConfidence(quotes: Quote[], india: IndiaInputs, gComp: Rec
 }
 
 // -------------------------------------------------------------------------------- main
-export function computeContext(quotes: Quote[], india: IndiaInputs, now = new Date()): ContextResult {
+export function computeContext(quotes: Quote[], india: IndiaInputs, now = new Date(), measured?: Measured | null): ContextResult {
   const g = scoreGlobal(quotes);
-  const i = scoreIndia(quotes, india);
-  const transmission = assessTransmission(g, i);
+  const i = scoreIndia(quotes, india, now);
+  const transmission = assessTransmission(g, i, measured);
   const regime = classifyRegime(g.components, g.raw);
   const confidence = assessConfidence(quotes, india, g.components, i.components, now);
   const sourceTimes = quotes.map((q) => q.sourceTs).filter((t): t is string => !!t).sort();
@@ -324,5 +342,7 @@ export function computeContext(quotes: Quote[], india: IndiaInputs, now = new Da
     transmission, regime, confidence,
     dataAsOf: sourceTimes.length ? sourceTimes[sourceTimes.length - 1] : null,
   };
-  return { ...partial, ...explain(partial) };
+  const narrative = explain(partial);
+  if (measured?.correlation20 != null) narrative.explanation += ` ${measured.reading}`;
+  return { ...partial, ...narrative };
 }

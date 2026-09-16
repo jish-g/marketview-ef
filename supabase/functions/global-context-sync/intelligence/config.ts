@@ -111,3 +111,43 @@ export const CONFIDENCE = { highCoverage: 0.8, mediumCoverage: 0.6, highMaxAgeMi
 
 // Cadence the sync is expected to run at; the frontend uses this to label a row as stale.
 export const EXPECTED_REFRESH_MIN = 15;
+
+// ------------------------------------------------------------------ history & analytics
+// Daily history behind momentum, realised volatility, z-scores and measured transmission.
+export const HISTORY = {
+  backfillRange: "6mo",      // Yahoo range used when an asset has too little history on record
+  minSessions: 30,           // below this many stored days an asset is backfilled on the next run
+  lookbackDays: 20,          // window for realised vol, correlation, beta, relative performance
+  shortDays: 5,              // short momentum window
+  minPairs: 12,              // minimum aligned India/US pairs before a correlation is trusted
+};
+
+// A day's move is "significant" when |z| (today's % change over 20-day realised daily vol)
+// crosses these. Events are only raised for significant moves.
+export const MOVE_THRESHOLDS = { significant: 1.5, extreme: 2.5, minAbsPct: 0.5 };
+
+// Measured transmission: 20-day correlation of Nifty's daily return with the prior US session.
+export const CORRELATION = { strong: 0.5, moderate: 0.3 };
+
+// How much a move in each group typically matters for India (0..1), and for the world.
+export const RELEVANCE: Record<string, { india: number; global: number }> = {
+  us_equity: { india: 0.7, global: 0.9 }, us_futures: { india: 0.7, global: 0.8 }, volatility: { india: 0.7, global: 0.9 },
+  rates: { india: 0.8, global: 0.9 }, dollar: { india: 0.8, global: 0.8 }, crude: { india: 0.9, global: 0.7 },
+  metals: { india: 0.3, global: 0.5 }, asia: { india: 0.5, global: 0.6 }, china: { india: 0.4, global: 0.6 },
+  europe: { india: 0.4, global: 0.6 }, india: { india: 1.0, global: 0.3 },
+};
+
+// Hedged one-liners on why a move in this group matters for India. Templates, not claims.
+export const INDIA_IMPACT: Record<string, { up: string; down: string }> = {
+  crude:      { up: "Higher crude tends to widen India's import bill and pressure the rupee and rate-sensitive sectors.", down: "Softer crude is usually supportive for India's trade balance, inflation outlook and OMC margins." },
+  rates:      { up: "Rising US yields tend to weigh on FII flows into Indian equities and on the rupee.", down: "Falling US yields usually ease pressure on FII flows and emerging-market currencies including the rupee." },
+  dollar:     { up: "A stronger dollar is typically associated with rupee weakness and foreign outflows from India.", down: "A weaker dollar usually supports the rupee and risk appetite for emerging markets." },
+  volatility: { up: "A jump in the VIX often precedes risk-off flows that reach India through FII selling.", down: "A falling VIX is consistent with improving global risk appetite, which tends to support Indian equities." },
+  us_equity:  { up: "A strong US session tends to set a positive tone for GIFT Nifty and the Indian open.", down: "A weak US session often carries into a soft Indian open via GIFT Nifty and FII positioning." },
+  us_futures: { up: "Firmer US futures usually lift GIFT Nifty ahead of the Indian open.", down: "Weaker US futures usually weigh on GIFT Nifty ahead of the Indian open." },
+  asia:       { up: "Broad strength across Asian markets is consistent with regional risk appetite supporting India.", down: "Weakness across Asia points to regional risk-off pressure that India rarely escapes fully." },
+  china:      { up: "A China rally can pull some emerging-market flows toward China and away from India.", down: "China weakness can redirect emerging-market allocations toward India, though it also dents regional sentiment." },
+  europe:     { up: "European strength is mildly supportive for global risk appetite.", down: "European weakness adds to global caution but has limited direct transmission to India." },
+  metals:     { up: "Gold strength often signals defensive positioning; copper strength points to growth optimism.", down: "Falling gold suggests less demand for safety; falling copper points to growth concerns." },
+  india:      { up: "A direct move in Indian benchmarks.", down: "A direct move in Indian benchmarks." },
+};

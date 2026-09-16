@@ -1,20 +1,24 @@
 // global-context-sync
-// v1: the quantitative half of the Global → India intelligence engine.
+// v2: the quantitative half of the Global → India intelligence engine, now with history.
 //
 // Every run: pull the basket in ./intelligence/config.ts from Yahoo Finance's free chart
-// endpoint, upsert each quote into market_snapshots (keyed on the exchange's own quote time, so a
-// closed market adds no rows), read the India-side inputs the existing pipeline already stores,
-// run the deterministic engine, and append one global_context row. No LLM here: numbers, bands,
-// transmission and regime all come from engine.ts and are traceable to the inputs column.
+// endpoint (one call per symbol returns the live quote AND the last few daily bars), upsert the
+// live quote into market_snapshots and the daily bars into market_daily, read the India-side
+// inputs the existing pipeline already stores, run the deterministic engine plus the history
+// analytics (momentum, realised vol, z-scores, measured Nifty-vs-US correlation), raise
+// quantitative 'price_move' events for moves beyond the configured multiple of an instrument's
+// own volatility, and append one global_context row. No LLM here.
 //
-// Nothing else in the pipeline is touched: never reads or writes agent_calls, trades, blog_posts;
-// reads premarket_dashboard / postmarket_summary / gift_nifty_staging only.
+// Self-healing backfill: an asset with fewer than HISTORY.minSessions stored days is fetched with
+// the long range on that run, so the first run after deploy fills six months by itself.
 //
-// POST body: {} -- same x-cron-secret as the other cron'd functions. Safe to re-run any time.
+// Nothing else in the pipeline is touched: reads premarket_dashboard / postmarket_summary only.
+// POST body: {} or {"mode":"backfill"} -- same x-cron-secret as the other cron'd functions.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { BASKET } from "./intelligence/config.ts";
+import { BASKET, HISTORY } from "./intelligence/config.ts";
 import { computeContext, type IndiaInputs, type Quote } from "./intelligence/engine.ts";
+import { computeStats, detectMoves, measureTransmission, type DailyBar } from "./intelligence/analytics.ts";
 
 const FETCH_TIMEOUT_MS = 12_000;
 const UA = "Mozilla/5.0 (compatible; MarketCue/1.0; +https://marketcue.in)";
@@ -23,20 +27,39 @@ function todayIST(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
-async function fetchQuote(symbol: string): Promise<Quote> {
+type Fetched = { quote: Quote; bars: DailyBar[] };
+
+async function fetchChart(symbol: string, range: string): Promise<Fetched> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: ctrl.signal });
+    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=1d`, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: ctrl.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
-    const meta = json?.chart?.result?.[0]?.meta;
+    const r = json?.chart?.result?.[0];
+    const meta = r?.meta;
     if (!meta || typeof meta.regularMarketPrice !== "number") throw new Error(json?.chart?.error?.description ?? "no meta");
     const last = meta.regularMarketPrice as number;
     let changePct: number | null = typeof meta.regularMarketChangePercent === "number" ? meta.regularMarketChangePercent : null;
-    if (changePct == null && typeof meta.chartPreviousClose === "number" && meta.chartPreviousClose > 0) changePct = ((last - meta.chartPreviousClose) / meta.chartPreviousClose) * 100;
+    if (changePct == null && typeof meta.previousClose === "number" && meta.previousClose > 0) changePct = ((last - meta.previousClose) / meta.previousClose) * 100;
     const sourceTs = typeof meta.regularMarketTime === "number" ? new Date(meta.regularMarketTime * 1000).toISOString() : null;
-    return { symbol, last, changePct: changePct == null ? null : +changePct.toFixed(3), sourceTs };
+    const quote: Quote = { symbol, last, changePct: changePct == null ? null : +changePct.toFixed(3), sourceTs };
+
+    // Daily bars: timestamp is the session open in the exchange's zone; the session date is
+    // taken in that zone so a Tokyo bar and a New York bar both land on their own calendar day.
+    const tz = typeof meta.exchangeTimezoneName === "string" ? meta.exchangeTimezoneName : "UTC";
+    const dayOf = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+    const ts: number[] = r.timestamp ?? [];
+    const closes: (number | null)[] = r.indicators?.quote?.[0]?.close ?? [];
+    const bars: DailyBar[] = [];
+    let prev: number | null = null;
+    for (let i = 0; i < ts.length; i++) {
+      const c = closes[i];
+      if (c == null || !Number.isFinite(c)) continue;
+      bars.push({ asset: symbol, day: dayOf.format(new Date(ts[i] * 1000)), close: c, changePct: prev && prev > 0 ? +(((c - prev) / prev) * 100).toFixed(3) : null });
+      prev = c;
+    }
+    return { quote, bars };
   } finally { clearTimeout(t); }
 }
 
@@ -57,14 +80,25 @@ Deno.serve(async (req: Request) => {
   const { data: expectedSecret } = await admin.rpc("get_vault_secret", { secret_name: "edge_function_cron_secret" });
   if (!cronSecret || cronSecret !== expectedSecret) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
 
+  let body: { mode?: string } = {};
+  try { body = await req.json(); } catch { /* no body */ }
+  const forceBackfill = body.mode === "backfill";
+
   const now = new Date();
   const skipped: string[] = [];
 
-  // 1. Quotes, each isolated.
+  // 0. How much history each asset already has, to decide the fetch range per symbol.
+  const { data: counts, error: countErr } = await admin.rpc("market_daily_counts");
+  if (countErr) skipped.push(`market_daily_counts: ${countErr.message}`);
+  const have = new Map<string, number>(((counts ?? []) as { asset: string; n: number }[]).map((c) => [c.asset, Number(c.n)]));
+
+  // 1. Quotes + bars, each symbol isolated.
   const settled = await Promise.all(BASKET.map(async (b) => {
-    try { return await fetchQuote(b.symbol); } catch (e) { skipped.push(`${b.symbol}: ${e instanceof Error ? e.message : e}`); return null; }
+    const range = forceBackfill || (have.get(b.symbol) ?? 0) < HISTORY.minSessions ? HISTORY.backfillRange : "5d";
+    try { return await fetchChart(b.symbol, range); } catch (e) { skipped.push(`${b.symbol}: ${e instanceof Error ? e.message : e}`); return null; }
   }));
-  const quotes = settled.filter((q): q is Quote => q != null);
+  const fetched = settled.filter((f): f is Fetched => f != null);
+  const quotes = fetched.map((f) => f.quote);
 
   if (quotes.length) {
     const rows = quotes.map((q) => {
@@ -74,8 +108,22 @@ Deno.serve(async (req: Request) => {
     const { error } = await admin.from("market_snapshots").upsert(rows, { onConflict: "asset,source_ts" });
     if (error) skipped.push(`market_snapshots upsert: ${error.message}`);
   }
+  const newBars = fetched.flatMap((f) => f.bars);
+  if (newBars.length) {
+    const rows = newBars.map((b) => ({ asset: b.asset, day: b.day, close: b.close, change_pct: b.changePct, source: "yahoo", ingested_at: now.toISOString() }));
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error } = await admin.from("market_daily").upsert(rows.slice(i, i + 500), { onConflict: "asset,day" });
+      if (error) { skipped.push(`market_daily upsert: ${error.message}`); break; }
+    }
+  }
 
-  // 2. India-side inputs from the existing pipeline. Today's row when it exists, else the most
+  // 2. Full history for analytics: the stored series, which now includes what was just written.
+  const since = new Date(now.getTime() - 200 * 86400_000).toISOString().slice(0, 10);
+  const { data: hist, error: histErr } = await admin.from("market_daily").select("asset, day, close, change_pct").gte("day", since).order("day", { ascending: true }).limit(10000);
+  if (histErr) skipped.push(`market_daily read: ${histErr.message}`);
+  const bars: DailyBar[] = (hist ?? []).map((h) => ({ asset: String(h.asset), day: String(h.day), close: Number(h.close), changePct: h.change_pct == null ? null : Number(h.change_pct) }));
+
+  // 3. India-side inputs from the existing pipeline. Today's row when it exists, else the most
   //    recent, and the engine is told how old that is.
   const today = todayIST();
   const pick = async (table: string, cols: string) => {
@@ -98,10 +146,24 @@ Deno.serve(async (req: Request) => {
     pcrNifty: num(pre?.pcr_nifty),
   };
 
-  // 3. Engine.
-  const ctx = computeContext(quotes, india, now);
+  // 4. Analytics + engine.
+  const liveChange = new Map(quotes.map((q) => [q.symbol, q.changePct]));
+  const stats = computeStats(bars, liveChange);
+  const measured = measureTransmission(bars);
+  const moves = detectMoves(stats, liveChange, now);
+  const ctx = computeContext(quotes, india, now, measured);
 
-  // 4. Persist.
+  // 5. Persist events (upsert on dedupe key so an evolving intraday move updates, not duplicates).
+  if (moves.length) {
+    const { error } = await admin.from("market_events").upsert(moves.map((m) => ({
+      dedupe_key: m.dedupeKey, event_time: m.eventTime, updated_at: now.toISOString(), category: m.category, title: m.title, summary: m.summary,
+      affected_assets: m.affectedAssets, market_direction: m.marketDirection, global_relevance: m.globalRelevance, india_relevance: m.indiaRelevance,
+      confidence: m.confidence, india_impact: m.indiaImpact, why_it_matters: m.indiaImpact, sources: [{ type: "quant", source: "yahoo", detail: "MarketCue move detection" }], evidence: m.evidence, status: "active",
+    })), { onConflict: "dedupe_key" });
+    if (error) skipped.push(`market_events upsert: ${error.message}`);
+  }
+
+  // 6. Persist context.
   const { error: ctxErr } = await admin.from("global_context").insert({
     calculated_at: ctx.calculatedAt,
     data_as_of: ctx.dataAsOf,
@@ -113,9 +175,10 @@ Deno.serve(async (req: Request) => {
     global_drivers: ctx.global.drivers, india_drivers: ctx.india.drivers,
     channels: ctx.transmission.channels, counterforces: ctx.transmission.counterforces,
     what_is_driving: ctx.whatIsDriving, explanation: ctx.explanation,
-    inputs: { quotes, india, premarket_trade_date: pre?.trade_date ?? null, postmarket_trade_date: post?.trade_date ?? null, skipped },
+    measured, asset_stats: stats,
+    inputs: { quotes, india, premarket_trade_date: pre?.trade_date ?? null, postmarket_trade_date: post?.trade_date ?? null, history_days: bars.length, skipped },
   });
   if (ctxErr) skipped.push(`global_context insert: ${ctxErr.message}`);
 
-  return new Response(JSON.stringify({ ok: !ctxErr, quotes: quotes.length, global: ctx.global.band, india: ctx.india.band, transmission: ctx.transmission.label, regime: ctx.regime, confidence: ctx.confidence.level, skipped }), { status: 200, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ ok: !ctxErr, quotes: quotes.length, bars_written: newBars.length, history_rows: bars.length, events: moves.length, global: ctx.global.band, india: ctx.india.band, transmission: ctx.transmission.label, measured: measured.label, regime: ctx.regime, confidence: ctx.confidence.level, skipped }), { status: 200, headers: { "Content-Type": "application/json" } });
 });
