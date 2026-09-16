@@ -19,7 +19,7 @@ import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } fro
 type Row = Record<string, string | number | boolean | null>
 type Phase = 'premarket' | 'cues' | 'open' | 'verdict' | 'chart' | 'mid' | 'post' | 'journal' | 'rules' | 'history' | 'trade'
 const phases = [
-  { id: 'cues' as Phase, label: 'GlobalCue/News', subtitle: 'Overnight markets & headlines', icon: Globe },
+  { id: 'cues' as Phase, label: 'GlobalCue/News', subtitle: 'Global → India intelligence', icon: Globe },
   { id: 'premarket' as Phase, label: 'Pre-market', subtitle: 'Overnight setup', icon: Clock3 },
   { id: 'open' as Phase, label: 'Market open', subtitle: 'Opening auction', icon: Activity },
   { id: 'verdict' as Phase, label: 'Verdict', subtitle: 'Strategy selection', icon: CheckCircle2 },
