@@ -90,12 +90,43 @@ $$;
 --   headers := jsonb_build_object('Content-Type','application/json','x-cron-secret', public.get_vault_secret('edge_function_cron_secret')),
 --   body := '{"mode":"session"}'::jsonb) $$);
 
--- ---------------------------------------------------------------------------------------
--- Vault secrets the function expects (add once, alongside edge_function_cron_secret):
---   kite_api_key        -- the Kite Connect app's api_key
---   kite_access_token   -- refreshed by the same daily Kite login that feeds gift-nifty-fetch
---
--- If gift-nifty-fetch already stores these under different names, point the function's
--- KITE_API_KEY_SECRET / KITE_ACCESS_TOKEN_SECRET constants at those names instead of adding a
--- second copy -- one login should refresh one token, not two that can drift apart.
+-- kite_session: the daily access_token the function's own TOTP login produces, cached so a
+-- minutely invocation reuses today's login instead of re-authenticating with Kite every minute
+-- (which would be both slow and the kind of pattern that gets an account flagged). One row per
+-- IST day; the function upserts it after every fresh login.
+create table if not exists public.kite_session (
+  trade_date   date primary key,
+  access_token text        not null,
+  created_at   timestamptz not null default now()
+);
+alter table public.kite_session enable row level security;
+-- No select/insert/update policy for anon or authenticated -- only the service role (Edge
+-- Function) ever touches this table. A live access_token is a bearer credential for the whole
+-- Kite account and must never be readable from the browser.
+
+-- candle_sync_runs: one sanitized row per function run, so the outcome is inspectable with the
+-- publishable key even when the pg_net/cron caller timed out before the function returned. Holds
+-- counts and skip REASONS only -- never a token, cookie, raw Kite body, or redirect URL. Readable
+-- by anon so the operator (and Claude) can confirm a run without Edge Function logs.
+create table if not exists public.candle_sync_runs (
+  id          bigint generated always as identity primary key,
+  run_at      timestamptz not null default now(),
+  mode        text,
+  ok          boolean,
+  written     jsonb,
+  skipped     jsonb,
+  reason      text,
+  range_from  text,
+  range_to    text
+);
+create index if not exists candle_sync_runs_run_at_idx on public.candle_sync_runs (run_at desc);
+alter table public.candle_sync_runs enable row level security;
+drop policy if exists "candle_sync_runs read" on public.candle_sync_runs;
+create policy "candle_sync_runs read" on public.candle_sync_runs
+  for select to anon, authenticated using (true);
+-- No insert/update policy: only the service role (Edge Function) writes.
+
+-- Vault secrets the function reads (all five already present in this project's vault):
+--   kite_user_id, kite_password, kite_totp_secret  -- the login itself, run by the function
+--   kite_api_key, kite_api_secret                  -- the Kite Connect app's own credentials
 -- ---------------------------------------------------------------------------------------
