@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
-import type { IChartApi, IPriceLine, ISeriesApi, UTCTimestamp } from 'lightweight-charts'
+import type { IChartApi, IPriceLine, IPrimitivePaneRenderer, IPrimitivePaneView, ISeriesApi, ISeriesPrimitive, SeriesAttachedParameter, Time, UTCTimestamp } from 'lightweight-charts'
 import { createClient } from '@/lib/supabase/client'
 import { useChartColors } from '@/hooks/use-chart-colors'
 import { PhaseAside, Disclaimer, EmptyState, Skeleton } from '@/components/ui/ds'
@@ -67,7 +67,7 @@ function aggregate(bars: Bar[], minutes: number): Bar[] {
 // browser. Adding an indicator is one line here plus whatever computes its levels.
 type LevelKey = 'oi' | 'pivot' | 'phlc'
 const INDICATORS: { key: LevelKey; label: string; description: string; defaultOn: boolean }[] = [
-  { key: 'oi', label: 'OI walls', description: 'OI support, OI resistance and max pain from the option chain', defaultOn: true },
+  { key: 'oi', label: 'OI walls', description: 'OI support and resistance zones, plus max pain, from the option chain', defaultOn: true },
   { key: 'phlc', label: 'PHLC', description: 'Previous day high, low and close', defaultOn: true },
   { key: 'pivot', label: 'Pivots', description: 'Pivot support and resistance', defaultOn: false },
 ]
@@ -84,7 +84,57 @@ function loadHidden(): Set<LevelKey> {
   } catch { return fallback }
 }
 
-type LevelDef = { group: LevelKey; title: string; value: number; tone: 'up' | 'down' | 'info' | 'muted'; dashed: boolean }
+// A level is a line by default. A level with `band` is a zone: a shaded strip `band` points either
+// side of the value, drawn behind the candles. OI walls are zones because option OI sits on a strike
+// and price reacts around it, not at one tick.
+type LevelDef = { group: LevelKey; title: string; value: number; tone: 'up' | 'down' | 'info' | 'muted'; dashed: boolean; band?: number }
+
+// Strike interval per index. A wall zone spans one interval centred on the strike.
+const STRIKE_STEP: Record<Instrument, number> = { NIFTY: 50, SENSEX: 100 }
+
+type Zone = { from: number; to: number; color: string }
+
+// lightweight-charts series primitive that paints horizontal zones across the pane, under the
+// series. It reads the series' own price scale, so zones pan and zoom with the candles.
+class ZonesPrimitive implements ISeriesPrimitive<Time> {
+  private zones: Zone[] = []
+  private series: ISeriesApi<'Candlestick'> | null = null
+  private requestUpdate: (() => void) | null = null
+  private readonly view: IPrimitivePaneView = {
+    zOrder: () => 'bottom',
+    renderer: (): IPrimitivePaneRenderer => ({
+      draw: (target) => {
+        const series = this.series
+        if (!series || this.zones.length === 0) return
+        target.useMediaCoordinateSpace(({ context, mediaSize }) => {
+          for (const z of this.zones) {
+            const top = series.priceToCoordinate(z.to)
+            const bottom = series.priceToCoordinate(z.from)
+            if (top == null || bottom == null) continue
+            context.save()
+            context.globalAlpha = 0.18
+            context.fillStyle = z.color
+            context.fillRect(0, Math.min(top, bottom), mediaSize.width, Math.max(1, Math.abs(bottom - top)))
+            context.restore()
+          }
+        })
+      },
+    }),
+  }
+  attached({ series, requestUpdate }: SeriesAttachedParameter<Time>) {
+    this.series = series as ISeriesApi<'Candlestick'>
+    this.requestUpdate = requestUpdate
+  }
+  detached() { this.series = null; this.requestUpdate = null }
+  paneViews() { return [this.view] }
+  // Widen the price scale so every visible zone is on screen. Without this a wall just beyond
+  // the session's range would be silently off the chart, which is the opposite of its purpose.
+  autoscaleInfo() {
+    if (this.zones.length === 0) return null
+    return { priceRange: { minValue: Math.min(...this.zones.map((z) => z.from)), maxValue: Math.max(...this.zones.map((z) => z.to)) } }
+  }
+  setZones(zones: Zone[]) { this.zones = zones; this.requestUpdate?.() }
+}
 
 // Option-chain levels the Verdict screen reads, drawn on the index price axis. The verdict's
 // premium target and stop are deliberately absent: they are option-premium points, not prices
@@ -98,8 +148,8 @@ function levelsFor(row: Row, instrument: Instrument): LevelDef[] {
     return Number.isFinite(n) && n > 0 ? n : null
   }
   const defs: (LevelDef | null)[] = [
-    read(`oi_support_${suffix}`) != null ? { group: 'oi', title: 'OI support', value: read(`oi_support_${suffix}`)!, tone: 'up', dashed: false } : null,
-    read(`oi_resistance_${suffix}`) != null ? { group: 'oi', title: 'OI resistance', value: read(`oi_resistance_${suffix}`)!, tone: 'down', dashed: false } : null,
+    read(`oi_support_${suffix}`) != null ? { group: 'oi', title: 'OI support', value: read(`oi_support_${suffix}`)!, tone: 'up', dashed: false, band: STRIKE_STEP[instrument] / 2 } : null,
+    read(`oi_resistance_${suffix}`) != null ? { group: 'oi', title: 'OI resistance', value: read(`oi_resistance_${suffix}`)!, tone: 'down', dashed: false, band: STRIKE_STEP[instrument] / 2 } : null,
     read(`max_pain_${suffix}`) != null ? { group: 'oi', title: 'Max pain', value: read(`max_pain_${suffix}`)!, tone: 'info', dashed: true } : null,
     read(`chart_support_${suffix}`) != null ? { group: 'pivot', title: 'Pivot support', value: read(`chart_support_${suffix}`)!, tone: 'up', dashed: true } : null,
     read(`chart_resistance_${suffix}`) != null ? { group: 'pivot', title: 'Pivot resistance', value: read(`chart_resistance_${suffix}`)!, tone: 'down', dashed: true } : null,
@@ -173,6 +223,7 @@ export function ChartView({ row }: { row: Row }) {
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const priceLinesRef = useRef<IPriceLine[]>([])
+  const zonesRef = useRef<ZonesPrimitive | null>(null)
   const [chartReady, setChartReady] = useState(false)
 
   // Always load the 30-session window, whatever range is on screen: the range switch is then a
@@ -310,6 +361,9 @@ export function ChartView({ row }: { row: Row }) {
 
       chartRef.current = chart
       seriesRef.current = series
+      const zones = new ZonesPrimitive()
+      series.attachPrimitive(zones)
+      zonesRef.current = zones
       setChartReady(true)
 
       observer = new ResizeObserver(([entry]) => {
@@ -323,6 +377,7 @@ export function ChartView({ row }: { row: Row }) {
       disposed = true
       observer?.disconnect()
       priceLinesRef.current = []
+      zonesRef.current = null
       seriesRef.current = null
       chartRef.current = null
       setChartReady(false)
@@ -365,11 +420,14 @@ export function ChartView({ row }: { row: Row }) {
     const series = seriesRef.current
     if (!chartReady || !series) return
     for (const line of priceLinesRef.current) series.removePriceLine(line)
-    priceLinesRef.current = levels
-      .filter((l) => !hidden.has(l.group))
+    const visible = levels.filter((l) => !hidden.has(l.group))
+    const toneColor = (l: LevelDef) => l.tone === 'up' ? colors.up : l.tone === 'down' ? colors.down : l.tone === 'info' ? colors.info : colors.faint
+    zonesRef.current?.setZones(visible.filter((l) => l.band != null).map((l) => ({ from: l.value - l.band!, to: l.value + l.band!, color: toneColor(l) })))
+    priceLinesRef.current = visible
+      .filter((l) => l.band == null)
       .map((l) => series.createPriceLine({
         price: l.value,
-        color: l.tone === 'up' ? colors.up : l.tone === 'down' ? colors.down : l.tone === 'info' ? colors.info : colors.faint,
+        color: toneColor(l),
         lineWidth: 1,
         lineStyle: l.dashed ? 2 : 0,
         axisLabelVisible: true,
