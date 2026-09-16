@@ -49,10 +49,8 @@ export default function MarketTicker({ tradeDate: initialTradeDate, initial }: P
   const chips = data?.chips ?? []
   if (chips.length === 0) return null
 
-  const asOf = data!.asOf === 'close' ? 'Close' : data!.asOf === 'pre-market' ? 'Pre-market' : `${data!.asOf} IST`
   return (
     <div className="ticker" aria-label="Market strip">
-      <div className="ticker-stamp"><span className="landing-live-dot" aria-hidden="true" /><span className="ticker-stamp-label">As of</span><b>{asOf}</b></div>
       <div className="ticker-viewport">
         <div className="ticker-track" style={{ ['--ticker-n' as string]: chips.length }}>
           {chips.map(c => <Chip key={c.key} chip={c} />)}
