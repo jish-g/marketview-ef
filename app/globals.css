@@ -1086,7 +1086,8 @@ button, input { font: inherit; }
 .gv-chip:hover { border-color: var(--ink); }
 .gv-meter { display: block; height: 6px; margin-top: 8px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
 .gv-meter i { display: block; height: 100%; border-radius: 3px; background: var(--info); }
-.gv-meter-scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-top: 4px; }
+.gv-list small.gv-meter-scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-top: 4px; }
+.gv-verdict span .gv-label-badge { margin-left: 8px; vertical-align: middle; text-transform: none; letter-spacing: 0; }
 .gv-foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; color: var(--muted); font-size: var(--text-label); }
 .drivers-grid .field-card strong { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .drivers-grid .field-card small, .measured-grid .field-card small { display: block; margin-top: 6px; color: var(--ink-2); font-size: var(--text-label); line-height: 1.45; opacity: 1; }
