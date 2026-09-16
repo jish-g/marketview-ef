@@ -1498,7 +1498,7 @@ function PhaseView({ phase, row, historyData, onSeeVerdict, agentCalls }: { phas
   return <section className="phase-view"><div className="review-section-head"><div><p className="eyebrow">{eyebrow} · {syncLabel(row, scheduledTime)}</p><h2>{heading}</h2></div><div className="phase-head-aside"><FreshnessStamp state={headStamp.state} label={headStamp.label} capturedAt={(row?.updated_at ?? null) as string | null} /><ProvenanceBadge source="system" /></div></div>{phase === 'premarket' && row && onSeeVerdict && <div className="thesis-row"><ThesisHero call={agentFor(agentCalls, 'premarket', 'BOTH')} onSeeVerdict={onSeeVerdict} />{priorDayLines && priorAgentRecap ? <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p>{priorAgentRecap.map(({ instrument, call }) => { const grade = GRADE_BADGE[String(call.grade ?? '').toLowerCase()]; return <div className="prior-session-block" key={instrument}><div className="prior-session-head"><span className="history-beat-label">{instrument === 'NIFTY' ? 'Nifty' : 'Sensex'}</span>{grade && <span className={`ds-badge ${grade.cls}`}>{grade.label}</span>}{call.agent_strategy && <span className="prior-session-strategy">{call.agent_strategy}</span>}</div>{call.reasoning && <p className="prior-session-line prior-session-story">{call.reasoning}</p>}</div> })}</div> : priorDayLines && priorDayLines.story && <div className="verdict-banner prior-sessions-banner"><p className="eyebrow">{priorDayLines.dayLabel} recap</p><p className="prior-session-line prior-session-story">{priorDayLines.story}</p></div>}</div>}<div className="metric-groups">{renderGroup('Common market data', common)}{openTargetCards}{renderGroup('Nifty', nifty)}{renderGroup('Sensex', sensex)}</div><Disclaimer capturedAt={fmt.timeIST((row?.updated_at ?? null) as string | null)} /></section>
 }
 export default function Dashboard() {
-  const [phase, setPhase] = useState<Phase>('premarket'); const [dark, setDark] = useState(true); const [navOpen, setNavOpen] = useState(false); const [liveDate, setLiveDate] = useState(''); const [liveDay, setLiveDay] = useState(''); const [liveTime, setLiveTime] = useState('')
+  const [phase, setPhase] = useState<Phase>('premarket'); const [dark, setDark] = useState(true); const [navOpen, setNavOpen] = useState(false); const [liveDate, setLiveDate] = useState(''); const [liveDay, setLiveDay] = useState(''); const [todayISO, setTodayISO] = useState<string | null>(null); const [liveTime, setLiveTime] = useState('')
   const isMobile = useIsMobile()
   // The sidebar is a permanent rail on desktop and an overlay drawer on mobile, so the default open state
   // follows the viewport rather than being fixed at mount. isMobile is null until the viewport has been
@@ -1640,7 +1640,7 @@ export default function Dashboard() {
   }, { revalidateOnFocus: false })
   const { data: postSummary } = useSWR<Row | null>(row.trade_date ? ['postmarket-summary', row.trade_date] : null, async () => { const { data, error } = await supabase.from('postmarket_summary').select('*').eq('trade_date', row.trade_date).order('trade_date', { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data as Row | null }, { revalidateOnFocus: false })
   useEffect(() => { document.documentElement.classList.toggle('light', !dark) }, [dark])
-  useEffect(() => { const updateClock = () => { const now = new Date(); const options = { timeZone: 'Asia/Kolkata' } as const; setLiveDate(navDate(now)); setLiveDay(new Intl.DateTimeFormat('en-IN', { ...options, weekday: 'long' }).format(now)); setLiveTime(new Intl.DateTimeFormat('en-IN', { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(now)) }; updateClock(); const timer = window.setInterval(updateClock, 1000); return () => window.clearInterval(timer) }, [])
+  useEffect(() => { const updateClock = () => { const now = new Date(); const options = { timeZone: 'Asia/Kolkata' } as const; setLiveDate(navDate(now)); setTodayISO(now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })); setLiveDay(new Intl.DateTimeFormat('en-IN', { ...options, weekday: 'long' }).format(now)); setLiveTime(new Intl.DateTimeFormat('en-IN', { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(now)) }; updateClock(); const timer = window.setInterval(updateClock, 1000); return () => window.clearInterval(timer) }, [])
   // History already fetches the last 15 sessions on load, so the picker knows which dates
   // exist without another request -- and stepping moves to the next PUBLISHED session rather
   // than to the next calendar day, which would land on weekends and holidays.
@@ -1653,7 +1653,14 @@ export default function Dashboard() {
   // sessionDates is newest-first, so "older" is a higher index.
   const olderDate = currentIdx >= 0 && currentIdx < sessionDates.length - 1 ? sessionDates[currentIdx + 1] : null
   const newerDate = currentIdx > 0 ? sessionDates[currentIdx - 1] : null
-  const isArchived = sessionDate != null && latestDate != null && sessionDate !== latestDate
+  // With no ?session= the top query takes the newest published row, whatever its date. Before
+  // the 08:45 IST pre-market write (and all weekend / on holidays) that row is the PREVIOUS
+  // session, yet it rendered under today's live clock with no archive bar -- yesterday's
+  // figures presented as today's. A newest row dated before today (IST) is therefore treated
+  // as archived too, so the same bar and dated topbar frame it honestly. Nothing is hidden:
+  // a blank dashboard every weekend would be worse than a clearly-labelled last session.
+  const latestIsPrevious = sessionDate == null && latestDate != null && todayISO != null && latestDate < todayISO
+  const isArchived = (sessionDate != null && latestDate != null && sessionDate !== latestDate) || latestIsPrevious
   // The picker's compact form of the same date: "Tue 15-Sep". Same month table as navDate,
   // so the two never disagree about how September is spelled.
   const sessionLabel = (d: string | null) => {
@@ -1687,13 +1694,13 @@ export default function Dashboard() {
         together and did the same thing. The bar's is the one to keep: it sits inside the
         state it exits. */}<div className="topbar-meta">{/* The freshness stamp lived here and in every screen's own header, saying the same thing twice on one view. The screen-level one is kept -- it sits beside the read it qualifies, which is where it means something. */}<button type="button" className="icon-button" onClick={() => setDark(!dark)} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'} aria-pressed={!dark}>{dark ? <Sun size={16} /> : <Moon size={16} />}</button>{!sessionLoading && (session ? <button type="button" className="topbar-toggle" onClick={() => signOut()}>Sign out</button> : <Link href="/login" className="topbar-toggle">Sign in</Link>)}</div></header>
     {isArchived && <div className="archive-bar" role="status">
-      <span className="archive-bar-tag">Archived session</span>
+      <span className="archive-bar-tag">{latestIsPrevious ? 'Previous session' : 'Archived session'}</span>
       <span className="archive-bar-text">
-        Viewing <b>{sessionLabelLong(currentDate)}</b>
-        {sessionsBack > 0 && <> — {sessionsBack === 1 ? 'the previous session' : `${sessionsBack} sessions ago`}</>}.
-        {' '}Figures are as published that day and do not update.
+        {latestIsPrevious
+          ? <>Today&apos;s session (<b>{liveDate}</b>) is not published yet — Pre-market lands at 08:45 IST. Showing the last published session, <b>{sessionLabelLong(currentDate)}</b>. Figures are as published that day and do not update.</>
+          : <>Viewing <b>{sessionLabelLong(currentDate)}</b>{sessionsBack > 0 && <> — {sessionsBack === 1 ? 'the previous session' : `${sessionsBack} sessions ago`}</>}. Figures are as published that day and do not update.</>}
       </span>
-      <button type="button" className="archive-bar-exit" onClick={() => goToSession(null)}>Back to today</button>
+      {!latestIsPrevious && <button type="button" className="archive-bar-exit" onClick={() => goToSession(null)}>Back to today</button>}
     </div>}
     <div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile === true && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)} aria-current={phase === id ? 'page' : undefined}><span><strong>{label}</strong><small>{subtitle}</small></span></button>)}<div className="side-rule" /><div className="side-source"><span className="side-label">Data source</span><strong>NSE option chain</strong><small>{capturedLabel}</small></div></aside>{isMobile === true && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView row={row} /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} agentCalls={agentCalls} /> : phase === 'chart' ? <ChartView row={row} /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} agentCalls={agentCalls} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} agentCalls={agentCalls} /> : phase === 'open' && row && row.gap_points_nifty != null ? <MarketOpenView row={row} capturedAt={(row.updated_at ?? null) as string | null} agentCalls={agentCalls} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} onSeeVerdict={() => setPhase('verdict')} agentCalls={agentCalls} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
 }
