@@ -141,12 +141,13 @@ function watchNext(ctx: ContextRow, events: EventRow[], now: number): string[] {
   return out.slice(0, 4)
 }
 
-const TONE_WORD: Record<Tone, string> = { up: 'Supportive', down: 'Negative', caution: 'Cautious', neutral: 'Neutral' }
+// Lowercase only the leading letter, so "Higher US yields alongside FII selling" keeps its acronyms.
+const lcFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
 
-function Verdict({ label, band, tone, sub }: { label: string; band: string; tone: Tone; sub: string }) {
+function Verdict({ label, band, tone, sub, badge }: { label: string; band: string; tone: Tone; sub: string; badge?: { text: string; tone: Tone } }) {
   return <div className="field-card gv-verdict">
     <span>{label}</span>
-    <strong>{band} <em className={`ds-badge ds-badge--${tone}`}>{TONE_WORD[tone]}</em></strong>
+    <strong className={`gv-band gv-band--${tone}`}>{band}{badge && <em className={`ds-badge ds-badge--${badge.tone}`}>{badge.text}</em>}</strong>
     <small>{sub}</small>
   </div>
 }
@@ -236,7 +237,9 @@ export function GlobalCuesView() {
         <div className="field-grid">
           <Verdict label="Global" band={ctx.global_band} tone={gTone} sub={gSub} />
           <Verdict label="India" band={ctx.india_band} tone={iTone} sub={iSub} />
-          <Verdict label="Global → India" band={ctx.transmission_label.replace(' global influence', '').replace('India ', '')} tone={ctx.transmission_tone} sub={ctx.counterforces.length ? `Domestic factors appear to be offsetting: ${ctx.counterforces.slice(0, 2).join(' and ').toLowerCase()}.` : ctx.channels.length ? `Evidence of transmission: ${ctx.channels[0].toLowerCase()}.` : 'No single transmission channel stands out today.'} />
+          <Verdict label="Global → India" band={ctx.transmission_label.replace(' global influence', '').replace('India ', '')} tone={ctx.transmission_tone}
+            badge={ctx.measured?.correlation20 != null ? { text: `${ctx.measured.label.toLowerCase()} tracking, 20 days`, tone: ctx.measured.label === 'Strong' ? 'down' : ctx.measured.label === 'Moderate' ? 'caution' : 'neutral' } : undefined}
+            sub={ctx.counterforces.length ? `Domestic factors appear to be offsetting: ${ctx.counterforces.slice(0, 2).map(lcFirst).join(' and ')}.` : ctx.channels.length ? `Evidence of transmission: ${lcFirst(ctx.channels[0])}.` : 'No single transmission channel stands out today.'} />
         </div>
       </section>
       <section className="metric-group">

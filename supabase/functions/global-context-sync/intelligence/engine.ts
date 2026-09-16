@@ -264,6 +264,8 @@ export function classifyRegime(components: Record<string, number | null>, raw: {
 function describeBand(band: Band): string {
   return band.toLowerCase();
 }
+// Lowercase only the leading letter so "Higher US yields alongside FII selling" keeps its acronyms.
+const lcFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
 
 export function explain(res: Omit<ContextResult, "explanation" | "whatIsDriving">): { explanation: string; whatIsDriving: string[] } {
   const gTop = res.global.drivers.filter((d) => Math.abs(d.score) >= 0.2).slice(0, 3);
@@ -280,7 +282,7 @@ export function explain(res: Omit<ContextResult, "explanation" | "whatIsDriving"
   let explanation: string;
   switch (res.transmission.label) {
     case "Strong global influence":
-      explanation = `Global sentiment is ${describeBand(res.global.band)} on ${gPhrase}, and Indian markets appear to be following: ${res.transmission.channels[0]?.toLowerCase() ?? "moves are aligned"}. India reads ${describeBand(res.india.band)} on ${iPhrase}.`;
+      explanation = `Global sentiment is ${describeBand(res.global.band)} on ${gPhrase}, and Indian markets appear to be following: ${res.transmission.channels[0] ? lcFirst(res.transmission.channels[0]) : "moves are aligned"}. India reads ${describeBand(res.india.band)} on ${iPhrase}.`;
       break;
     case "Moderate global influence":
       explanation = `Global sentiment is ${describeBand(res.global.band)}, consistent with ${gPhrase}. India is ${describeBand(res.india.band)}; the global tone is a likely contributor, with ${iPhrase} shaping the domestic read.`;
@@ -289,14 +291,14 @@ export function explain(res: Omit<ContextResult, "explanation" | "whatIsDriving"
       explanation = `Global and Indian sentiment are both ${describeBand(res.global.band)}; India appears to be moving with the external environment (${gPhrase}), though no single transmission channel stands out.`;
       break;
     case "India diverging from global markets":
-      explanation = `Global sentiment is ${describeBand(res.global.band)} on ${gPhrase}, but India is ${describeBand(res.india.band)}. ${res.transmission.counterforces.length ? `Domestic factors appear to be offsetting: ${res.transmission.counterforces.join("; ").toLowerCase()}.` : "The driver of the divergence is unclear from the available inputs."}`;
+      explanation = `Global sentiment is ${describeBand(res.global.band)} on ${gPhrase}, but India is ${describeBand(res.india.band)}. ${res.transmission.counterforces.length ? `Domestic factors appear to be offsetting: ${res.transmission.counterforces.map(lcFirst).join("; ")}.` : "The driver of the divergence is unclear from the available inputs."}`;
       break;
     default:
       if (Math.abs(res.global.score) < QUIET) {
         explanation = `Global inputs are broadly flat, so external influence on India is limited right now. ${iTop.length ? `India reads ${describeBand(res.india.band)} on ${iPhrase}.` : "Indian inputs show no clear direction either."}`;
-        if (res.transmission.channels.length) explanation += ` One channel is still active: ${res.transmission.channels[0].toLowerCase()}.`;
+        if (res.transmission.channels.length) explanation += ` One channel is still active: ${lcFirst(res.transmission.channels[0])}.`;
       } else {
-        explanation = `Global sentiment is ${describeBand(res.global.band)} on ${gPhrase}, but India is showing relative resilience${res.transmission.counterforces.length ? `, consistent with ${res.transmission.counterforces.join(" and ").toLowerCase()}` : ""}.`;
+        explanation = `Global sentiment is ${describeBand(res.global.band)} on ${gPhrase}, but India is showing relative resilience${res.transmission.counterforces.length ? `, consistent with ${res.transmission.counterforces.map(lcFirst).join(" and ")}` : ""}.`;
       }
   }
   if (res.confidence.level === "Low") explanation += " Confidence is low: several inputs are missing or stale.";
