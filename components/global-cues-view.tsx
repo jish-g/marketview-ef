@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { createClient } from '@/lib/supabase/client'
-import { DeltaValue, Disclaimer, EmptyState, Skeleton } from '@/components/ui/ds'
+import { DeltaValue, Disclaimer, EmptyState, Label, Skeleton } from '@/components/ui/ds'
 
 // GlobalCue/News: the Global View. Reads the newest global_context row (calculated by the
 // deterministic engine in supabase/functions/global-context-sync/intelligence), the latest
@@ -104,6 +104,14 @@ const pctTone = (v: number | null): Tone => v == null ? 'neutral' : v > 0.05 ? '
 const timesUsual = (z?: number) => z == null ? '' : `about ${Math.abs(z).toFixed(1)} times its usual daily move`
 const level = (v: number) => v >= 0.7 ? 'high' : v >= 0.4 ? 'medium' : 'low'
 
+// Hero headline: a few words from the bands, the way the pre-market thesis hero reads.
+function headline(ctx: ContextRow): string {
+  const gt = BAND_TONE[ctx.global_band], it = BAND_TONE[ctx.india_band]
+  const g = gt === 'up' ? 'Supportive world' : gt === 'down' ? 'Pressured world' : gt === 'caution' ? 'Cautious world' : 'Quiet world'
+  const i = it === 'up' ? 'resilient India' : it === 'down' ? 'soft India' : it === 'caution' ? 'hesitant India' : 'undecided India'
+  return `${g}, ${i}`
+}
+
 // One sentence for the day, from the three bands. Templates, hedged, no numbers.
 function oneLine(ctx: ContextRow): string {
   const g = ctx.global_band.toLowerCase(), i = ctx.india_band.toLowerCase()
@@ -133,26 +141,29 @@ function watchNext(ctx: ContextRow, events: EventRow[], now: number): string[] {
   return out.slice(0, 4)
 }
 
+const TONE_WORD: Record<Tone, string> = { up: 'Supportive', down: 'Negative', caution: 'Cautious', neutral: 'Neutral' }
+
 function Verdict({ label, band, tone, sub }: { label: string; band: string; tone: Tone; sub: string }) {
-  return <div className={`ds-card gv-verdict gv-verdict--${tone}`}>
-    <span className="ds-label">{label}</span>
-    <strong className="gv-band"><i className={`gv-dot gv-dot--${tone}`} aria-hidden="true" />{band}</strong>
-    <p>{sub}</p>
+  return <div className="field-card gv-verdict">
+    <span>{label}</span>
+    <strong>{band} <em className={`ds-badge ds-badge--${tone}`}>{TONE_WORD[tone]}</em></strong>
+    <small>{sub}</small>
   </div>
 }
-function WordList({ label, tone, items, empty }: { label: string; tone?: 'up' | 'down'; items: string[]; empty: string }) {
-  return <div className="ds-card gv-list">
-    <span className={`ds-label ${tone === 'down' ? 'ds-label--down' : tone === 'up' ? 'ds-label--up' : ''}`}>{label}</span>
-    {items.length ? <ul>{items.map((t) => <li key={t}>{t}</li>)}</ul> : <p className="gv-empty">{empty}</p>}
+function WordList({ label, items, empty }: { label: string; items: string[]; empty: string }) {
+  return <div className="field-card gv-list">
+    <span>{label}</span>
+    {items.length ? <ul>{items.map((t) => <li key={t}>{t}</li>)}</ul> : <small className="field-empty-reason">{empty}</small>}
   </div>
 }
 function EventCard({ e, now }: { e: EventRow; now: number }) {
   const scale = timesUsual(e.evidence?.z)
-  return <article className={`ds-card gv-event gv-event--${e.market_direction}`}>
-    <strong>{stripPct(e.title)}</strong>
-    <p>{scale ? `${scale.charAt(0).toUpperCase()}${scale.slice(1)}.` : e.summary}</p>
-    <p className="gv-event-why"><b>Why it matters for India.</b> {e.india_impact || 'Driver unclear.'}</p>
-    <small>India relevance {level(Number(e.india_relevance))} · confidence {level(Number(e.confidence))} · {ago(e.updated_at, now)}</small>
+  const tone: Tone = e.market_direction === 'risk_off' ? 'down' : e.market_direction === 'risk_on' ? 'up' : 'neutral'
+  return <article className="field-card gv-event">
+    <span>{e.market_direction === 'risk_off' ? 'Risk-off move' : e.market_direction === 'risk_on' ? 'Risk-on move' : 'Move'} · {ago(e.updated_at, now)}</span>
+    <strong>{stripPct(e.title)} <em className={`ds-badge ds-badge--${tone}`}>{scale ? `${Math.abs(Number(e.evidence?.z)).toFixed(1)}× usual` : 'notable'}</em></strong>
+    <small className="gv-event-why">{e.india_impact || 'Driver unclear.'}</small>
+    <small className="gv-event-meta">India relevance {level(Number(e.india_relevance))} · confidence {level(Number(e.confidence))}</small>
   </article>
 }
 
@@ -203,7 +214,7 @@ export function GlobalCuesView() {
     {TABS.map((t) => <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'is-active' : ''} onClick={() => setTab(t.id)}>{t.label}</button>)}
   </div>
 
-  if (isLoading) return <section className="phase-view cues-view">{head}{tabs}<div className="gv-row3"><Skeleton height={110} /><Skeleton height={110} /><Skeleton height={110} /></div></section>
+  if (isLoading) return <section className="phase-view cues-view">{head}{tabs}<div className="field-grid"><Skeleton height={110} /><Skeleton height={110} /><Skeleton height={110} /></div></section>
   if (error) return <section className="phase-view cues-view">{head}<EmptyState label="Global view" headline="Context could not be loaded" reason="The request to Supabase failed. Reopening this screen retries." /></section>
   if (!ctx) return <section className="phase-view cues-view">{head}<EmptyState label="Global view" headline="No calculation on record" reason="The global-context-sync function has not written a row yet. The first run populates this screen." /></section>
 
@@ -212,63 +223,79 @@ export function GlobalCuesView() {
     {tabs}
 
     {tab === 'summary' && <>
-      <div className={`ds-card gv-oneline gv-oneline--${ctx.transmission_tone}`}>
-        <span className="ds-label">Today in one line</span>
-        <p>{oneLine(ctx)}</p>
+      <div className="thesis-hero">
+        <div className="thesis-hero-main">
+          <Label tone="info">The read right now</Label>
+          <strong className="thesis-hero-value">{headline(ctx)}</strong>
+          <p className="thesis-hero-note">{oneLine(ctx)}</p>
+          {events.length > 0 && <div className="agent-badges">{events.slice(0, 3).map((e) => <button type="button" key={e.id} className={`ds-badge ${e.market_direction === 'risk_off' ? 'ds-badge--down' : e.market_direction === 'risk_on' ? 'ds-badge--up' : 'ds-badge--neutral'} gv-chip`} onClick={() => setTab('link')}>{stripPct(e.title)}</button>)}</div>}
+        </div>
       </div>
-      <div className="gv-row3">
-        <Verdict label="Global" band={ctx.global_band} tone={gTone} sub={gSub} />
-        <Verdict label="India" band={ctx.india_band} tone={iTone} sub={iSub} />
-        <Verdict label="Global → India" band={ctx.transmission_label.replace(' global influence', '').replace('India ', '')} tone={ctx.transmission_tone} sub={ctx.counterforces.length ? `Domestic factors appear to be offsetting: ${ctx.counterforces.slice(0, 2).join(' and ').toLowerCase()}.` : ctx.channels.length ? `Evidence of transmission: ${ctx.channels[0].toLowerCase()}.` : 'No single transmission channel stands out today.'} />
-      </div>
-      <div className="gv-row2">
-        <WordList label="Why" items={ctx.what_is_driving.slice(0, 4)} empty="Driver unclear. No input moved enough to stand out." />
-        <WordList label="Watch next" items={watchNext(ctx, events, now)} empty="Nothing pending." />
-      </div>
-      {events.length > 0 && <div className="gv-chips">
-        {events.slice(0, 3).map((e) => <button type="button" key={e.id} className="ds-badge ds-badge--outline gv-chip" onClick={() => setTab('link')}><i className={`gv-dot gv-dot--${e.market_direction === 'risk_off' ? 'down' : e.market_direction === 'risk_on' ? 'up' : 'neutral'}`} aria-hidden="true" />{stripPct(e.title)}, {timesUsual(e.evidence?.z)}</button>)}
-        <span className="gv-chip-note">{events.length} significant move{events.length === 1 ? '' : 's'} · see Global → India</span>
-      </div>}
+      <section className="metric-group">
+        <div className="group-heading"><h3>Verdicts</h3></div>
+        <div className="field-grid">
+          <Verdict label="Global" band={ctx.global_band} tone={gTone} sub={gSub} />
+          <Verdict label="India" band={ctx.india_band} tone={iTone} sub={iSub} />
+          <Verdict label="Global → India" band={ctx.transmission_label.replace(' global influence', '').replace('India ', '')} tone={ctx.transmission_tone} sub={ctx.counterforces.length ? `Domestic factors appear to be offsetting: ${ctx.counterforces.slice(0, 2).join(' and ').toLowerCase()}.` : ctx.channels.length ? `Evidence of transmission: ${ctx.channels[0].toLowerCase()}.` : 'No single transmission channel stands out today.'} />
+        </div>
+      </section>
+      <section className="metric-group">
+        <div className="group-heading"><h3>Why, and what comes next</h3></div>
+        <div className="field-grid gv-grid2">
+          <WordList label="Why" items={ctx.what_is_driving.slice(0, 4)} empty="Driver unclear. No input moved enough to stand out." />
+          <WordList label="Watch next" items={watchNext(ctx, events, now)} empty="Nothing pending." />
+        </div>
+      </section>
     </>}
 
     {tab === 'global' && <>
-      <Verdict label="Global verdict" band={ctx.global_band} tone={gTone} sub={`Regime: ${ctx.regime.toLowerCase()}. ${gSub}`} />
-      <div className="gv-row2">
-        <WordList label="Working against risk" tone="down" items={againstRisk(gd).map(words)} empty="Nothing is pushing against risk appetite right now." />
-        <WordList label="Working for risk" tone="up" items={forRisk(gd).map(words)} empty="Nothing is supporting risk appetite right now." />
-      </div>
+      <div className="thesis-hero"><div className="thesis-hero-main"><Label tone="info">Global verdict</Label><strong className="thesis-hero-value">{ctx.global_band}</strong><p className="thesis-hero-note">Regime: {ctx.regime.toLowerCase()}. {gSub}</p></div></div>
+      <section className="metric-group">
+        <div className="group-heading"><h3>What is pulling the verdict</h3></div>
+        <div className="field-grid gv-grid2">
+          <WordList label="Working against risk" items={againstRisk(gd).map(words)} empty="Nothing is pushing against risk appetite right now." />
+          <WordList label="Working for risk" items={forRisk(gd).map(words)} empty="Nothing is supporting risk appetite right now." />
+        </div>
+      </section>
       {quiet(gd).length > 0 && <p className="chart-note">Quiet today: {quiet(gd).map((d) => d.label.toLowerCase()).join(', ')}.</p>}
       <p className="chart-note">Verdict from {gd.length} global components across 21 instruments. Every number sits under Data &amp; reference.</p>
     </>}
 
     {tab === 'india' && <>
-      <Verdict label="India verdict" band={ctx.india_band} tone={iTone} sub={iSub} />
-      <div className="gv-row2">
-        <WordList label="Supporting" tone="up" items={forRisk(id).map(words)} empty="No domestic input is supportive right now." />
-        <WordList label="Dragging" tone="down" items={againstRisk(id).map(words)} empty="No domestic input is dragging right now." />
-      </div>
+      <div className="thesis-hero"><div className="thesis-hero-main"><Label tone="info">India verdict</Label><strong className="thesis-hero-value">{ctx.india_band}</strong><p className="thesis-hero-note">{iSub}</p></div></div>
+      <section className="metric-group">
+        <div className="group-heading"><h3>What is pulling the verdict</h3></div>
+        <div className="field-grid gv-grid2">
+          <WordList label="Supporting" items={forRisk(id).map(words)} empty="No domestic input is supportive right now." />
+          <WordList label="Dragging" items={againstRisk(id).map(words)} empty="No domestic input is dragging right now." />
+        </div>
+      </section>
       {quiet(id).length > 0 && <p className="chart-note">Quiet today: {quiet(id).map((d) => d.label.toLowerCase()).join(', ')}.</p>}
       {ctx.confidence_detail?.note?.startsWith('Missing') && <p className="chart-note">{ctx.confidence_detail.note.replace('Missing: ', 'Not yet available today: ').replace(/_/g, ' ')}.</p>}
     </>}
 
     {tab === 'link' && <>
-      <div className={`ds-card gv-verdict gv-verdict--${ctx.transmission_tone}`}>
-        <span className="ds-label">Global → India</span>
-        <strong className="gv-band"><i className={`gv-dot gv-dot--${ctx.transmission_tone}`} aria-hidden="true" />{ctx.transmission_label}</strong>
-        <p>{ctx.explanation}</p>
-        <span className="ds-label gv-meter-label">How closely India has tracked the US lately</span>
-        {corr != null ? <>
-          <span className="gv-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.abs(corr) * 100)}%` }} /></span>
-          <span className="gv-meter-scale"><span>Weak</span><span>Moderate</span><span>Strong</span></span>
-        </> : <p className="gv-empty">{ctx.measured?.reading ?? 'History is still being collected.'}</p>}
-      </div>
-      <div className="gv-row2">
-        <WordList label="Channels active" items={ctx.channels} empty="No transmission channel is active today." />
-        <WordList label="Domestic counterforces" items={ctx.counterforces} empty="No domestic factor is leaning against the global tone." />
-      </div>
-      <div className="group-heading"><h3>Significant moves</h3></div>
-      {events.length ? <div className="gv-row2">{events.map((e) => <EventCard e={e} key={e.id} now={now} />)}</div>
-        : <p className="chart-note">No instrument has moved beyond its usual daily range in the last 36 hours.</p>}
+      <div className="thesis-hero"><div className="thesis-hero-main"><Label tone="info">Global → India</Label><strong className="thesis-hero-value">{ctx.transmission_label}</strong><p className="thesis-hero-note">{ctx.explanation}</p></div></div>
+      <section className="metric-group">
+        <div className="group-heading"><h3>How it is transmitting</h3></div>
+        <div className="field-grid">
+          <div className="field-card gv-list">
+            <span>How closely India has tracked the US lately</span>
+            {corr != null ? <>
+              <strong>{ctx.measured?.label} <em className={`ds-badge ds-badge--${ctx.measured?.label === 'Strong' ? 'down' : ctx.measured?.label === 'Moderate' ? 'caution' : 'neutral'}`}>20 sessions</em></strong>
+              <span className="gv-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.abs(corr) * 100)}%` }} /></span>
+              <small className="gv-meter-scale"><span>Weak</span><span>Moderate</span><span>Strong</span></small>
+            </> : <small className="field-empty-reason">{ctx.measured?.reading ?? 'History is still being collected.'}</small>}
+          </div>
+          <WordList label="Channels active" items={ctx.channels} empty="No transmission channel is active today." />
+          <WordList label="Domestic counterforces" items={ctx.counterforces} empty="No domestic factor is leaning against the global tone." />
+        </div>
+      </section>
+      <section className="metric-group">
+        <div className="group-heading"><h3>Significant moves</h3></div>
+        {events.length ? <div className="field-grid gv-grid2">{events.map((e) => <EventCard e={e} key={e.id} now={now} />)}</div>
+          : <p className="chart-note">No instrument has moved beyond its usual daily range in the last 36 hours.</p>}
+      </section>
     </>}
 
     {tab === 'data' && <>
