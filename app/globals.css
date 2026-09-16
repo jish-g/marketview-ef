@@ -970,3 +970,15 @@ button, input { font: inherit; }
   .chart-last { margin-left: 0; }
   .chart-frame { height: clamp(260px, 44vh, 380px); }
 }
+
+/* GlobalCue/News screen: the overnight basket reuses .field-card; headlines get a plain list. */
+.cues-view { display: grid; gap: var(--s-4); }
+.cues-grid .field-card strong { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.cues-grid .field-card strong .cue-delta { font-style: normal; opacity: 1; letter-spacing: 0; font-size: var(--text-label); }
+.cues-grid .field-card .cue-time { display: block; margin-top: 4px; color: var(--muted); font-size: var(--text-label); }
+.news-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.news-list li { display: grid; gap: 2px; padding: 10px 12px; }
+.news-list li + li { border-top: 1px solid var(--border); }
+.news-list a { color: var(--ink); text-decoration: none; font-size: var(--text-meta); line-height: 1.45; }
+.news-list a:hover { text-decoration: underline; }
+.news-list small { color: var(--muted); font-size: var(--text-label); }
