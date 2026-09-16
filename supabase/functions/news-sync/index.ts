@@ -141,7 +141,7 @@ Deno.serve(async (req: Request) => {
       // 10Y move but a BOJ headline, whose primary asset is the Nikkei, does not.
       const assets = new Set([...c.entities.values()].map((e) => e.assets[0]).filter(Boolean));
       const linked = moves.find((m) => (m.affected_assets ?? []).some((a) => assets.has(a))) ?? null;
-      const qualifies = (ANALYSE.officialCounts && c.official) || c.sources.size >= ANALYSE.minSources || (ANALYSE.linkedMoveCounts && linked != null);
+      const qualifies = (ANALYSE.officialCounts && c.official) || c.sources.size >= ANALYSE.minSources || (ANALYSE.linkedMoveCounts && linked != null && c.articles.length >= ANALYSE.linkedMoveMinArticles);
       const prev = eventByCluster.get(c.key);
       const changed = prev ? c.articles.length >= prev.nSources * 2 : true;
       return { c, linked, qualifies, prev, changed };

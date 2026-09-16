@@ -52,7 +52,7 @@ export const GLOBAL_COMPONENTS = {
   asia:         { weight: 0.08, scale: 1.2,  label: "Asia" },
   china:        { weight: 0.02, scale: 1.5,  label: "China" },
   europe:       { weight: 0.05, scale: 1.0,  label: "Europe" },
-  news:         { weight: 0.12, scale: 1.5,  label: "News flow" },          // decayed sum of event direction × relevance × confidence
+  news:         { weight: 0.12, scale: 1.0,  label: "News flow" },          // decay-weighted mean of event direction × relevance × confidence
 } as const;
 
 // VIX level adjustment: a VIX at or above `high` pulls the volatility component down even when
@@ -70,7 +70,7 @@ export const INDIA_COMPONENTS = {
   inr:          { weight: 0.08, scale: 0.4,  label: "INR" },                // % change USDINR, inverted
   gift:         { weight: 0.05, scale: 0.8,  label: "GIFT Nifty" },         // gap % vs prior close
   options:      { weight: 0.05, scale: 0.4,  label: "Options positioning" }, // PCR - 1
-  news:         { weight: 0.12, scale: 1.5,  label: "News flow" },          // Indian events plus global events weighted by India relevance
+  news:         { weight: 0.12, scale: 1.0,  label: "News flow" },          // Indian events plus global events weighted by India relevance
 } as const;
 
 export const INDIA_VIX_LEVEL = { low: 12, high: 18, weight: 0.5 };
@@ -114,7 +114,7 @@ export const CONFIDENCE = { highCoverage: 0.8, mediumCoverage: 0.6, highMaxAgeMi
 // News component: analysed events from the last `lookbackHours`, each contributing
 // direction × relevance × confidence, decayed with this half-life so a morning story fades by
 // evening. Global side uses global_relevance; India side uses india_relevance for every event.
-export const NEWS = { lookbackHours: 24, halfLifeHours: 8, minEvents: 1 };
+export const NEWS = { lookbackHours: 24, halfLifeHours: 8, minEvents: 1, saturateAt: 3 }; // saturateAt: events needed for full weight
 
 // Cadence the sync is expected to run at; the frontend uses this to label a row as stale.
 export const EXPECTED_REFRESH_MIN = 15;

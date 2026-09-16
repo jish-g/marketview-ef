@@ -174,9 +174,16 @@ export function scoreNews(events: NewsEventLite[], now: Date, scale: number): Ne
   const recent = events.filter((e) => now.getTime() - Date.parse(e.event_time) <= NEWS.lookbackHours * 3600_000);
   const g = recent.filter((e) => e.region !== "india");
   const i = recent; // Indian events count fully; global events count by their India relevance
-  const sum = (xs: NewsEventLite[], rel: (e: NewsEventLite) => number) => xs.reduce((a, e) => a + dir(e.market_direction) * rel(e) * e.confidence * decay(e.event_time), 0);
-  const gRaw = g.length >= NEWS.minEvents ? sum(g, (e) => e.global_relevance) : null;
-  const iRaw = i.length >= NEWS.minEvents ? sum(i, (e) => e.region === "india" ? e.india_relevance : e.india_relevance * 0.8) : null;
+  // Decay-weighted mean of per-event contributions (each already in [-1, 1]), scaled by how many
+  // events there are up to NEWS.saturateAt. Bounded by construction: twenty-five same-direction
+  // stories read as a strong lean, not as an off-the-scale number.
+  const lean = (xs: NewsEventLite[], rel: (e: NewsEventLite) => number) => {
+    let num = 0, den = 0;
+    for (const e of xs) { const w = decay(e.event_time); num += w * dir(e.market_direction) * rel(e) * e.confidence; den += w; }
+    return den > 0 ? (num / den) * Math.min(1, xs.length / NEWS.saturateAt) : 0;
+  };
+  const gRaw = g.length >= NEWS.minEvents ? lean(g, (e) => e.global_relevance) : null;
+  const iRaw = i.length >= NEWS.minEvents ? lean(i, (e) => e.region === "india" ? e.india_relevance : e.india_relevance * 0.8) : null;
   const lead = (xs: NewsEventLite[], rel: (e: NewsEventLite) => number) => xs.slice().sort((a, b) => Math.abs(dir(b.market_direction) * rel(b) * b.confidence) - Math.abs(dir(a.market_direction) * rel(a) * a.confidence)).slice(0, 2).map((e) => e.title).join("; ");
   const word = (v: number | null) => v == null ? "no analysed events" : v > 0.15 ? "leaning risk-on" : v < -0.15 ? "leaning risk-off" : "balanced";
   const gScore = gRaw == null ? null : Math.max(-1, Math.min(1, gRaw / scale));
