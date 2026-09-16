@@ -16,7 +16,7 @@ export const NARRATIVE_MODEL = "claude-sonnet-4-5-20250929";
 export const JUDGE_MODEL = "claude-sonnet-4-5-20250929";
 // Bump whenever the prompt, the input shape or the gate changes: it is part of the reuse key, so
 // a deploy forces a fresh, re-checked narrative instead of carrying the previous one forward.
-export const NARRATIVE_VERSION = "3";
+export const NARRATIVE_VERSION = "4";
 const TIMEOUT_MS = 30_000;
 const LIMITS = { summary: [50, 120], global: [40, 110], india: [40, 110], link: [40, 110] } as const;
 
@@ -58,7 +58,9 @@ function allowedNumbers(input: unknown): Set<string> {
   const walk = (v: unknown) => {
     if (typeof v === "number" && Number.isFinite(v)) {
       const a = Math.abs(v);
-      for (const s of [a.toString(), a.toFixed(0), a.toFixed(1), a.toFixed(2), Math.round(a).toLocaleString("en-IN"), Math.round(a).toLocaleString("en-US")]) out.add(s.replace(/\.0+$/, ""));
+      // Rounded and truncated forms both count: the model writes -1.195 as 1.2 or as 1.19.
+      const trunc = (d: number) => (Math.trunc(a * 10 ** d) / 10 ** d).toFixed(d);
+      for (const s of [a.toString(), a.toFixed(0), a.toFixed(1), a.toFixed(2), trunc(1), trunc(2), Math.round(a).toLocaleString("en-IN"), Math.round(a).toLocaleString("en-US")]) out.add(s.replace(/\.0+$/, ""));
     } else if (typeof v === "string") {
       for (const m of v.matchAll(/\d+(?:,\d{3})*(?:\.\d+)?/g)) out.add(m[0].replace(/,/g, "").replace(/\.0+$/, ""));
     } else if (Array.isArray(v)) v.forEach(walk);
