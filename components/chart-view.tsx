@@ -12,6 +12,20 @@ type Row = Record<string, string | number | boolean | null>
 type Instrument = 'NIFTY' | 'SENSEX'
 type Span = 'session' | 'history'
 type Bar = { time: UTCTimestamp; open: number; high: number; low: number; close: number }
+// A one-minute candle as stored, with the IST trade date it belongs to. Everything the chart
+// draws is derived from these in the browser: the range filter, the timeframe aggregation and
+// the previous-session levels all read this one array, so a live one-minute update flows into
+// every view without a second query.
+type Candle = { tradeDate: string; bar: Bar }
+
+type Timeframe = '1m' | '3m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d'
+const TIMEFRAMES: { key: Timeframe; minutes: number }[] = [
+  { key: '1m', minutes: 1 }, { key: '3m', minutes: 3 }, { key: '5m', minutes: 5 }, { key: '15m', minutes: 15 },
+  { key: '30m', minutes: 30 }, { key: '1h', minutes: 60 }, { key: '4h', minutes: 240 }, { key: '1d', minutes: 0 },
+]
+
+const IST_OFFSET_S = 19800
+const SESSION_OPEN_MIN = 9 * 60 + 15
 
 function todayIST() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -21,16 +35,45 @@ const IST_TIME = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', ho
 const IST_DAY = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' })
 const IST_FULL = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
 
-type LevelKey = 'oi' | 'pivot' | 'maxpain' | 'prev'
+// Buckets are anchored to the 09:15 IST open, not to the clock hour, so a 3m bar runs
+// 09:15-09:18, an hourly bar 09:15-10:15 and a 4h bar 09:15-13:15 then 13:15-close. That is how
+// every Indian charting terminal cuts intraday bars, and it keeps the first bar of the day whole.
+function bucketStart(time: UTCTimestamp, minutes: number): UTCTimestamp {
+  const istMinuteOfDay = Math.floor(((time + IST_OFFSET_S) % 86400) / 60)
+  const sinceOpen = Math.max(0, istMinuteOfDay - SESSION_OPEN_MIN)
+  const offset = minutes === 0 ? sinceOpen : sinceOpen % minutes
+  return (time - offset * 60) as UTCTimestamp
+}
+
+function aggregate(bars: Bar[], minutes: number): Bar[] {
+  if (minutes === 1) return bars
+  const out: Bar[] = []
+  for (const b of bars) {
+    const start = bucketStart(b.time, minutes)
+    const last = out[out.length - 1]
+    if (last && last.time === start) {
+      last.high = Math.max(last.high, b.high)
+      last.low = Math.min(last.low, b.low)
+      last.close = b.close
+    } else {
+      out.push({ time: start, open: b.open, high: b.high, low: b.low, close: b.close })
+    }
+  }
+  return out
+}
+
+type LevelKey = 'oi' | 'pivot' | 'phlc'
 const LEVEL_GROUPS: { key: LevelKey; label: string }[] = [
-  { key: 'oi', label: 'OI support / resistance' },
+  { key: 'oi', label: 'OI walls' },
   { key: 'pivot', label: 'Pivot support / resistance' },
-  { key: 'maxpain', label: 'Max pain' },
-  { key: 'prev', label: 'Previous close' },
+  { key: 'phlc', label: 'PHLC · prev day high / low / close' },
 ]
 
 type LevelDef = { group: LevelKey; title: string; value: number; tone: 'up' | 'down' | 'info' | 'muted'; dashed: boolean }
 
+// Option-chain levels the Verdict screen reads, drawn on the index price axis. The verdict's
+// premium target and stop are deliberately absent: they are option-premium points, not prices
+// the spot is expected to reach.
 function levelsFor(row: Row, instrument: Instrument): LevelDef[] {
   const suffix = instrument === 'NIFTY' ? 'nifty' : 'sensex'
   const read = (key: string): number | null => {
@@ -42,94 +85,127 @@ function levelsFor(row: Row, instrument: Instrument): LevelDef[] {
   const defs: (LevelDef | null)[] = [
     read(`oi_support_${suffix}`) != null ? { group: 'oi', title: 'OI support', value: read(`oi_support_${suffix}`)!, tone: 'up', dashed: false } : null,
     read(`oi_resistance_${suffix}`) != null ? { group: 'oi', title: 'OI resistance', value: read(`oi_resistance_${suffix}`)!, tone: 'down', dashed: false } : null,
+    read(`max_pain_${suffix}`) != null ? { group: 'oi', title: 'Max pain', value: read(`max_pain_${suffix}`)!, tone: 'info', dashed: true } : null,
     read(`chart_support_${suffix}`) != null ? { group: 'pivot', title: 'Pivot support', value: read(`chart_support_${suffix}`)!, tone: 'up', dashed: true } : null,
     read(`chart_resistance_${suffix}`) != null ? { group: 'pivot', title: 'Pivot resistance', value: read(`chart_resistance_${suffix}`)!, tone: 'down', dashed: true } : null,
-    read(`max_pain_${suffix}`) != null ? { group: 'maxpain', title: 'Max pain', value: read(`max_pain_${suffix}`)!, tone: 'info', dashed: true } : null,
-    read(`prev_close_${suffix}`) != null ? { group: 'prev', title: 'Prev close', value: read(`prev_close_${suffix}`)!, tone: 'muted', dashed: true } : null,
   ]
   return defs.filter((d): d is LevelDef => d != null)
 }
 
-function sessionRead(bars: Bar[], levels: LevelDef[]): string | null {
+// Previous session high, low and close, from the candles themselves: the last trade date in the
+// loaded set that is earlier than the one on screen. The dashboard row's prev close is the
+// fallback for the close alone when no earlier session is loaded.
+function phlcFor(candles: Candle[], tradeDate: string, fallbackClose: number | null): LevelDef[] {
+  let prevDate = ''
+  for (const c of candles) if (c.tradeDate < tradeDate && c.tradeDate > prevDate) prevDate = c.tradeDate
+  if (!prevDate) {
+    return fallbackClose != null ? [{ group: 'phlc', title: 'PDC', value: fallbackClose, tone: 'muted', dashed: true }] : []
+  }
+  let high = -Infinity, low = Infinity, close = NaN
+  for (const c of candles) {
+    if (c.tradeDate !== prevDate) continue
+    high = Math.max(high, c.bar.high)
+    low = Math.min(low, c.bar.low)
+    close = c.bar.close
+  }
+  if (!Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) return []
+  return [
+    { group: 'phlc', title: 'PDH', value: high, tone: 'muted', dashed: true },
+    { group: 'phlc', title: 'PDL', value: low, tone: 'muted', dashed: true },
+    { group: 'phlc', title: 'PDC', value: close, tone: 'muted', dashed: true },
+  ]
+}
+
+function sessionRead(bars: Bar[], levels: LevelDef[], scope: string): string | null {
   if (bars.length < 2) return null
   const first = bars[0]
   const last = bars[bars.length - 1]
-  const changePct = ((last.close - first.open) / first.open) * 100
   const high = Math.max(...bars.map((b) => b.high))
   const low = Math.min(...bars.map((b) => b.low))
+  const changePct = ((last.close - first.open) / first.open) * 100
   const flat = Math.abs(changePct) <= 0.05
   const support = levels.find((l) => l.group === 'oi' && l.tone === 'up')
   const resistance = levels.find((l) => l.group === 'oi' && l.tone === 'down')
   const parts: string[] = []
-  parts.push(flat ? `Flat on the session at ${fmt.level(last.close)}` : `${fmt.pct(changePct)} on the session at ${fmt.level(last.close)}`)
+  parts.push(flat ? `Flat ${scope} at ${fmt.level(last.close)}` : `${fmt.pct(changePct)} ${scope} at ${fmt.level(last.close)}`)
   parts.push(`range ${fmt.level(low)}–${fmt.level(high)}`)
   if (resistance && high >= resistance.value) parts.push(`tagged OI resistance at ${fmt.level(resistance.value)}`)
   else if (support && low <= support.value) parts.push(`tagged OI support at ${fmt.level(support.value)}`)
-  else if (support && resistance) parts.push('held inside the OI band')
-  return `${parts.join(', ')}.`
+  else if (support && resistance) parts.push(`inside the OI band ${fmt.level(support.value)}–${fmt.level(resistance.value)}`)
+  return parts.join(' · ') + '.'
 }
 
 export function ChartView({ row }: { row: Row }) {
   const [instrument, setInstrument] = useState<Instrument>('NIFTY')
   const [span, setSpan] = useState<Span>('history')
-  const [hidden, setHidden] = useState<Set<LevelKey>>(() => new Set<LevelKey>(['prev']))
-  const [bars, setBars] = useState<Bar[]>([])
+  const [timeframe, setTimeframe] = useState<Timeframe>('5m')
+  const [hidden, setHidden] = useState<Set<LevelKey>>(() => new Set<LevelKey>(['pivot']))
+  const [candles, setCandles] = useState<Candle[]>([])
+  const [fullscreen, setFullscreen] = useState(false)
 
   const colors = useChartColors()
   const supabase = useMemo(() => createClient(), [])
   const tradeDate = String(row.trade_date ?? todayIST())
   const isToday = tradeDate === todayIST()
-  const levels = useMemo(() => levelsFor(row, instrument), [row, instrument])
 
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const frameRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const priceLinesRef = useRef<IPriceLine[]>([])
   const [chartReady, setChartReady] = useState(false)
 
-  // Fetch enough calendar days to reliably contain 30 trading sessions, then trim to the
-  // latest 30 distinct trade dates. Holidays and weekends therefore do not shorten the chart.
+  // Always load the 30-session window, whatever range is on screen: the range switch is then a
+  // client-side filter (instant), and the previous session is always present for PHLC.
+  // 60 calendar days reliably contains 30 trading sessions across holidays.
   const fromDate = useMemo(() => {
-    if (span === 'session') return tradeDate
     const d = new Date(`${tradeDate}T00:00:00Z`)
     d.setUTCDate(d.getUTCDate() - 60)
     return d.toISOString().slice(0, 10)
-  }, [span, tradeDate])
+  }, [tradeDate])
 
-  const { data: fetched, error, isLoading } = useSWR<Bar[]>(
-    ['index-candles', instrument, fromDate, tradeDate, span],
+  const { data: fetched, error, isLoading } = useSWR<Candle[]>(
+    ['index-candles', instrument, fromDate, tradeDate],
     async () => {
-      const { data, error: queryError } = await supabase
+      // PostgREST caps a single response at 1,000 rows and 30 sessions of one-minute bars is
+      // ~11,000, so the window is read in pages. One count request first, then every page in
+      // parallel, so the whole history lands in about the time of two round trips.
+      const PAGE = 1000
+      const base = () => supabase
         .from('index_candles')
-        .select('bucket, trade_date, open, high, low, close')
+        .select('bucket, trade_date, open, high, low, close', { count: 'exact' })
         .eq('instrument', instrument)
         .gte('trade_date', fromDate)
         .lte('trade_date', tradeDate)
         .order('bucket', { ascending: true })
-      if (queryError) throw queryError
+      const first = await base().range(0, PAGE - 1)
+      if (first.error) throw first.error
+      const total = first.count ?? (first.data?.length ?? 0)
+      const rest = await Promise.all(
+        Array.from({ length: Math.max(0, Math.ceil(total / PAGE) - 1) }, (_, i) => base().range((i + 1) * PAGE, (i + 2) * PAGE - 1)),
+      )
+      for (const page of rest) if (page.error) throw page.error
+      const data = [...(first.data ?? []), ...rest.flatMap((p) => p.data ?? [])]
 
-      const mapped = ((data ?? []) as Row[]).map((c) => ({
+      const mapped: Candle[] = (data as Row[]).map((c) => ({
         tradeDate: String(c.trade_date ?? ''),
         bar: {
           time: Math.floor(new Date(String(c.bucket)).getTime() / 1000) as UTCTimestamp,
           open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
-        } satisfies Bar,
-      })).filter(({ bar }) => [bar.open, bar.high, bar.low, bar.close].every(Number.isFinite))
+        },
+      })).filter(({ tradeDate: d, bar }) => d && [bar.open, bar.high, bar.low, bar.close].every(Number.isFinite))
 
-      if (span === 'session') return mapped.filter(({ tradeDate: d }) => d === tradeDate).map(({ bar }) => bar)
-
-      const dates = Array.from(new Set(mapped.map(({ tradeDate: d }) => d).filter(Boolean))).sort().slice(-30)
+      const dates = Array.from(new Set(mapped.map((c) => c.tradeDate))).sort().slice(-30)
       const keep = new Set(dates)
-      return mapped.filter(({ tradeDate: d }) => keep.has(d)).map(({ bar }) => bar)
+      return mapped.filter((c) => keep.has(c.tradeDate))
     },
     { revalidateOnFocus: false },
   )
 
-  useEffect(() => { setBars(fetched ?? []) }, [fetched])
+  useEffect(() => { setCandles(fetched ?? []) }, [fetched])
 
-  // Live updates are enabled only for the current trading date. Historical sessions remain fixed.
-  // The existing index-candle-sync writes one-minute Kite candles into Supabase, and Realtime
-  // delivers those inserts/updates directly to this chart.
+  // Live updates only for the current trading date. index-candle-sync writes one-minute Kite
+  // candles into Supabase and Realtime delivers those inserts/updates straight to this chart.
   useEffect(() => {
     if (!isToday) return
     const channel = supabase
@@ -142,18 +218,38 @@ export function ChartView({ row }: { row: Row }) {
           open: Number(next.open), high: Number(next.high), low: Number(next.low), close: Number(next.close),
         }
         if (![bar.open, bar.high, bar.low, bar.close].every(Number.isFinite)) return
-        setBars((prev) => {
-          const at = prev.findIndex((b) => b.time === bar.time)
-          if (at === -1) return [...prev, bar].sort((a, b) => a.time - b.time)
-          if (prev[at].close === bar.close && prev[at].high === bar.high && prev[at].low === bar.low) return prev
+        setCandles((prev) => {
+          const at = prev.findIndex((c) => c.bar.time === bar.time)
+          if (at === -1) return [...prev, { tradeDate, bar }].sort((a, b) => a.bar.time - b.bar.time)
+          const cur = prev[at].bar
+          if (cur.close === bar.close && cur.high === bar.high && cur.low === bar.low && cur.open === bar.open) return prev
           const copy = prev.slice()
-          copy[at] = bar
+          copy[at] = { tradeDate, bar }
           return copy
         })
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [supabase, instrument, isToday, tradeDate])
+
+  // Derived views. The one-minute array is the only state; everything below is a pure function
+  // of it plus the three switches, so a live update re-derives all of them in one render.
+  const sessionCandles = useMemo(
+    () => (span === 'session' ? candles.filter((c) => c.tradeDate === tradeDate) : candles),
+    [candles, span, tradeDate],
+  )
+  const tfMinutes = TIMEFRAMES.find((t) => t.key === timeframe)?.minutes ?? 1
+  const bars = useMemo(() => aggregate(sessionCandles.map((c) => c.bar), tfMinutes), [sessionCandles, tfMinutes])
+
+  const prevCloseFallback = useMemo(() => {
+    const v = row[`prev_close_${instrument === 'NIFTY' ? 'nifty' : 'sensex'}`]
+    const n = Number(v)
+    return v != null && v !== '' && Number.isFinite(n) && n > 0 ? n : null
+  }, [row, instrument])
+  const levels = useMemo(
+    () => [...levelsFor(row, instrument), ...phlcFor(candles, tradeDate, prevCloseFallback)],
+    [row, instrument, candles, tradeDate, prevCloseFallback],
+  )
 
   useEffect(() => {
     let disposed = false
@@ -216,14 +312,16 @@ export function ChartView({ row }: { row: Row }) {
     seriesRef.current.setData(bars)
   }, [bars, chartReady])
 
+  // Fit once per view identity, after bars have arrived. Not on every bars change: a refit each
+  // minute would yank the axis out from under someone who has zoomed in.
   const fitKeyRef = useRef('')
   useEffect(() => {
     if (!chartReady || !chartRef.current || bars.length === 0) return
-    const key = `${instrument}|${span}|${tradeDate}`
+    const key = `${instrument}|${span}|${timeframe}|${tradeDate}`
     if (fitKeyRef.current === key) return
     fitKeyRef.current = key
     chartRef.current.timeScale().fitContent()
-  }, [bars, chartReady, instrument, span, tradeDate])
+  }, [bars, chartReady, instrument, span, timeframe, tradeDate])
 
   useEffect(() => {
     if (!chartReady || !chartRef.current || !seriesRef.current) return
@@ -256,6 +354,33 @@ export function ChartView({ row }: { row: Row }) {
       }))
   }, [levels, hidden, colors, chartReady])
 
+  // Fullscreen prefers the browser's own API: the frame element goes fullscreen, the
+  // ResizeObserver above resizes the canvas, and Escape exits as everywhere else. Where the API
+  // is missing or refused (iPhone Safari, embedded views) the frame is instead pinned over the
+  // viewport with CSS, which the same ResizeObserver handles. Escape is wired for that path too.
+  useEffect(() => {
+    const sync = () => { if (document.fullscreenElement == null) setFullscreen(false) }
+    document.addEventListener('fullscreenchange', sync)
+    return () => document.removeEventListener('fullscreenchange', sync)
+  }, [])
+  useEffect(() => {
+    if (!fullscreen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.fullscreenElement) setFullscreen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [fullscreen])
+  const toggleFullscreen = useCallback(async () => {
+    const el = frameRef.current
+    if (!el) return
+    if (fullscreen) {
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined)
+      setFullscreen(false)
+      return
+    }
+    setFullscreen(true)
+    try { await el.requestFullscreen?.() } catch { /* CSS fallback already applied */ }
+  }, [fullscreen])
+
   const toggleLevel = useCallback((key: LevelKey) => {
     setHidden((prev) => {
       const next = new Set(prev)
@@ -265,9 +390,10 @@ export function ChartView({ row }: { row: Row }) {
     })
   }, [])
 
-  const read = useMemo(() => sessionRead(bars, levels), [bars, levels])
+  const read = useMemo(() => sessionRead(bars, levels, span === 'session' ? 'on the session' : 'over 30 sessions'), [bars, levels, span])
   const availableGroups = useMemo(() => LEVEL_GROUPS.filter((g) => levels.some((l) => l.group === g.key)), [levels])
   const lastBar = bars.length ? bars[bars.length - 1] : null
+  const lastCandleAt = sessionCandles.length ? new Date(sessionCandles[sessionCandles.length - 1].bar.time * 1000).toISOString() : null
 
   return <section className="phase-view chart-view">
     <div className="review-section-head">
@@ -275,7 +401,7 @@ export function ChartView({ row }: { row: Row }) {
         <p className="eyebrow">Price action · {isToday ? 'LIVE FROM KITE' : `HISTORY THROUGH ${tradeDate}`}</p>
         <h2>Chart</h2>
       </div>
-      <PhaseAside capturedAt={lastBar ? new Date(lastBar.time * 1000).toISOString() : null} />
+      <PhaseAside capturedAt={lastCandleAt} />
     </div>
 
     <div className="chart-controls">
@@ -291,11 +417,23 @@ export function ChartView({ row }: { row: Row }) {
           <button key={s} type="button" className={span === s ? 'is-active' : ''} aria-pressed={span === s} onClick={() => setSpan(s)}>{label}</button>
         ))}
       </div>
+      <div className="chart-switch chart-switch-tf" role="group" aria-label="Timeframe">
+        {TIMEFRAMES.map((t) => (
+          <button key={t.key} type="button" className={timeframe === t.key ? 'is-active' : ''} aria-pressed={timeframe === t.key} onClick={() => setTimeframe(t.key)}>{t.key}</button>
+        ))}
+      </div>
       {lastBar && <span className="chart-last"><span>Last</span><b>{fmt.level(lastBar.close)}</b></span>}
     </div>
 
-    <div className="chart-frame">
+    <div className={`chart-frame ${fullscreen ? 'is-fullscreen' : ''}`} ref={frameRef}>
       <div className="chart-canvas" ref={containerRef} />
+      <button type="button" className="chart-fullscreen" onClick={toggleFullscreen} aria-pressed={fullscreen} title={fullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}>
+        {fullscreen ? 'Exit' : 'Fullscreen'}
+      </button>
+      {fullscreen && <div className="chart-fullscreen-caption">
+        <b>{instrument === 'NIFTY' ? 'Nifty 50' : 'Sensex'}</b> · {timeframe} · {span === 'session' ? 'This session' : '30 trading days'}
+        {lastBar && <> · Last <b>{fmt.level(lastBar.close)}</b></>}
+      </div>}
       {(isLoading || error || bars.length === 0) && <div className="chart-overlay">
         {isLoading
           ? <Skeleton width={480} height={180} />
@@ -311,7 +449,7 @@ export function ChartView({ row }: { row: Row }) {
     </div>
 
     {availableGroups.length > 0 && <div className="chart-legend">
-      <span className="chart-legend-label">Levels</span>
+      <span className="chart-legend-label">Indicators</span>
       {availableGroups.map((g) => (
         <button key={g.key} type="button" className={`chart-legend-item ${hidden.has(g.key) ? 'is-off' : ''}`} aria-pressed={!hidden.has(g.key)} onClick={() => toggleLevel(g.key)}>
           <i className={`chart-legend-swatch swatch-${g.key}`} aria-hidden="true" />{g.label}
@@ -322,10 +460,12 @@ export function ChartView({ row }: { row: Row }) {
     {read && <p className="chart-read">{read}</p>}
 
     <p className="chart-note">
-      One-minute index spot candles from Zerodha Kite Connect. The chart keeps the latest 30 trading
-      sessions for historical context and receives the current session live through Supabase Realtime.
+      One-minute index spot candles from Zerodha Kite Connect, aggregated in the browser to the
+      selected timeframe from the 09:15 IST open. The chart keeps the latest 30 trading sessions and
+      receives the current session live through Supabase Realtime. OI walls and pivots are the same
+      figures the Verdict screen reads; PHLC is computed from the previous session&apos;s candles.
     </p>
 
-    <Disclaimer source="Zerodha Kite Connect" capturedAt={lastBar ? fmt.timeIST(new Date(lastBar.time * 1000).toISOString()) : null} />
+    <Disclaimer source="Zerodha Kite Connect" capturedAt={lastCandleAt ? fmt.timeIST(lastCandleAt) : null} />
   </section>
 }

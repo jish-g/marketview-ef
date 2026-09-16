@@ -997,7 +997,30 @@ button, input { font: inherit; }
 .chart-legend-swatch.swatch-oi { border-top-color: var(--down); }
 .chart-legend-swatch.swatch-pivot { border-top-color: var(--down); border-top-style: dashed; }
 .chart-legend-swatch.swatch-maxpain { border-top-color: var(--info); border-top-style: dashed; }
-.chart-legend-swatch.swatch-prev { border-top-color: var(--faint); border-top-style: dashed; }
+.chart-legend-swatch.swatch-phlc { border-top-color: var(--faint); border-top-style: dashed; }
+
+/* Timeframe switch: eight short labels, so tighter padding than the two-option switches. */
+.chart-switch-tf button { padding-left: var(--s-3); padding-right: var(--s-3); text-transform: none; font-variant-numeric: tabular-nums; }
+
+/* Fullscreen: the frame itself goes fullscreen through the browser API, so the canvas and the
+   overlay come with it and the ResizeObserver resizes the chart. The button lives inside the
+   frame for the same reason -- it must still be reachable once the frame is all there is. */
+.chart-fullscreen {
+  position: absolute; top: var(--s-2); left: var(--s-2); z-index: 2;
+  padding: var(--s-1) var(--s-3); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--ground); color: var(--muted); cursor: pointer;
+  font: 600 var(--text-label) var(--font-sans); letter-spacing: var(--tracking-label); text-transform: uppercase;
+}
+.chart-fullscreen:hover { color: var(--ink); }
+.chart-frame.is-fullscreen, .chart-frame:fullscreen { height: 100vh; border: 0; background: var(--ground); }
+/* CSS fallback when the Fullscreen API is unavailable or refused: pin the frame over the page. */
+.chart-frame.is-fullscreen:not(:fullscreen) { position: fixed; inset: 0; z-index: 60; height: 100dvh; }
+.chart-frame.is-fullscreen .chart-canvas { inset: var(--s-5) 0 0 0; }
+.chart-fullscreen-caption {
+  position: absolute; top: var(--s-2); left: 50%; transform: translateX(-50%); z-index: 2;
+  color: var(--muted); font: var(--text-label) var(--font-sans); white-space: nowrap;
+}
+.chart-fullscreen-caption b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .chart-read { margin: 0; color: var(--ink); font-size: var(--text-meta); line-height: 1.6; }
 .chart-note { margin: 0; max-width: 72ch; color: var(--muted); font-size: var(--text-label); line-height: 1.6; }
@@ -1007,6 +1030,9 @@ button, input { font: inherit; }
   .chart-controls { flex-direction: column; align-items: stretch; }
   .chart-switch { justify-content: stretch; }
   .chart-switch button { flex: 1; text-align: center; }
+  .chart-switch-tf { flex-wrap: wrap; }
+  .chart-switch-tf button { flex: 1 1 25%; }
+  .chart-fullscreen-caption { display: none; }
   .chart-last { margin-left: 0; }
   .chart-frame { height: clamp(260px, 44vh, 380px); }
 }
