@@ -9,6 +9,8 @@ import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, Lo
 import { useSession } from '@/hooks/use-session'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { createClient } from '@/lib/supabase/client'
+import MarketTicker from '@/components/market-ticker'
+import type { TickerData } from '@/lib/ticker'
 
 const differentiators = [
   { icon: Gauge, title: 'Reads, not just reports', description: 'Weighted bias scoring from Gap, OI, PCR, and Max Pain — not a raw data dump.' },
@@ -68,6 +70,7 @@ type HomeClientProps = {
   tradeDate: string
   initialPre: Row | null
   initialPost: Row | null
+  initialTicker: TickerData | null
 }
 
 function fmtPct(v: any) {
@@ -88,7 +91,7 @@ function istHour() {
   return Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: false }).format(new Date()))
 }
 
-export default function HomeClient({ tradeDate: initialTradeDate, initialPre, initialPost }: HomeClientProps) {
+export default function HomeClient({ tradeDate: initialTradeDate, initialPre, initialPost, initialTicker }: HomeClientProps) {
   const [dark, setDark] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const isMobile = useIsMobile()
@@ -190,6 +193,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
         </div>
       </header>
       {isMobile === true && menuOpen && <button type="button" className="landing-nav-backdrop" aria-label="Close menu" onClick={() => setMenuOpen(false)} />}
+      <MarketTicker tradeDate={initialTradeDate} initial={initialTicker} />
 
       <section className="landing-hero">
         <div className="landing-hero-copy">

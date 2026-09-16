@@ -186,6 +186,50 @@ button, input { font: inherit; }
 @media (max-width: 560px) { .history-beats { grid-template-columns: 1fr; } .history-day-head { flex-direction: column; align-items: flex-start; } }
 .landing-shell { min-height: 100vh; background: var(--ground); color: var(--ink); font-family: var(--font-sans); }
 .landing-topbar { position: sticky; top: 0; z-index: 20; height: 68px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; background: color-mix(in srgb, var(--surface) 90%, transparent); backdrop-filter: saturate(140%) blur(8px); border-bottom: 1px solid var(--border); }
+/* ---- Market ticker ----
+   Six chips the pipeline already computes every phase, scrolling under the top bar.
+   Numbers are mono + tabular; direction is carried by tint AND glyph so it survives
+   greyscale. The list is rendered twice and the track moves by exactly half its width
+   (translateX(-50%)), so the loop has no seam at any chip count. Duration scales with the
+   number of chips so the speed stays constant. Hover pauses; reduced-motion stops it and
+   hides the duplicate. On a phone the stamp shrinks to dot + time and chips tighten. */
+.ticker { display: flex; align-items: stretch; min-height: 52px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 55%, var(--ground)); }
+.ticker-stamp { flex: 0 0 auto; display: flex; align-items: center; gap: 7px; padding: 0 16px; border-right: 1px solid var(--border); color: var(--muted); font: 600 var(--text-label) var(--font-sans); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.ticker-stamp b { color: var(--ink); font: 600 var(--text-label) var(--font-mono); letter-spacing: 0; text-transform: none; }
+.ticker-viewport { flex: 1; min-width: 0; position: relative; overflow: hidden; }
+.ticker-viewport::before, .ticker-viewport::after { content: ''; position: absolute; top: 0; bottom: 0; width: 32px; z-index: 1; pointer-events: none; }
+.ticker-viewport::before { left: 0; background: linear-gradient(90deg, var(--ground), transparent); }
+.ticker-viewport::after { right: 0; background: linear-gradient(270deg, var(--ground), transparent); }
+.ticker-track { display: flex; gap: 8px; width: max-content; padding: 7px 8px; }
+.ticker-chip { display: grid; grid-template-columns: auto auto; column-gap: 12px; row-gap: 2px; align-items: baseline; min-width: 172px; padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ticker-chip.is-pos { border-color: color-mix(in srgb, var(--up) 40%, var(--border)); background: color-mix(in srgb, var(--up) 9%, var(--surface)); }
+.ticker-chip.is-neg { border-color: color-mix(in srgb, var(--down) 40%, var(--border)); background: color-mix(in srgb, var(--down) 9%, var(--surface)); }
+.ticker-chip-name { color: var(--ink); font: 600 var(--text-label) var(--font-sans); letter-spacing: .04em; }
+.ticker-chip-name small { margin-left: 5px; color: var(--muted); font-weight: 500; font-size: 11px; letter-spacing: .02em; text-transform: uppercase; }
+.ticker-chip-last { justify-self: end; color: var(--ink); font: 600 var(--text-meta) var(--font-mono); }
+.ticker-chip-last em { margin-left: 4px; color: var(--muted); font: 500 11px var(--font-sans); font-style: normal; }
+.ticker-chip-chg { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 5px; color: var(--muted); font: 500 var(--text-label) var(--font-mono); }
+.ticker-chip-chg i { font-style: normal; font-size: 9px; }
+.ticker-chip-chg b { font-weight: 500; }
+.ticker-chip-chg small { margin-left: 2px; color: var(--muted); font: 500 11px var(--font-sans); }
+.ticker-chip.is-pos .ticker-chip-chg { color: var(--up); }
+.ticker-chip.is-neg .ticker-chip-chg { color: var(--down); }
+@keyframes mc-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: no-preference) {
+  .ticker-track { animation: mc-marquee calc(var(--ticker-n, 6) * 5.5s) linear infinite; }
+  .ticker:hover .ticker-track, .ticker:focus-within .ticker-track { animation-play-state: paused; }
+}
+@media (prefers-reduced-motion: reduce) { .ticker-track { overflow-x: auto; max-width: 100%; } .ticker-chip[aria-hidden="true"] { display: none; } }
+@media (max-width: 640px) {
+  .ticker { min-height: 46px; }
+  .ticker-stamp { padding: 0 10px; gap: 6px; }
+  .ticker-stamp-label { display: none; }
+  .ticker-track { gap: 6px; padding: 6px; }
+  .ticker-chip { min-width: 150px; padding: 5px 10px; column-gap: 10px; }
+  .ticker-chip-name small { display: none; }
+  .ticker-chip.has-tag .ticker-chip-name::after { content: ' STRADDLE'; color: var(--muted); font-weight: 500; font-size: 10px; letter-spacing: .04em; }
+}
+
 /* ---- Marketing accent: --brand amber ----
    In dark the landing page resolved to pure warm grey: --action aliases --ink, so every
    "accent" (eyebrow dots, diff icons, hovers) rendered #f9f9f7, and --brand never appeared
