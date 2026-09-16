@@ -11,10 +11,15 @@ import type { ContextResult } from "./engine.ts";
 import type { Measured, MoveEvent } from "./analytics.ts";
 
 export const NARRATIVE_MODEL = "claude-sonnet-4-5-20250929";
+// The publish gate: a second, cheaper model reads each paragraph against the same input and
+// flags any claim that the input contradicts (wrong day, wrong direction, wrong instrument).
+export const JUDGE_MODEL = "claude-haiku-4-5-20251001";
 const TIMEOUT_MS = 30_000;
 const LIMITS = { summary: [50, 120], global: [40, 110], india: [40, 110], link: [40, 110] } as const;
 
-export type Narrative = { summary: string; global: string; india: string; link: string; model: string; written_at: string; dropped: string[]; rejected?: Record<string, { reason: string; text: string }> };
+export type Narrative = { summary: string; global: string; india: string; link: string; model: string; written_at: string; dropped: string[]; rejected?: Record<string, { reason: string; text: string }>; judge?: { model: string; verdicts: Record<string, { ok: boolean; problems: string[] }> } };
+
+export type TimeContext = { now_ist: string; india_session: "pre-open" | "open" | "closed"; previous_session: { day: string; nifty_change_pct: number | null } | null };
 
 const SYSTEM = `You write MarketCue's Global View: a plain-English read of how the world's markets are affecting India right now.
 
@@ -23,7 +28,7 @@ Rules, all of them hard:
 - Explain cause and consequence in hedged language: "consistent with", "appears to", "likely contributor", "tends to". Never assert that one thing caused another.
 - Say what is happening, then why it matters for Indian equities, then what it sets up. Specific over generic: name the instrument and its move rather than "markets were mixed".
 - No advice, no predictions of levels, no adjectives like "massive" or "crash". No bullet points, no headings, no markdown. Plain prose only.
-- Mention freshness when an input is from the last session rather than today (the input marks these).
+- TIME IS PART OF THE FACT. Every reading is labelled with when it is from ("today, live as of 14:05 IST", "today's close", "last session, Mon 15 Sep"). Use that label's meaning and nothing else: never write "closed", "yesterday", "overnight" or "this morning" unless the label says so. Today's live move is today's move. The previous session is described only from time_context.previous_session.
 
 Style to match (this is a sample of tone, not of facts):
 "GIFT Nifty gapped half a percent after yesterday's selloff, but support and resistance are both being reinforced. VIX at 13.4 sits in the ideal zone, yet six days to Nifty expiry and one to Sensex create a split setup. FII outflows of 930 crore against DII buying kept the fall orderly, but the gap opens where calls are being built."
@@ -73,9 +78,50 @@ function validate(text: unknown, allowed: Set<string>, [min, max]: readonly [num
   return { ok: t };
 }
 
-export async function writeNarrative(apiKey: string, ctx: ContextResult, measured: Measured, events: MoveEvent[], indiaAsOf: string | null): Promise<Narrative | null> {
+// ------------------------------------------------------------------------------- judge
+const JUDGE_SYSTEM = `You are a fact checker for a market note. You receive the structured input the writer was given and one paragraph the writer produced. List every claim in the paragraph that the input CONTRADICTS: a move attributed to the wrong day (e.g. "closed yesterday" when the reading is labelled today), the wrong direction (up vs down), the wrong instrument, or a figure that differs from the input. Ignore hedged interpretation ("tends to", "consistent with"); judge only factual claims about what the input shows. If nothing is contradicted, return ok=true with an empty list.`;
+const JUDGE_SCHEMA = { type: "object", properties: { ok: { type: "boolean" }, problems: { type: "array", items: { type: "string" } } }, required: ["ok", "problems"] };
+
+async function judge(apiKey: string, input: unknown, key: string, text: string): Promise<{ ok: boolean; problems: string[] }> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+    body: JSON.stringify({
+      model: JUDGE_MODEL, max_tokens: 400, temperature: 0, system: JUDGE_SYSTEM,
+      tools: [{ name: "verdict", description: "The fact-check verdict.", input_schema: JUDGE_SCHEMA }],
+      tool_choice: { type: "tool", name: "verdict" },
+      messages: [{ role: "user", content: `Structured input (JSON):\n${JSON.stringify(input)}\n\nParagraph "${key}":\n${text}` }],
+    }),
+  });
+  if (!res.ok) throw new Error(`judge ${res.status}`);
+  const json = await res.json();
+  const block = (json.content ?? []).find((c: { type: string }) => c.type === "tool_use") as { input?: { ok?: boolean; problems?: unknown } } | undefined;
+  const problems = Array.isArray(block?.input?.problems) ? block!.input!.problems.map(String).slice(0, 6) : [];
+  return { ok: block?.input?.ok === true && problems.length === 0, problems };
+}
+
+// Deterministic direction check: an instrument named with an "up" word whose input change is
+// negative (or the reverse) is a contradiction we do not need a model to see.
+const UP = /\b(rose|rise|rises|up|gained|gain|gains|climbed|climb|advanced|higher|firmed|rallied|added)\b/i;
+const DOWN = /\b(fell|fall|falls|down|lost|loss|losses|dropped|drop|declined|decline|lower|slid|slipped|weakened|eased)\b/i;
+function directionProblems(text: string, readings: { label: string; change: number | null }[]): string[] {
+  const out: string[] = [];
+  for (const s of text.split(/(?<=[.;])\s+/)) {
+    for (const r of readings) {
+      if (r.change == null || !s.toLowerCase().includes(r.label.toLowerCase())) continue;
+      const up = UP.test(s), down = DOWN.test(s);
+      if (up && !down && r.change < 0) out.push(`${r.label} described as up but input change is ${r.change}%`);
+      if (down && !up && r.change > 0) out.push(`${r.label} described as down but input change is +${r.change}%`);
+    }
+  }
+  return out;
+}
+
+export async function writeNarrative(apiKey: string, ctx: ContextResult, measured: Measured, events: MoveEvent[], indiaAsOf: string | null, time?: TimeContext): Promise<Narrative | null> {
   const input = {
     calculated_at_utc: ctx.calculatedAt,
+    time_context: time ?? null,
     global: { band: ctx.global.band, score: ctx.global.score, regime: ctx.regime, drivers: ctx.global.drivers.map((d) => ({ factor: d.label, score: d.score, reading: d.reading })) },
     india: { band: ctx.india.band, score: ctx.india.score, inputs_as_of: indiaAsOf, drivers: ctx.india.drivers.map((d) => ({ factor: d.label, score: d.score, reading: d.reading })) },
     transmission: { label: ctx.transmission.label, channels_active: ctx.transmission.channels, domestic_counterforces: ctx.transmission.counterforces, measured_20_sessions: measured.correlation20 == null ? null : { correlation: measured.correlation20, beta: measured.beta20, sessions: measured.pairs, nifty_20d_pct: measured.niftyRet20, spx_20d_pct: measured.spxRet20, relative_pct_points: measured.relPerf20 } },
@@ -103,17 +149,27 @@ export async function writeNarrative(apiKey: string, ctx: ContextResult, measure
 
   const dropped: string[] = [];
   const rejected: Record<string, { reason: string; text: string }> = {};
-  const pick = (k: keyof typeof LIMITS, fallback: string) => {
+  const verdicts: Record<string, { ok: boolean; problems: string[] }> = {};
+  // Instrument readings the direction check can see: label + signed change from the driver text.
+  const readingsForCheck = [...ctx.global.drivers, ...ctx.india.drivers].map((d) => { const m = d.reading.match(/^(.+?)\s([+-]\d+(?:\.\d+)?)%/); return m ? { label: m[1], change: Number(m[2]) } : null; }).filter((x): x is { label: string; change: number } => x != null);
+
+  const fallbacks: Record<keyof typeof LIMITS, string> = { summary: ctx.explanation, global: ctx.whatIsDriving.slice(0, 3).join(" "), india: ctx.whatIsDriving.slice(3, 6).join(" "), link: ctx.explanation };
+  const out: Record<string, string> = {};
+  for (const k of Object.keys(LIMITS) as (keyof typeof LIMITS)[]) {
     const v = validate(block.input![k], allowed, LIMITS[k]);
-    if ("ok" in v) return v.ok;
-    dropped.push(k); rejected[k] = { reason: v.reason, text: String(block.input![k] ?? "").slice(0, 600) };
-    return fallback;
-  };
+    if (!("ok" in v)) { dropped.push(k); rejected[k] = { reason: v.reason, text: String(block.input![k] ?? "").slice(0, 600) }; out[k] = fallbacks[k]; continue; }
+    // Publish gate: deterministic direction check, then the judge model. Either contradiction
+    // drops the paragraph in favour of the template.
+    const problems = directionProblems(v.ok, readingsForCheck);
+    let verdict = { ok: problems.length === 0, problems };
+    if (verdict.ok) { try { verdict = await judge(apiKey, input, k, v.ok); } catch (e) { verdict = { ok: true, problems: [`judge unavailable: ${e instanceof Error ? e.message : e}`] }; } }
+    verdicts[k] = verdict;
+    if (!verdict.ok) { dropped.push(k); rejected[k] = { reason: `contradicted: ${verdict.problems.join("; ")}`, text: v.ok.slice(0, 600) }; out[k] = fallbacks[k]; continue; }
+    out[k] = v.ok;
+  }
   return {
-    summary: pick("summary", ctx.explanation),
-    global: pick("global", ctx.whatIsDriving.slice(0, 3).join(" ")),
-    india: pick("india", ctx.whatIsDriving.slice(3, 6).join(" ")),
-    link: pick("link", ctx.explanation),
+    summary: out.summary, global: out.global, india: out.india, link: out.link,
     model: NARRATIVE_MODEL, written_at: new Date().toISOString(), dropped, rejected,
+    judge: { model: JUDGE_MODEL, verdicts },
   };
 }

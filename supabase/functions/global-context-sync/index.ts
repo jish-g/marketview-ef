@@ -16,10 +16,10 @@
 // POST body: {} or {"mode":"backfill"} -- same x-cron-secret as the other cron'd functions.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { BASKET, GLOBAL_COMPONENTS, HISTORY, NEWS } from "./intelligence/config.ts";
+import { BASKET, GLOBAL_COMPONENTS, HISTORY, MAX_ABS_CHANGE_PCT, NEWS } from "./intelligence/config.ts";
 import { computeContext, type IndiaInputs, type Quote } from "./intelligence/engine.ts";
 import { computeStats, detectMoves, measureTransmission, scoreNews, type DailyBar, type NewsEventLite } from "./intelligence/analytics.ts";
-import { writeNarrative, type Narrative } from "./intelligence/narrative.ts";
+import { writeNarrative, type Narrative, type TimeContext } from "./intelligence/narrative.ts";
 
 // The narrative is re-written only when the picture it describes has changed, or after this long.
 const NARRATIVE_MAX_AGE_MS = 90 * 60_000;
@@ -102,7 +102,16 @@ Deno.serve(async (req: Request) => {
     try { return await fetchChart(b.symbol, range); } catch (e) { skipped.push(`${b.symbol}: ${e instanceof Error ? e.message : e}`); return null; }
   }));
   const fetched = settled.filter((f): f is Fetched => f != null);
-  const quotes = fetched.map((f) => f.quote);
+  // Plausibility gate: a change beyond the group's bound is a feed glitch, not a move. Drop the
+  // quote (and its bars) for this run so it reaches neither the score nor move detection.
+  const sane: Fetched[] = [];
+  for (const f of fetched) {
+    const b = BASKET.find((x) => x.symbol === f.quote.symbol)!;
+    const bound = MAX_ABS_CHANGE_PCT[b.group] ?? 12;
+    if (f.quote.changePct != null && Math.abs(f.quote.changePct) > bound) { skipped.push(`${f.quote.symbol}: implausible change ${f.quote.changePct}% (bound ${bound}%), quote dropped as a bad tick`); continue; }
+    sane.push(f);
+  }
+  const quotes = sane.map((f) => f.quote);
 
   if (quotes.length) {
     const rows = quotes.map((q) => {
@@ -112,7 +121,7 @@ Deno.serve(async (req: Request) => {
     const { error } = await admin.from("market_snapshots").upsert(rows, { onConflict: "asset,source_ts" });
     if (error) skipped.push(`market_snapshots upsert: ${error.message}`);
   }
-  const newBars = fetched.flatMap((f) => f.bars);
+  const newBars = sane.flatMap((f) => f.bars);
   if (newBars.length) {
     const rows = newBars.map((b) => ({ asset: b.asset, day: b.day, close: b.close, change_pct: b.changePct, source: "yahoo", ingested_at: now.toISOString() }));
     for (let i = 0; i < rows.length; i += 500) {
@@ -198,7 +207,17 @@ Deno.serve(async (req: Request) => {
     const { data: anthropicKey } = await admin.rpc("get_vault_secret", { secret_name: "anthropic_api_key" });
     if (!anthropicKey) skipped.push("narrative: anthropic_api_key not in vault");
     else {
-      try { narrative = await writeNarrative(String(anthropicKey), ctx, measured, moves, india.asOf); if (narrative.dropped.length) skipped.push(`narrative: dropped ${narrative.dropped.join(", ")} (cited a figure not in the input or wrong length)`); }
+      // Time context: what "now" is in IST, whether the Indian session is open, and the previous
+      // session's Nifty close from stored history, so "yesterday" can only mean that.
+      const hmIST = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false }).format(now);
+      const niftyDays = bars.filter((b) => b.asset === "^NSEI").sort((a, b) => b.day.localeCompare(a.day));
+      const prevDay = niftyDays.find((b) => b.day < today) ?? null;
+      const time: TimeContext = {
+        now_ist: `${today} ${hmIST} IST`,
+        india_session: hmIST < "09:15" ? "pre-open" : hmIST < "15:30" ? "open" : "closed",
+        previous_session: prevDay ? { day: prevDay.day, nifty_change_pct: prevDay.changePct } : null,
+      };
+      try { narrative = await writeNarrative(String(anthropicKey), ctx, measured, moves, india.asOf, time); if (narrative.dropped.length) skipped.push(`narrative: dropped ${narrative.dropped.join(", ")} (cited a figure not in the input or wrong length)`); }
       catch (e) { skipped.push(`narrative: ${e instanceof Error ? e.message : e}`); narrative = prev ?? null; }
     }
   }

@@ -153,23 +153,30 @@ export function scoreGlobal(quotes: Quote[], news?: NewsScores | null): { score:
 
 // ------------------------------------------------------------------------------- india
 const IST_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
+const IST_HM = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false });
+const IST_WD = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short" });
+
+// Human time label for a quote: same IST day as `now` -> today (live or close), else the day.
+export function whenIST(sourceTs: string | null, now: Date): string {
+  if (!sourceTs) return "time unknown";
+  const d = new Date(sourceTs);
+  if (IST_DAY.format(d) !== IST_DAY.format(now)) return `last session, ${IST_WD.format(d)}`;
+  const hm = IST_HM.format(d);
+  return hm >= "15:30" ? "today's close" : `today, live as of ${hm} IST`;
+}
 
 export function scoreIndia(quotes: Quote[], india: IndiaInputs, now = new Date(), news?: NewsScores | null): { score: number; band: Band; tone: Tone; drivers: Driver[]; components: Record<string, number | null> } {
   const q = quoteMap(quotes);
   const C = INDIA_COMPONENTS;
   const comp: Record<string, number | null> = {};
   const readings: Record<string, string> = {};
-  const todayIST = IST_DAY.format(now);
-
-  // An Indian index quote stamped before today's session is yesterday's close change: say so,
-  // rather than presenting it as today's move next to a live Nifty.
+  // Every index reading states WHEN it is from, so the narrative cannot mistake today's
+  // intraday move for yesterday's close: "today, live as of 14:05 IST", "today's close", or
+  // "last session, Mon 15 Sep".
   const idx = (sym: string, key: keyof typeof C, label: string) => {
     const v = q.get(sym);
     comp[key] = v?.changePct == null ? null : clamp(v.changePct / C[key].scale);
-    if (v?.changePct != null) {
-      const stale = v.sourceTs != null && IST_DAY.format(new Date(v.sourceTs)) !== todayIST;
-      readings[key] = `${label} ${pct(v.changePct)} at ${v.last.toFixed(0)}${stale ? " (last session)" : ""}`;
-    }
+    if (v?.changePct != null) readings[key] = `${label} ${pct(v.changePct)} at ${v.last.toFixed(0)} (${whenIST(v.sourceTs, now)})`;
   };
   idx("^NSEI", "nifty", "Nifty 50");
   idx("^BSESN", "sensex", "Sensex");

@@ -164,9 +164,9 @@ const CATEGORY_LABEL: Record<string, string> = { macro: 'Macro', rates: 'Rates',
 function NewsEventCard({ e, now }: { e: EventRow; now: number }) {
   const tone: Tone = e.market_direction === 'risk_off' ? 'down' : e.market_direction === 'risk_on' ? 'up' : 'neutral'
   const outlets = (e.sources ?? []).filter((s) => s.url)
-  return <article className="field-card gv-event">
-    <span>{CATEGORY_LABEL[e.category] ?? 'Event'} · {e.region === 'india' ? 'India' : 'Global'} · {ago(e.event_time, now)}</span>
-    <strong>{e.title} <em className={`ds-badge ds-badge--${tone}`}>{e.market_direction === 'risk_off' ? 'Risk-off' : e.market_direction === 'risk_on' ? 'Risk-on' : 'Neutral'}</em></strong>
+  return <article className="ds-card gv-event">
+    <span className="gv-event-kicker">{CATEGORY_LABEL[e.category] ?? 'Event'} · {e.region === 'india' ? 'India' : 'Global'} · {ago(e.event_time, now)} <em className={`ds-badge ds-badge--${tone}`}>{e.market_direction === 'risk_off' ? 'Risk-off' : e.market_direction === 'risk_on' ? 'Risk-on' : 'Neutral'}</em></span>
+    <strong className="gv-event-title">{e.title}</strong>
     <small className="gv-event-what">{e.summary}</small>
     {e.why_it_matters && <small className="gv-event-why">{e.why_it_matters}</small>}
     <small className="gv-event-why"><b>India.</b> {e.india_impact || 'No clear route into Indian markets from this event.'}</small>
@@ -178,9 +178,9 @@ function NewsEventCard({ e, now }: { e: EventRow; now: number }) {
 function EventCard({ e, now }: { e: EventRow; now: number }) {
   const scale = timesUsual(e.evidence?.z)
   const tone: Tone = e.market_direction === 'risk_off' ? 'down' : e.market_direction === 'risk_on' ? 'up' : 'neutral'
-  return <article className="field-card gv-event">
-    <span>{e.market_direction === 'risk_off' ? 'Risk-off move' : e.market_direction === 'risk_on' ? 'Risk-on move' : 'Move'} · {ago(e.updated_at, now)}</span>
-    <strong>{stripPct(e.title)} <em className={`ds-badge ds-badge--${tone}`}>{scale ? `${Math.abs(Number(e.evidence?.z)).toFixed(1)}× usual` : 'notable'}</em></strong>
+  return <article className="ds-card gv-event">
+    <span className="gv-event-kicker">{e.market_direction === 'risk_off' ? 'Risk-off move' : e.market_direction === 'risk_on' ? 'Risk-on move' : 'Move'} · {ago(e.updated_at, now)} <em className={`ds-badge ds-badge--${tone}`}>{scale ? `${Math.abs(Number(e.evidence?.z)).toFixed(1)}× usual` : 'notable'}</em></span>
+    <strong className="gv-event-title">{stripPct(e.title)}</strong>
     <small className="gv-event-why">{e.india_impact || 'Driver unclear.'}</small>
     <small className="gv-event-meta">India relevance {level(Number(e.india_relevance))} · confidence {level(Number(e.confidence))}</small>
   </article>
