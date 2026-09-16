@@ -28,7 +28,7 @@ function Chip({ chip, hidden }: { chip: TickerChip; hidden?: boolean }) {
           <>
             {dir === 'pos' && <i aria-label="up">▲</i>}
             {dir === 'neg' && <i aria-label="down">▼</i>}
-            {chip.changePts != null && <b>{fmt.pts(chip.changePts)}</b>}
+            {chip.changePts != null && <b>{chip.changeAs === 'level' ? fmt.score(chip.changePts) : fmt.pts(chip.changePts)}</b>}
             {chip.changePct != null && <span>({fmt.pct(chip.changePct)})</span>}
           </>
         ) : <span>—</span>}

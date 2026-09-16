@@ -25,7 +25,9 @@ export type TickerChip = {
   unit?: 'pts'           // straddle premiums are points, indices and VIX are levels
   changePts: number | null
   changePct: number | null
-  changeNote?: string    // 'prev close' | 'vs prev close' | 'new expiry'
+  changeNote?: string    // 'prev close' | 'vs prev close' | 'new expiry' | 'vs prev session'
+  /** 'level' prints the points delta as a signed 2-decimal figure with no unit (VIX). */
+  changeAs?: 'level'
 }
 
 export type TickerData = {
@@ -89,10 +91,19 @@ export function buildTicker({ tradeDate, pre, mid, post, prevPre, prevMid, bank 
     chips.push({ key: 'banknifty', name: 'BANK NIFTY', last: bankLast, changePct: pct, changePts: ptsFromPct(bankLast, pct) })
   }
 
+  // The pipeline's own change percent when it stored one; otherwise the same method the
+  // straddles use -- today's pre-market VIX against the previous session's pre-market VIX.
   const vix = n(pre?.india_vix)
   if (vix != null) {
     const pct = n(pre?.india_vix_change_pct)
-    chips.push({ key: 'vix', name: 'INDIA VIX', last: vix, changePct: pct, changePts: ptsFromPct(vix, pct) })
+    const prevVix = n(prevPre?.india_vix)
+    if (pct != null) {
+      chips.push({ key: 'vix', name: 'INDIA VIX', last: vix, changePct: pct, changePts: ptsFromPct(vix, pct), changeAs: 'level' })
+    } else if (prevVix != null && prevVix !== 0) {
+      chips.push({ key: 'vix', name: 'INDIA VIX', last: vix, changePct: ((vix - prevVix) / prevVix) * 100, changePts: vix - prevVix, changeNote: 'vs prev session', changeAs: 'level' })
+    } else {
+      chips.push({ key: 'vix', name: 'INDIA VIX', last: vix, changePct: null, changePts: null, changeAs: 'level' })
+    }
   }
 
   const dteToday = { nifty: n(pre?.days_to_expiry_nifty), sensex: n(pre?.days_to_expiry_sensex) }
@@ -124,7 +135,7 @@ export async function fetchTicker(supabase: Client, tradeDate: string): Promise<
       .select('close_nifty, close_sensex, day_change_pct_nifty, day_change_pct_sensex')
       .eq('trade_date', tradeDate).maybeSingle(),
     supabase.from('premarket_dashboard')
-      .select('trade_date, days_to_expiry_nifty, days_to_expiry_sensex, atm_straddle_price_nifty, atm_straddle_price_sensex')
+      .select('trade_date, india_vix, days_to_expiry_nifty, days_to_expiry_sensex, atm_straddle_price_nifty, atm_straddle_price_sensex')
       .lt('trade_date', tradeDate).order('trade_date', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('midmarket_snapshot')
       .select('trade_date, checkpoint, atm_straddle_price_nifty_mid, atm_straddle_price_sensex_mid')
