@@ -76,6 +76,8 @@ const forRisk = (ds: Driver[]) => ds.filter((d) => d.score >= QUIET)
 const againstRisk = (ds: Driver[]) => ds.filter((d) => d.score <= -QUIET)
 const quiet = (ds: Driver[]) => ds.filter((d) => Math.abs(d.score) < QUIET)
 const stripPct = (title: string) => title.replace(/\s[+-]?\d+(\.\d+)?%$/, '')
+// Lowercase only the leading letter, so "US 10Y yield slides" keeps its acronyms.
+const lcFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
 
 function todayIST() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -122,9 +124,9 @@ function oneLine(ctx: ContextRow): string {
   switch (ctx.transmission_label) {
     case 'Strong global influence': return `${world} (${g}), and India is following it closely (${i}).`
     case 'Moderate global influence': return `${world} (${g}), and some of that is reaching India (${i}).`
-    case 'India diverging from global markets': return `${world} (${g}), but ${india.toLowerCase()} on its own (${i}), moving against the global tone.`
-    case 'India moving in line with global markets': return `${world} and ${india.toLowerCase()} together (${g} and ${i}).`
-    default: return `${world} (${g}), ${india.toLowerCase()} (${i}), and little of the global picture is reaching us right now.`
+    case 'India diverging from global markets': return `${world} (${g}), but ${india} on its own (${i}), moving against the global tone.`
+    case 'India moving in line with global markets': return `${world} and ${india} together (${g} and ${i}).`
+    default: return `${world} (${g}), ${india} (${i}), and little of the global picture is reaching us right now.`
   }
 }
 
@@ -138,17 +140,14 @@ function watchNext(ctx: ContextRow, events: EventRow[], now: number): string[] {
   if (ctx.inputs?.postmarket_trade_date && ctx.inputs.postmarket_trade_date !== todayIST()) out.push('Today’s FII and DII print after the close.')
   if (hm < '19:00') out.push('US futures into the US open this evening.')
   else out.push('Tonight’s US session, which sets tomorrow’s pre-market tone.')
-  for (const e of events.slice(0, 2)) out.push(`Whether ${stripPct(e.title).toLowerCase()} extends.`)
+  for (const e of events.slice(0, 2)) out.push(`Whether ${lcFirst(stripPct(e.title))} extends.`)
   return out.slice(0, 4)
 }
 
-// Lowercase only the leading letter, so "Higher US yields alongside FII selling" keeps its acronyms.
-const lcFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
-
 function Verdict({ label, band, tone, sub, badge }: { label: string; band: string; tone: Tone; sub: string; badge?: { text: string; tone: Tone } }) {
   return <div className="field-card gv-verdict">
-    <span>{label}</span>
-    <strong className={`gv-band gv-band--${tone}`}>{band}{badge && <em className={`ds-badge ds-badge--${badge.tone}`}>{badge.text}</em>}</strong>
+    <span>{label}{badge && <em className={`ds-badge ds-badge--${badge.tone} gv-label-badge`}>{badge.text}</em>}</span>
+    <strong className={`gv-band gv-band--${tone}`}>{band}</strong>
     <small>{sub}</small>
   </div>
 }

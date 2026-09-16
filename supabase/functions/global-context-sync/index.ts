@@ -145,16 +145,22 @@ Deno.serve(async (req: Request) => {
   };
   const pre = await pick("premarket_dashboard", "trade_date, updated_at, india_vix, india_vix_change_pct, gift_nifty_gap_pct, advance_decline_ratio, pcr_nifty");
   const post = await pick("postmarket_summary", "trade_date, updated_at, fii_net_cash_cr, dii_net_cash_cr, fii_dii_data_date");
+  // The midday checkpoints refresh breadth and PCR through the session; the pre-market row is
+  // frozen at 09:38. Take the newest checkpoint for today when there is one, so the India read
+  // (and its as-of, which drives confidence) tracks the session rather than the open.
+  const { data: midRows } = await admin.from("midmarket_snapshot").select("updated_at, advance_decline_ratio_mid, pcr_nifty_mid").eq("trade_date", today).order("updated_at", { ascending: false }).limit(1);
+  const mid = (midRows?.[0] as Record<string, unknown> | undefined) ?? null;
   const num = (v: unknown) => (v == null || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
+  const midAd = parseAdRatio(mid?.advance_decline_ratio_mid), midPcr = num(mid?.pcr_nifty_mid);
   const india: IndiaInputs = {
-    asOf: (pre?.updated_at as string | undefined) ?? null,
-    advanceDeclineRatio: parseAdRatio(pre?.advance_decline_ratio),
+    asOf: (mid?.updated_at as string | undefined) ?? (pre?.updated_at as string | undefined) ?? null,
+    advanceDeclineRatio: midAd ?? parseAdRatio(pre?.advance_decline_ratio),
     indiaVix: num(pre?.india_vix),
     indiaVixChangePct: num(pre?.india_vix_change_pct),
     fiiNetCr: num(post?.fii_net_cash_cr),
     diiNetCr: num(post?.dii_net_cash_cr),
     giftGapPct: String(pre?.trade_date ?? "") === today ? num(pre?.gift_nifty_gap_pct) : null, // a stale GIFT gap is not today's open
-    pcrNifty: num(pre?.pcr_nifty),
+    pcrNifty: midPcr ?? num(pre?.pcr_nifty),
   };
 
   // 4. Analytics + engine.
@@ -206,7 +212,7 @@ Deno.serve(async (req: Request) => {
     what_is_driving: ctx.whatIsDriving, explanation: ctx.explanation,
     measured, asset_stats: stats,
     narrative, narrative_key: narrativeKey,
-    inputs: { quotes, india, premarket_trade_date: pre?.trade_date ?? null, postmarket_trade_date: post?.trade_date ?? null, history_days: bars.length, skipped },
+    inputs: { quotes, india, premarket_trade_date: pre?.trade_date ?? null, midmarket_updated_at: mid?.updated_at ?? null, postmarket_trade_date: post?.trade_date ?? null, history_days: bars.length, skipped },
   });
   if (ctxErr) skipped.push(`global_context insert: ${ctxErr.message}`);
 
