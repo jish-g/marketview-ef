@@ -13,7 +13,10 @@ import type { Measured, MoveEvent } from "./analytics.ts";
 export const NARRATIVE_MODEL = "claude-sonnet-4-5-20250929";
 // The publish gate: a second, cheaper model reads each paragraph against the same input and
 // flags any claim that the input contradicts (wrong day, wrong direction, wrong instrument).
-export const JUDGE_MODEL = "claude-haiku-4-5-20251001";
+export const JUDGE_MODEL = "claude-sonnet-4-5-20250929";
+// Bump whenever the prompt, the input shape or the gate changes: it is part of the reuse key, so
+// a deploy forces a fresh, re-checked narrative instead of carrying the previous one forward.
+export const NARRATIVE_VERSION = "5";
 const TIMEOUT_MS = 30_000;
 const LIMITS = { summary: [50, 120], global: [40, 110], india: [40, 110], link: [40, 110] } as const;
 
@@ -29,6 +32,8 @@ Rules, all of them hard:
 - Say what is happening, then why it matters for Indian equities, then what it sets up. Specific over generic: name the instrument and its move rather than "markets were mixed".
 - No advice, no predictions of levels, no adjectives like "massive" or "crash". No bullet points, no headings, no markdown. Plain prose only.
 - TIME IS PART OF THE FACT. Every reading is labelled with when it is from ("today, live as of 14:05 IST", "today's close", "last session, Mon 15 Sep"). Use that label's meaning and nothing else: never write "closed", "yesterday", "overnight" or "this morning" unless the label says so. Today's live move is today's move. The previous session is described only from time_context.previous_session.
+- USD/INR up means the rupee is WEAKER. Describe the rupee only as "weaker" or "firmer" and quote the USD/INR level; never say the rupee is "up" or "down".
+- Do not compute anything: no sums, differences, ratios or averages of input figures. Quote each figure as given (rounding is fine). A number you derived is a number that is not in the input.
 
 Style to match (this is a sample of tone, not of facts):
 "GIFT Nifty gapped half a percent after yesterday's selloff, but support and resistance are both being reinforced. VIX at 13.4 sits in the ideal zone, yet six days to Nifty expiry and one to Sensex create a split setup. FII outflows of 930 crore against DII buying kept the fall orderly, but the gap opens where calls are being built."
@@ -54,7 +59,9 @@ function allowedNumbers(input: unknown): Set<string> {
   const walk = (v: unknown) => {
     if (typeof v === "number" && Number.isFinite(v)) {
       const a = Math.abs(v);
-      for (const s of [a.toString(), a.toFixed(0), a.toFixed(1), a.toFixed(2), Math.round(a).toLocaleString("en-IN"), Math.round(a).toLocaleString("en-US")]) out.add(s.replace(/\.0+$/, ""));
+      // Rounded and truncated forms both count: the model writes -1.195 as 1.2 or as 1.19.
+      const trunc = (d: number) => (Math.trunc(a * 10 ** d) / 10 ** d).toFixed(d);
+      for (const s of [a.toString(), a.toFixed(0), a.toFixed(1), a.toFixed(2), trunc(1), trunc(2), Math.round(a).toLocaleString("en-IN"), Math.round(a).toLocaleString("en-US")]) out.add(s.replace(/\.0+$/, ""));
     } else if (typeof v === "string") {
       for (const m of v.matchAll(/\d+(?:,\d{3})*(?:\.\d+)?/g)) out.add(m[0].replace(/,/g, "").replace(/\.0+$/, ""));
     } else if (Array.isArray(v)) v.forEach(walk);
@@ -79,8 +86,14 @@ function validate(text: unknown, allowed: Set<string>, [min, max]: readonly [num
 }
 
 // ------------------------------------------------------------------------------- judge
-const JUDGE_SYSTEM = `You are a fact checker for a market note. You receive the structured input the writer was given and one paragraph the writer produced. List every claim in the paragraph that the input CONTRADICTS: a move attributed to the wrong day (e.g. "closed yesterday" when the reading is labelled today), the wrong direction (up vs down), the wrong instrument, or a figure that differs from the input. Ignore hedged interpretation ("tends to", "consistent with"); judge only factual claims about what the input shows. If nothing is contradicted, return ok=true with an empty list.`;
-const JUDGE_SCHEMA = { type: "object", properties: { ok: { type: "boolean" }, problems: { type: "array", items: { type: "string" } } }, required: ["ok", "problems"] };
+const JUDGE_SYSTEM = `You are a fact checker for a market note. You receive the structured input the writer was given and one paragraph the writer produced. List only claims the input CONTRADICTS, of exactly these kinds: a move attributed to the wrong day (e.g. "closed yesterday" when the reading is labelled today), the wrong direction (up vs down), the wrong instrument, or a figure that differs from the input.
+Rules: a negative number in the input is a fall, so calling it a decline or a drop is correct. USD/INR rising means the rupee weakened, so "rupee weaker" with a positive USD/INR change is correct. Rounding to any precision (1.195 written as 1.2, 1.20 or 1.19) is never a contradiction. Ignore hedged interpretation ("tends to", "consistent with") and wording you would merely phrase differently.
+For each claim you examine, write the claim, then what the input says, and only then decide contradiction true or false. A claim that turns out to match the input gets contradiction=false. The paragraph is rejected only on claims marked contradiction=true.`;
+const JUDGE_SCHEMA = {
+  type: "object",
+  properties: { checks: { type: "array", items: { type: "object", properties: { claim: { type: "string" }, input_says: { type: "string" }, contradiction: { type: "boolean" } }, required: ["claim", "input_says", "contradiction"] } } },
+  required: ["checks"],
+};
 
 async function judge(apiKey: string, input: unknown, key: string, text: string): Promise<{ ok: boolean; problems: string[] }> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -88,7 +101,7 @@ async function judge(apiKey: string, input: unknown, key: string, text: string):
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     signal: AbortSignal.timeout(TIMEOUT_MS),
     body: JSON.stringify({
-      model: JUDGE_MODEL, max_tokens: 400, temperature: 0, system: JUDGE_SYSTEM,
+      model: JUDGE_MODEL, max_tokens: 900, temperature: 0, system: JUDGE_SYSTEM,
       tools: [{ name: "verdict", description: "The fact-check verdict.", input_schema: JUDGE_SCHEMA }],
       tool_choice: { type: "tool", name: "verdict" },
       messages: [{ role: "user", content: `Structured input (JSON):\n${JSON.stringify(input)}\n\nParagraph "${key}":\n${text}` }],
@@ -96,18 +109,23 @@ async function judge(apiKey: string, input: unknown, key: string, text: string):
   });
   if (!res.ok) throw new Error(`judge ${res.status}`);
   const json = await res.json();
-  const block = (json.content ?? []).find((c: { type: string }) => c.type === "tool_use") as { input?: { ok?: boolean; problems?: unknown } } | undefined;
-  const problems = Array.isArray(block?.input?.problems) ? block!.input!.problems.map(String).slice(0, 6) : [];
-  return { ok: block?.input?.ok === true && problems.length === 0, problems };
+  const block = (json.content ?? []).find((c: { type: string }) => c.type === "tool_use") as { input?: { checks?: unknown } } | undefined;
+  const checks = Array.isArray(block?.input?.checks) ? (block!.input!.checks as { claim?: unknown; input_says?: unknown; contradiction?: unknown }[]) : [];
+  // Only a check the judge marked as a contradiction, after writing out both sides, counts.
+  const problems = checks.filter((c) => c.contradiction === true).map((c) => `${String(c.claim ?? "")} (input: ${String(c.input_says ?? "")})`).slice(0, 6);
+  return { ok: problems.length === 0, problems };
 }
 
 // Deterministic direction check: an instrument named with an "up" word whose input change is
 // negative (or the reverse) is a contradiction we do not need a model to see.
-const UP = /\b(rose|rise|rises|up|gained|gain|gains|climbed|climb|advanced|higher|firmed|rallied|added)\b/i;
-const DOWN = /\b(fell|fall|falls|down|lost|loss|losses|dropped|drop|declined|decline|lower|slid|slipped|weakened|eased)\b/i;
+const UP = /\b(rose|rise|rises|rising|up|gained|gain|gains|gaining|climbed|climb|climbing|advanced|advancing|higher|firmed|firmer|rallied|rallying|added|adding|stronger|strengthened|recovered|recovering)\b/i;
+const DOWN = /\b(fell|fall|falls|falling|down|lost|loss|losses|losing|dropped|drop|dropping|declined|decline|declining|lower|slid|sliding|slipped|slipping|weakened|weaker|eased|easing|retreated|softer)\b/i;
+// The check runs per clause, not per sentence: "crude falling 1.97 per cent, with Asia up 0.75"
+// is two claims, and the "up" belongs to Asia.
+const CLAUSE = /[,;:]|\s(?:and|while|with|but|though|although|as|whereas)\s/i;
 function directionProblems(text: string, readings: { label: string; change: number | null }[]): string[] {
   const out: string[] = [];
-  for (const s of text.split(/(?<=[.;])\s+/)) {
+  for (const s of text.split(/(?<=[.;])\s+/).flatMap((x) => x.split(CLAUSE))) {
     for (const r of readings) {
       if (r.change == null || !s.toLowerCase().includes(r.label.toLowerCase())) continue;
       const up = UP.test(s), down = DOWN.test(s);
