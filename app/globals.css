@@ -973,7 +973,7 @@ button, input { font: inherit; }
 .chart-last span { color: var(--muted); font: 600 var(--text-label) var(--font-sans); letter-spacing: var(--tracking-label); text-transform: uppercase; }
 .chart-last b { color: var(--ink); font-size: var(--text-value); font-variant-numeric: tabular-nums; }
 
-.chart-frame { position: relative; height: clamp(320px, 52vh, 560px); border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--surface); overflow: hidden; }
+.chart-frame { position: relative; height: clamp(440px, 62vh, 720px); border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--surface); overflow: hidden; }
 /* Fullscreen fills the screen edge to edge, so the rounding and border come off. */
 .chart-frame.is-fullscreen, .chart-frame:fullscreen { border-radius: 0; }
 .chart-canvas { position: absolute; inset: 0; }
@@ -1066,7 +1066,7 @@ button, input { font: inherit; }
   .chart-switch-tf button { flex: 1 1 25%; }
   .chart-fullscreen-caption { display: none; }
   .chart-last { margin-left: 0; }
-  .chart-frame { height: clamp(260px, 44vh, 380px); }
+  .chart-frame { height: clamp(320px, 54vh, 480px); }
 }
 
 /* GlobalCue/News screen: Global View. Built from the same pieces as Pre-market and Verdict:
