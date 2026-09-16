@@ -70,6 +70,7 @@ const DRIVER_WORDS: Record<string, { up: string; down: string; flat: string }> =
   inr: { up: 'Rupee firmer', down: 'Rupee weaker', flat: 'Rupee steady' },
   gift: { up: 'GIFT Nifty pointed to a firm open', down: 'GIFT Nifty pointed to a soft open', flat: 'GIFT Nifty pointed to a flat open' },
   options: { up: 'Put-heavy positioning, some cushion', down: 'Call-heavy positioning, upside capped', flat: 'Options positioning balanced' },
+  news: { up: 'News flow leaning supportive', down: 'News flow leaning risk-off', flat: 'News flow balanced' },
 }
 const words = (d: Driver) => { const w = DRIVER_WORDS[d.key]; if (!w) return d.reading; return d.score >= QUIET ? w.up : d.score <= -QUIET ? w.down : w.flat }
 const forRisk = (ds: Driver[]) => ds.filter((d) => d.score >= QUIET)

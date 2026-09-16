@@ -28,6 +28,10 @@ export type IndiaInputs = {
 
 export type Driver = { key: string; label: string; score: number; weight: number; reading: string; tone: Tone };
 
+// The news component, computed by the sync from analysed events: a score in [-1, 1] per side
+// (null when there are no events in the window) and a one-line reading naming the leaders.
+export type NewsScores = { global: number | null; india: number | null; globalReading: string; indiaReading: string };
+
 export type Transmission = {
   label: "Strong global influence" | "Moderate global influence" | "Limited global influence" | "India diverging from global markets" | "India moving in line with global markets";
   tone: Tone;
@@ -88,7 +92,7 @@ function groupChange(q: Map<string, Quote>, group: string): number | null {
 }
 
 // ------------------------------------------------------------------------------ global
-export function scoreGlobal(quotes: Quote[]): { score: number; band: Band; tone: Tone; drivers: Driver[]; components: Record<string, number | null>; raw: { vixChangePct: number | null; usEquityAvgPct: number | null } } {
+export function scoreGlobal(quotes: Quote[], news?: NewsScores | null): { score: number; band: Band; tone: Tone; drivers: Driver[]; components: Record<string, number | null>; raw: { vixChangePct: number | null; usEquityAvgPct: number | null } } {
   const q = quoteMap(quotes);
   const C = GLOBAL_COMPONENTS;
   const comp: Record<string, number | null> = {};
@@ -139,6 +143,9 @@ export function scoreGlobal(quotes: Quote[]): { score: number; band: Band; tone:
     if (v != null) readings[g] = `${C[g].label} averaged ${pct(v)}`;
   }
 
+  comp.news = news?.global == null ? null : clamp(news.global);
+  if (news?.global != null) readings.news = news.globalReading;
+
   const score = aggregate(comp, C);
   const drivers = buildDrivers(comp, C, readings);
   return { score, ...bandFor(score), drivers, components: comp, raw: { vixChangePct: vix?.changePct ?? null, usEquityAvgPct: usEq } };
@@ -147,7 +154,7 @@ export function scoreGlobal(quotes: Quote[]): { score: number; band: Band; tone:
 // ------------------------------------------------------------------------------- india
 const IST_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
 
-export function scoreIndia(quotes: Quote[], india: IndiaInputs, now = new Date()): { score: number; band: Band; tone: Tone; drivers: Driver[]; components: Record<string, number | null> } {
+export function scoreIndia(quotes: Quote[], india: IndiaInputs, now = new Date(), news?: NewsScores | null): { score: number; band: Band; tone: Tone; drivers: Driver[]; components: Record<string, number | null> } {
   const q = quoteMap(quotes);
   const C = INDIA_COMPONENTS;
   const comp: Record<string, number | null> = {};
@@ -194,6 +201,9 @@ export function scoreIndia(quotes: Quote[], india: IndiaInputs, now = new Date()
 
   comp.options = india.pcrNifty == null ? null : clamp((india.pcrNifty - 1) / C.options.scale);
   if (india.pcrNifty != null) readings.options = `Nifty PCR ${india.pcrNifty.toFixed(2)}, ${india.pcrNifty >= 1.2 ? "put-heavy, supportive" : india.pcrNifty <= 0.8 ? "call-heavy, capped" : "balanced"}`;
+
+  comp.news = news?.india == null ? null : clamp(news.india);
+  if (news?.india != null) readings.news = news.indiaReading;
 
   const score = aggregate(comp, C);
   return { score, ...bandFor(score), drivers: buildDrivers(comp, C, readings), components: comp };
@@ -330,9 +340,9 @@ export function assessConfidence(quotes: Quote[], india: IndiaInputs, gComp: Rec
 }
 
 // -------------------------------------------------------------------------------- main
-export function computeContext(quotes: Quote[], india: IndiaInputs, now = new Date(), measured?: Measured | null): ContextResult {
-  const g = scoreGlobal(quotes);
-  const i = scoreIndia(quotes, india, now);
+export function computeContext(quotes: Quote[], india: IndiaInputs, now = new Date(), measured?: Measured | null, news?: NewsScores | null): ContextResult {
+  const g = scoreGlobal(quotes, news);
+  const i = scoreIndia(quotes, india, now, news);
   const transmission = assessTransmission(g, i, measured);
   const regime = classifyRegime(g.components, g.raw);
   const confidence = assessConfidence(quotes, india, g.components, i.components, now);

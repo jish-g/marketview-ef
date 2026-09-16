@@ -5,7 +5,8 @@
 // correlation and beta of Nifty's daily return against the prior US session; and quantitative
 // "significant move" events. Deterministic, config-driven, no LLM.
 
-import { BASKET, CORRELATION, HISTORY, INDIA_IMPACT, MOVE_THRESHOLDS, RELEVANCE } from "./config.ts";
+import { BASKET, CORRELATION, HISTORY, INDIA_IMPACT, MOVE_THRESHOLDS, NEWS, RELEVANCE } from "./config.ts";
+import type { NewsScores } from "./engine.ts";
 
 export type DailyBar = { asset: string; day: string; close: number; changePct: number | null };
 
@@ -159,4 +160,31 @@ export function detectMoves(stats: AssetStats[], liveChange: Map<string, number 
     });
   }
   return out.sort((a, b) => b.indiaRelevance * Math.abs(b.evidence.z) - a.indiaRelevance * Math.abs(a.evidence.z));
+}
+
+// ------------------------------------------------------------------------------ news score
+// Analysed news events -> one score per side. direction × relevance × confidence per event,
+// decayed by age with NEWS.halfLifeHours, summed and scaled by the component's `scale` in
+// config so a handful of confident, relevant, same-direction events reach a full ±1.
+export type NewsEventLite = { title: string; region: string; market_direction: string; global_relevance: number; india_relevance: number; confidence: number; event_time: string };
+
+export function scoreNews(events: NewsEventLite[], now: Date, scale: number): NewsScores {
+  const dir = (d: string) => (d === "risk_on" ? 1 : d === "risk_off" ? -1 : 0);
+  const decay = (iso: string) => { const h = Math.max(0, (now.getTime() - Date.parse(iso)) / 3600_000); return Math.pow(0.5, h / NEWS.halfLifeHours); };
+  const recent = events.filter((e) => now.getTime() - Date.parse(e.event_time) <= NEWS.lookbackHours * 3600_000);
+  const g = recent.filter((e) => e.region !== "india");
+  const i = recent; // Indian events count fully; global events count by their India relevance
+  const sum = (xs: NewsEventLite[], rel: (e: NewsEventLite) => number) => xs.reduce((a, e) => a + dir(e.market_direction) * rel(e) * e.confidence * decay(e.event_time), 0);
+  const gRaw = g.length >= NEWS.minEvents ? sum(g, (e) => e.global_relevance) : null;
+  const iRaw = i.length >= NEWS.minEvents ? sum(i, (e) => e.region === "india" ? e.india_relevance : e.india_relevance * 0.8) : null;
+  const lead = (xs: NewsEventLite[], rel: (e: NewsEventLite) => number) => xs.slice().sort((a, b) => Math.abs(dir(b.market_direction) * rel(b) * b.confidence) - Math.abs(dir(a.market_direction) * rel(a) * a.confidence)).slice(0, 2).map((e) => e.title).join("; ");
+  const word = (v: number | null) => v == null ? "no analysed events" : v > 0.15 ? "leaning risk-on" : v < -0.15 ? "leaning risk-off" : "balanced";
+  const gScore = gRaw == null ? null : Math.max(-1, Math.min(1, gRaw / scale));
+  const iScore = iRaw == null ? null : Math.max(-1, Math.min(1, iRaw / scale));
+  return {
+    global: gScore == null ? null : +gScore.toFixed(2),
+    india: iScore == null ? null : +iScore.toFixed(2),
+    globalReading: g.length ? `${g.length} global event${g.length === 1 ? "" : "s"} in the last ${NEWS.lookbackHours}h, ${word(gScore)}: ${lead(g, (e) => e.global_relevance)}` : "No analysed global events in the window",
+    indiaReading: i.length ? `${i.length} event${i.length === 1 ? "" : "s"} touching India, ${word(iScore)}: ${lead(i, (e) => e.india_relevance)}` : "No analysed events touching India in the window",
+  };
 }
