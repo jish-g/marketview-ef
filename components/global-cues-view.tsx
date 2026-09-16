@@ -29,9 +29,9 @@ type ContextRow = {
   narrative?: { summary: string; global: string; india: string; link: string; written_at: string } | null
   inputs?: { postmarket_trade_date?: string | null }
 }
-type EventRow = { id: number; event_time: string; updated_at: string; category: string; title: string; summary: string; affected_assets: string[]; market_direction: string; global_relevance: number; india_relevance: number; confidence: number; india_impact: string; sources: { type: string; source: string; detail?: string }[]; evidence: { z?: number; asset?: string } }
+type EventRow = { id: number; event_time: string; updated_at: string; category: string; title: string; summary: string; why_it_matters?: string; affected_assets: string[]; market_direction: string; global_relevance: number; india_relevance: number; confidence: number; india_impact: string; sources: { type: string; source: string; url?: string; detail?: string }[]; evidence: { z?: number; asset?: string; outlets?: number; official?: boolean }; region?: string; cluster_key?: string | null; linked_move?: string | null }
 type SnapshotRow = { asset: string; label: string; cue_group: string; price: number; change_pct: number | null; source_ts: string; ingested_at: string }
-type NewsRow = { url: string; source: string; title: string; published_at: string | null }
+type NewsRow = { url: string; source: string; region?: string; title: string; published_at: string | null; relevance?: number }
 
 type Tab = 'summary' | 'global' | 'india' | 'link' | 'data'
 const TABS: { id: Tab; label: string }[] = [
@@ -131,7 +131,7 @@ function oneLine(ctx: ContextRow): string {
 }
 
 // "Watch next": the inputs still to come today, derived from what is missing or pending.
-function watchNext(ctx: ContextRow, events: EventRow[], now: number): string[] {
+function watchNext(ctx: ContextRow, events: EventRow[], now: number, newsEventsForWatch: EventRow[] = []): string[] {
   const out: string[] = []
   const hm = IST_HM.format(new Date(now))
   const missing = ctx.confidence_detail?.note ?? ''
@@ -140,7 +140,8 @@ function watchNext(ctx: ContextRow, events: EventRow[], now: number): string[] {
   if (ctx.inputs?.postmarket_trade_date && ctx.inputs.postmarket_trade_date !== todayIST()) out.push('Today’s FII and DII print after the close.')
   if (hm < '19:00') out.push('US futures into the US open this evening.')
   else out.push('Tonight’s US session, which sets tomorrow’s pre-market tone.')
-  for (const e of events.slice(0, 2)) out.push(`Whether ${lcFirst(stripPct(e.title))} extends.`)
+  for (const e of events.slice(0, 1)) out.push(`Whether ${lcFirst(stripPct(e.title))} extends.`)
+  for (const e of newsEventsForWatch.slice(0, 1)) out.push(`Follow-through on: ${e.title}.`)
   return out.slice(0, 4)
 }
 
@@ -157,6 +158,22 @@ function WordList({ label, items, empty }: { label: string; items: string[]; emp
     {items.length ? <ul>{items.map((t) => <li key={t}>{t}</li>)}</ul> : <small className="field-empty-reason">{empty}</small>}
   </div>
 }
+const CATEGORY_LABEL: Record<string, string> = { macro: 'Macro', rates: 'Rates', currency: 'Currency', commodities: 'Commodities', geopolitics: 'Geopolitics', equities: 'Equities', policy_india: 'India policy', flows: 'Flows', earnings: 'Earnings', sector: 'Sector', other: 'Event' }
+
+function NewsEventCard({ e, now }: { e: EventRow; now: number }) {
+  const tone: Tone = e.market_direction === 'risk_off' ? 'down' : e.market_direction === 'risk_on' ? 'up' : 'neutral'
+  const outlets = (e.sources ?? []).filter((s) => s.url)
+  return <article className="field-card gv-event">
+    <span>{CATEGORY_LABEL[e.category] ?? 'Event'} · {e.region === 'india' ? 'India' : 'Global'} · {ago(e.event_time, now)}</span>
+    <strong>{e.title} <em className={`ds-badge ds-badge--${tone}`}>{e.market_direction === 'risk_off' ? 'Risk-off' : e.market_direction === 'risk_on' ? 'Risk-on' : 'Neutral'}</em></strong>
+    <small className="gv-event-what">{e.summary}</small>
+    {e.why_it_matters && <small className="gv-event-why">{e.why_it_matters}</small>}
+    <small className="gv-event-why"><b>India.</b> {e.india_impact || 'No clear route into Indian markets from this event.'}</small>
+    {e.linked_move && <small className="gv-event-why"><b>Confirmed by the tape.</b> A significant move in a linked instrument was detected in the same window.</small>}
+    <small className="gv-event-meta">India relevance {level(Number(e.india_relevance))} · confidence {level(Number(e.confidence))}{e.evidence?.official ? ' · official source' : ''}{outlets.length ? <> · {outlets.slice(0, 4).map((s, i) => <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer">{i ? ', ' : ''}{s.source}</a>)}</> : null}</small>
+  </article>
+}
+
 function EventCard({ e, now }: { e: EventRow; now: number }) {
   const scale = timesUsual(e.evidence?.z)
   const tone: Tone = e.market_direction === 'risk_off' ? 'down' : e.market_direction === 'risk_on' ? 'up' : 'neutral'
@@ -178,8 +195,8 @@ export function GlobalCuesView() {
     const [ctx, snaps, news, events] = await Promise.all([
       supabase.from('global_context').select('*').order('calculated_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('market_snapshots').select('asset, label, cue_group, price, change_pct, source_ts, ingested_at').order('source_ts', { ascending: false }).limit(200),
-      supabase.from('market_news').select('url, source, title, published_at').eq('trade_date', today).order('published_at', { ascending: false, nullsFirst: false }).limit(12),
-      supabase.from('market_events').select('*').eq('status', 'active').gte('event_time', new Date(Date.now() - 36 * 3600_000).toISOString()).order('india_relevance', { ascending: false }).order('event_time', { ascending: false }).limit(8),
+      supabase.from('news_articles').select('url, source, region, title, published_at, relevance').gte('fetched_at', new Date(Date.now() - 24 * 3600_000).toISOString()).gt('relevance', 0).order('published_at', { ascending: false, nullsFirst: false }).limit(20),
+      supabase.from('market_events').select('*').eq('status', 'active').gte('event_time', new Date(Date.now() - 36 * 3600_000).toISOString()).order('india_relevance', { ascending: false }).order('event_time', { ascending: false }).limit(14),
     ])
     if (ctx.error) throw ctx.error
     const seen = new Set<string>()
@@ -189,7 +206,9 @@ export function GlobalCuesView() {
   }, { revalidateOnFocus: true, refreshInterval: 60_000 })
 
   const ctx = data?.ctx ?? null
-  const events = data?.events ?? []
+  const allEvents = data?.events ?? []
+  const newsEvents = allEvents.filter((e) => e.category !== 'price_move')
+  const events = allEvents.filter((e) => e.category === 'price_move')
   const calcAgeMin = ctx ? (now - Date.parse(ctx.calculated_at)) / 60000 : null
   const stale = calcAgeMin != null && calcAgeMin > EXPECTED_REFRESH_MIN * 2
   const gTone = ctx ? BAND_TONE[ctx.global_band] ?? 'neutral' : 'neutral'
@@ -229,7 +248,7 @@ export function GlobalCuesView() {
           <Label tone="info">The read right now</Label>
           <strong className="thesis-hero-value">{headline(ctx)}</strong>
           <p className="thesis-hero-note">{ctx.narrative?.summary ?? oneLine(ctx)}</p>
-          {events.length > 0 && <div className="agent-badges">{events.slice(0, 3).map((e) => <button type="button" key={e.id} className={`ds-badge ${e.market_direction === 'risk_off' ? 'ds-badge--down' : e.market_direction === 'risk_on' ? 'ds-badge--up' : 'ds-badge--neutral'} gv-chip`} onClick={() => setTab('link')}>{stripPct(e.title)}</button>)}</div>}
+          {(newsEvents.length > 0 || events.length > 0) && <div className="agent-badges">{[...newsEvents.slice(0, 2), ...events.slice(0, 2)].map((e) => <button type="button" key={e.id} className={`ds-badge ${e.market_direction === 'risk_off' ? 'ds-badge--down' : e.market_direction === 'risk_on' ? 'ds-badge--up' : 'ds-badge--neutral'} gv-chip`} onClick={() => setTab('link')}>{stripPct(e.title)}</button>)}</div>}
         </div>
       </div>
       <section className="metric-group">
@@ -246,7 +265,7 @@ export function GlobalCuesView() {
         <div className="group-heading"><h3>Why, and what comes next</h3></div>
         <div className="field-grid gv-grid2">
           <WordList label="Why" items={ctx.what_is_driving.slice(0, 4)} empty="Driver unclear. No input moved enough to stand out." />
-          <WordList label="Watch next" items={watchNext(ctx, events, now)} empty="Nothing pending." />
+          <WordList label="Watch next" items={watchNext(ctx, events, now, newsEvents)} empty="Nothing pending." />
         </div>
       </section>
     </>}
@@ -295,6 +314,11 @@ export function GlobalCuesView() {
         </div>
       </section>
       <section className="metric-group">
+        <div className="group-heading"><h3>Key events</h3></div>
+        {newsEvents.length ? <div className="field-grid gv-grid2">{newsEvents.map((e) => <NewsEventCard e={e} key={e.id} now={now} />)}</div>
+          : <p className="chart-note">No analysed news event in the last 36 hours. Headlines are clustered every five minutes and analysed when several outlets or an official source carry the same story.</p>}
+      </section>
+      <section className="metric-group">
         <div className="group-heading"><h3>Significant moves</h3></div>
         {events.length ? <div className="field-grid gv-grid2">{events.map((e) => <EventCard e={e} key={e.id} now={now} />)}</div>
           : <p className="chart-note">No instrument has moved beyond its usual daily range in the last 36 hours.</p>}
@@ -340,8 +364,8 @@ export function GlobalCuesView() {
       <section className="metric-group">
         <div className="group-heading"><h3>Headlines</h3></div>
         {!data?.news.length
-          ? <p className="chart-note">No headlines on record for today. Pulled from Economic Times, Livemint and NDTV Profit at 08:30 and 09:05 IST.</p>
-          : <ul className="news-list">{data.news.map((n) => <li key={n.url}><a href={n.url} target="_blank" rel="noopener noreferrer">{n.title}</a><small>{n.source}{n.published_at ? ` · ${IST_CLOCK.format(new Date(n.published_at))} IST` : ''}</small></li>)}</ul>}
+          ? <p className="chart-note">No market-relevant headlines in the last 24 hours. Feeds are polled every five minutes.</p>
+          : <ul className="news-list">{data.news.map((n) => <li key={n.url}><a href={n.url} target="_blank" rel="noopener noreferrer">{n.title}</a><small>{n.source}{n.region ? ` · ${n.region === 'india' ? 'India' : n.region === 'official' ? 'Official' : 'Global'}` : ''}{n.published_at ? ` · ${IST_CLOCK.format(new Date(n.published_at))} IST` : ''}</small></li>)}</ul>}
       </section>
       <p className="chart-note">Quotes from Yahoo Finance; India flows, breadth and options from the pre-market and post-market pipeline. Weights, scales and thresholds live in one config file.</p>
     </>}
