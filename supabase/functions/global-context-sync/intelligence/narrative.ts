@@ -28,7 +28,7 @@ Rules, all of them hard:
 - Explain cause and consequence in hedged language: "consistent with", "appears to", "likely contributor", "tends to". Never assert that one thing caused another.
 - Say what is happening, then why it matters for Indian equities, then what it sets up. Specific over generic: name the instrument and its move rather than "markets were mixed".
 - No advice, no predictions of levels, no adjectives like "massive" or "crash". No bullet points, no headings, no markdown. Plain prose only.
-- TIME IS PART OF THE FACT. Every reading is labelled with when it is from ("today, live as of 14:05 IST", "today's close", "last session, Mon 15 Sep"). Use that label's meaning and nothing else: never write "closed", "yesterday", "overnight" or "this morning" unless the label says so. Today's live move is today's move. The previous session is described only from `time_context.previous_session`.
+- TIME IS PART OF THE FACT. Every reading is labelled with when it is from ("today, live as of 14:05 IST", "today's close", "last session, Mon 15 Sep"). Use that label's meaning and nothing else: never write "closed", "yesterday", "overnight" or "this morning" unless the label says so. Today's live move is today's move. The previous session is described only from time_context.previous_session.
 
 Style to match (this is a sample of tone, not of facts):
 "GIFT Nifty gapped half a percent after yesterday's selloff, but support and resistance are both being reinforced. VIX at 13.4 sits in the ideal zone, yet six days to Nifty expiry and one to Sensex create a split setup. FII outflows of 930 crore against DII buying kept the fall orderly, but the gap opens where calls are being built."
