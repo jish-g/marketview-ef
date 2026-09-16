@@ -973,7 +973,9 @@ button, input { font: inherit; }
 .chart-last span { color: var(--muted); font: 600 var(--text-label) var(--font-sans); letter-spacing: var(--tracking-label); text-transform: uppercase; }
 .chart-last b { color: var(--ink); font-size: var(--text-value); font-variant-numeric: tabular-nums; }
 
-.chart-frame { position: relative; height: clamp(320px, 52vh, 560px); border: 1px solid var(--border); background: var(--surface); }
+.chart-frame { position: relative; height: clamp(320px, 52vh, 560px); border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--surface); overflow: hidden; }
+/* Fullscreen fills the screen edge to edge, so the rounding and border come off. */
+.chart-frame.is-fullscreen, .chart-frame:fullscreen { border-radius: 0; }
 .chart-canvas { position: absolute; inset: 0; }
 /* Sits over the canvas rather than replacing it: the chart is created once on mount and
    keeps its pan and zoom across an empty stretch, a reload and a theme flip. */

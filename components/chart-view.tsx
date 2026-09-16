@@ -287,9 +287,13 @@ export function ChartView({ row }: { row: Row }) {
         layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: colors.muted, attributionLogo: false },
         grid: { vertLines: { visible: false }, horzLines: { visible: false } },
         crosshair: { mode: CrosshairMode.Normal },
-        rightPriceScale: { borderColor: colors.rule },
+        // Breathing room the way a charting terminal lays it out: the series keeps 12% clear
+        // above and below so the outer axis labels are never clipped by the frame, and the last
+        // candle sits a few bars in from the price axis instead of touching it.
+        rightPriceScale: { borderColor: colors.rule, scaleMargins: { top: 0.12, bottom: 0.12 } },
         timeScale: {
           borderColor: colors.rule,
+          rightOffset: 6,
           timeVisible: true,
           secondsVisible: false,
           tickMarkFormatter: (time: number, tickMarkType: number) => tickMarkType <= 2 ? IST_DAY.format(new Date(time * 1000)) : IST_TIME.format(new Date(time * 1000)),
