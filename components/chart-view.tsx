@@ -62,12 +62,27 @@ function aggregate(bars: Bar[], minutes: number): Bar[] {
   return out
 }
 
+// The indicator registry. Every overlay the chart can draw is one entry here: the Indicators
+// panel lists them, the price-line effect filters on them, and the choice is remembered per
+// browser. Adding an indicator is one line here plus whatever computes its levels.
 type LevelKey = 'oi' | 'pivot' | 'phlc'
-const LEVEL_GROUPS: { key: LevelKey; label: string }[] = [
-  { key: 'oi', label: 'OI walls' },
-  { key: 'pivot', label: 'Pivot support / resistance' },
-  { key: 'phlc', label: 'PHLC · prev day high / low / close' },
+const INDICATORS: { key: LevelKey; label: string; description: string; defaultOn: boolean }[] = [
+  { key: 'oi', label: 'OI walls', description: 'OI support, OI resistance and max pain from the option chain', defaultOn: true },
+  { key: 'phlc', label: 'PHLC', description: 'Previous day high, low and close', defaultOn: true },
+  { key: 'pivot', label: 'Pivots', description: 'Pivot support and resistance', defaultOn: false },
 ]
+const INDICATOR_STORE = 'marketcue.chart.indicators.v1'
+
+function loadHidden(): Set<LevelKey> {
+  const fallback = new Set<LevelKey>(INDICATORS.filter((i) => !i.defaultOn).map((i) => i.key))
+  try {
+    const raw = window.localStorage.getItem(INDICATOR_STORE)
+    if (!raw) return fallback
+    const off = JSON.parse(raw) as string[]
+    const known = new Set(INDICATORS.map((i) => i.key as string))
+    return new Set(off.filter((k): k is LevelKey => known.has(k)))
+  } catch { return fallback }
+}
 
 type LevelDef = { group: LevelKey; title: string; value: number; tone: 'up' | 'down' | 'info' | 'muted'; dashed: boolean }
 
@@ -139,7 +154,12 @@ export function ChartView({ row }: { row: Row }) {
   const [instrument, setInstrument] = useState<Instrument>('NIFTY')
   const [span, setSpan] = useState<Span>('history')
   const [timeframe, setTimeframe] = useState<Timeframe>('5m')
-  const [hidden, setHidden] = useState<Set<LevelKey>>(() => new Set<LevelKey>(['pivot']))
+  // Defaults for the server render; the remembered choice is applied after mount so the first
+  // client paint matches the HTML and hydration stays clean.
+  const [hidden, setHidden] = useState<Set<LevelKey>>(() => new Set<LevelKey>(INDICATORS.filter((i) => !i.defaultOn).map((i) => i.key)))
+  useEffect(() => { setHidden(loadHidden()) }, [])
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const [candles, setCandles] = useState<Candle[]>([])
   const [fullscreen, setFullscreen] = useState(false)
 
@@ -265,7 +285,7 @@ export function ChartView({ row }: { row: Row }) {
         width: el.clientWidth,
         height: el.clientHeight,
         layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: colors.muted, attributionLogo: false },
-        grid: { vertLines: { color: colors.rule }, horzLines: { color: colors.rule } },
+        grid: { vertLines: { visible: false }, horzLines: { visible: false } },
         crosshair: { mode: CrosshairMode.Normal },
         rightPriceScale: { borderColor: colors.rule },
         timeScale: {
@@ -327,7 +347,6 @@ export function ChartView({ row }: { row: Row }) {
     if (!chartReady || !chartRef.current || !seriesRef.current) return
     chartRef.current.applyOptions({
       layout: { textColor: colors.muted },
-      grid: { vertLines: { color: colors.rule }, horzLines: { color: colors.rule } },
       rightPriceScale: { borderColor: colors.rule },
       timeScale: { borderColor: colors.rule },
     })
@@ -386,12 +405,22 @@ export function ChartView({ row }: { row: Row }) {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
+      try { window.localStorage.setItem(INDICATOR_STORE, JSON.stringify(Array.from(next))) } catch { /* private mode */ }
       return next
     })
   }, [])
 
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDown = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [menuOpen])
+
   const read = useMemo(() => sessionRead(bars, levels, span === 'session' ? 'on the session' : 'over 30 sessions'), [bars, levels, span])
-  const availableGroups = useMemo(() => LEVEL_GROUPS.filter((g) => levels.some((l) => l.group === g.key)), [levels])
+  const activeCount = useMemo(() => INDICATORS.filter((i) => !hidden.has(i.key) && levels.some((l) => l.group === i.key)).length, [hidden, levels])
   const lastBar = bars.length ? bars[bars.length - 1] : null
   const lastCandleAt = sessionCandles.length ? new Date(sessionCandles[sessionCandles.length - 1].bar.time * 1000).toISOString() : null
 
@@ -422,6 +451,25 @@ export function ChartView({ row }: { row: Row }) {
           <button key={t.key} type="button" className={timeframe === t.key ? 'is-active' : ''} aria-pressed={timeframe === t.key} onClick={() => setTimeframe(t.key)}>{t.key}</button>
         ))}
       </div>
+      <div className="chart-menu" ref={menuRef}>
+        <button type="button" className={`chart-menu-button ${menuOpen ? 'is-open' : ''}`} aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
+          <span aria-hidden="true">ƒ</span> Indicators{activeCount > 0 && <b>{activeCount}</b>}
+        </button>
+        {menuOpen && <div className="chart-menu-panel" role="dialog" aria-label="Indicators">
+          <p className="chart-menu-title">Indicators</p>
+          {INDICATORS.map((ind) => {
+            const available = levels.some((l) => l.group === ind.key)
+            const on = available && !hidden.has(ind.key)
+            return <label key={ind.key} className={`chart-menu-item ${available ? '' : 'is-unavailable'}`}>
+              <span className="chart-menu-text">
+                <span className="chart-menu-name"><i className={`chart-legend-swatch swatch-${ind.key}`} aria-hidden="true" />{ind.label}</span>
+                <small>{available ? ind.description : 'Not available for this session'}</small>
+              </span>
+              <input type="checkbox" role="switch" className="chart-menu-switch" checked={on} disabled={!available} onChange={() => toggleLevel(ind.key)} />
+            </label>
+          })}
+        </div>}
+      </div>
       {lastBar && <span className="chart-last"><span>Last</span><b>{fmt.level(lastBar.close)}</b></span>}
     </div>
 
@@ -447,15 +495,6 @@ export function ChartView({ row }: { row: Row }) {
                 : 'The selected history is not present in the candle table.'} />}
       </div>}
     </div>
-
-    {availableGroups.length > 0 && <div className="chart-legend">
-      <span className="chart-legend-label">Indicators</span>
-      {availableGroups.map((g) => (
-        <button key={g.key} type="button" className={`chart-legend-item ${hidden.has(g.key) ? 'is-off' : ''}`} aria-pressed={!hidden.has(g.key)} onClick={() => toggleLevel(g.key)}>
-          <i className={`chart-legend-swatch swatch-${g.key}`} aria-hidden="true" />{g.label}
-        </button>
-      ))}
-    </div>}
 
     {read && <p className="chart-read">{read}</p>}
 
