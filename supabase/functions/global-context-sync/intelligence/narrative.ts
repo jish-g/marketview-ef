@@ -14,6 +14,9 @@ export const NARRATIVE_MODEL = "claude-sonnet-4-5-20250929";
 // The publish gate: a second, cheaper model reads each paragraph against the same input and
 // flags any claim that the input contradicts (wrong day, wrong direction, wrong instrument).
 export const JUDGE_MODEL = "claude-haiku-4-5-20251001";
+// Bump whenever the prompt, the input shape or the gate changes: it is part of the reuse key, so
+// a deploy forces a fresh, re-checked narrative instead of carrying the previous one forward.
+export const NARRATIVE_VERSION = "2";
 const TIMEOUT_MS = 30_000;
 const LIMITS = { summary: [50, 120], global: [40, 110], india: [40, 110], link: [40, 110] } as const;
 
