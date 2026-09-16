@@ -101,7 +101,7 @@ async function judge(apiKey: string, input: unknown, key: string, text: string):
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     signal: AbortSignal.timeout(TIMEOUT_MS),
     body: JSON.stringify({
-      model: JUDGE_MODEL, max_tokens: 400, temperature: 0, system: JUDGE_SYSTEM,
+      model: JUDGE_MODEL, max_tokens: 900, temperature: 0, system: JUDGE_SYSTEM,
       tools: [{ name: "verdict", description: "The fact-check verdict.", input_schema: JUDGE_SCHEMA }],
       tool_choice: { type: "tool", name: "verdict" },
       messages: [{ role: "user", content: `Structured input (JSON):\n${JSON.stringify(input)}\n\nParagraph "${key}":\n${text}` }],
