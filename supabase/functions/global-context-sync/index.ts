@@ -117,11 +117,18 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // 2. Full history for analytics: the stored series, which now includes what was just written.
-  const since = new Date(now.getTime() - 200 * 86400_000).toISOString().slice(0, 10);
-  const { data: hist, error: histErr } = await admin.from("market_daily").select("asset, day, close, change_pct").gte("day", since).order("day", { ascending: true }).limit(10000);
-  if (histErr) skipped.push(`market_daily read: ${histErr.message}`);
-  const bars: DailyBar[] = (hist ?? []).map((h) => ({ asset: String(h.asset), day: String(h.day), close: Number(h.close), changePct: h.change_pct == null ? null : Number(h.change_pct) }));
+  // 2. History for analytics: the stored series, which now includes what was just written.
+  //    PostgREST caps any single response at 1000 rows whatever `limit` asks for, so this pages
+  //    in 1000-row chunks. The window is 45 calendar days: enough for the 20-session lookback
+  //    on every exchange with holidays, and small enough that the read stays to a page or two.
+  const since = new Date(now.getTime() - 45 * 86400_000).toISOString().slice(0, 10);
+  const bars: DailyBar[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data: page, error: histErr } = await admin.from("market_daily").select("asset, day, close, change_pct").gte("day", since).order("day", { ascending: true }).order("asset", { ascending: true }).range(from, from + 999);
+    if (histErr) { skipped.push(`market_daily read: ${histErr.message}`); break; }
+    for (const h of page ?? []) bars.push({ asset: String(h.asset), day: String(h.day), close: Number(h.close), changePct: h.change_pct == null ? null : Number(h.change_pct) });
+    if (!page || page.length < 1000) break;
+  }
 
   // 3. India-side inputs from the existing pipeline. Today's row when it exists, else the most
   //    recent, and the engine is told how old that is.
