@@ -19,6 +19,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { BASKET, HISTORY } from "./intelligence/config.ts";
 import { computeContext, type IndiaInputs, type Quote } from "./intelligence/engine.ts";
 import { computeStats, detectMoves, measureTransmission, type DailyBar } from "./intelligence/analytics.ts";
+import { writeNarrative, type Narrative } from "./intelligence/narrative.ts";
+
+// The narrative is re-written only when the picture it describes has changed, or after this long.
+const NARRATIVE_MAX_AGE_MS = 90 * 60_000;
 
 const FETCH_TIMEOUT_MS = 12_000;
 const UA = "Mozilla/5.0 (compatible; MarketCue/1.0; +https://marketcue.in)";
@@ -170,6 +174,24 @@ Deno.serve(async (req: Request) => {
     if (error) skipped.push(`market_events upsert: ${error.message}`);
   }
 
+  // 5b. Narrative: four paragraphs from the model, explaining the numbers above and nothing else.
+  //     Reused from the previous row while the verdicts, regime and event set are unchanged and
+  //     the previous narrative is younger than NARRATIVE_MAX_AGE_MS; otherwise re-written.
+  const narrativeKey = [ctx.global.band, ctx.india.band, ctx.transmission.label, ctx.regime, ...moves.map((m) => m.dedupeKey)].join("|");
+  let narrative: Narrative | null = null;
+  const { data: prevRow } = await admin.from("global_context").select("narrative, narrative_key").order("calculated_at", { ascending: false }).limit(1).maybeSingle();
+  const prev = prevRow?.narrative as Narrative | null | undefined;
+  if (prev && prevRow?.narrative_key === narrativeKey && Date.now() - Date.parse(prev.written_at) < NARRATIVE_MAX_AGE_MS) {
+    narrative = prev;
+  } else {
+    const { data: anthropicKey } = await admin.rpc("get_vault_secret", { secret_name: "anthropic_api_key" });
+    if (!anthropicKey) skipped.push("narrative: anthropic_api_key not in vault");
+    else {
+      try { narrative = await writeNarrative(String(anthropicKey), ctx, measured, moves, india.asOf); if (narrative.dropped.length) skipped.push(`narrative: dropped ${narrative.dropped.join(", ")} (cited a figure not in the input or wrong length)`); }
+      catch (e) { skipped.push(`narrative: ${e instanceof Error ? e.message : e}`); narrative = prev ?? null; }
+    }
+  }
+
   // 6. Persist context.
   const { error: ctxErr } = await admin.from("global_context").insert({
     calculated_at: ctx.calculatedAt,
@@ -183,9 +205,10 @@ Deno.serve(async (req: Request) => {
     channels: ctx.transmission.channels, counterforces: ctx.transmission.counterforces,
     what_is_driving: ctx.whatIsDriving, explanation: ctx.explanation,
     measured, asset_stats: stats,
+    narrative, narrative_key: narrativeKey,
     inputs: { quotes, india, premarket_trade_date: pre?.trade_date ?? null, postmarket_trade_date: post?.trade_date ?? null, history_days: bars.length, skipped },
   });
   if (ctxErr) skipped.push(`global_context insert: ${ctxErr.message}`);
 
-  return new Response(JSON.stringify({ ok: !ctxErr, quotes: quotes.length, bars_written: newBars.length, history_rows: bars.length, events: moves.length, global: ctx.global.band, india: ctx.india.band, transmission: ctx.transmission.label, measured: measured.label, regime: ctx.regime, confidence: ctx.confidence.level, skipped }), { status: 200, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ ok: !ctxErr, quotes: quotes.length, bars_written: newBars.length, history_rows: bars.length, events: moves.length, narrative: narrative ? (narrative === prev ? "reused" : "written") : "none", global: ctx.global.band, india: ctx.india.band, transmission: ctx.transmission.label, measured: measured.label, regime: ctx.regime, confidence: ctx.confidence.level, skipped }), { status: 200, headers: { "Content-Type": "application/json" } });
 });
