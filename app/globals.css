@@ -192,10 +192,8 @@ button, input { font: inherit; }
    greyscale. The list is rendered twice and the track moves by exactly half its width
    (translateX(-50%)), so the loop has no seam at any chip count. Duration scales with the
    number of chips so the speed stays constant. Hover pauses; reduced-motion stops it and
-   hides the duplicate. On a phone the stamp shrinks to dot + time and chips tighten. */
+   hides the duplicate. On a phone the chips tighten. */
 .ticker { display: flex; align-items: stretch; min-height: 52px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 55%, var(--ground)); }
-.ticker-stamp { flex: 0 0 auto; display: flex; align-items: center; gap: 7px; padding: 0 16px; border-right: 1px solid var(--border); color: var(--muted); font: 600 var(--text-label) var(--font-sans); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
-.ticker-stamp b { color: var(--ink); font: 600 var(--text-label) var(--font-mono); letter-spacing: 0; text-transform: none; }
 .ticker-viewport { flex: 1; min-width: 0; position: relative; overflow: hidden; }
 .ticker-viewport::before, .ticker-viewport::after { content: ''; position: absolute; top: 0; bottom: 0; width: 32px; z-index: 1; pointer-events: none; }
 .ticker-viewport::before { left: 0; background: linear-gradient(90deg, var(--ground), transparent); }
@@ -222,8 +220,6 @@ button, input { font: inherit; }
 @media (prefers-reduced-motion: reduce) { .ticker-track { overflow-x: auto; max-width: 100%; } .ticker-chip[aria-hidden="true"] { display: none; } }
 @media (max-width: 640px) {
   .ticker { min-height: 46px; }
-  .ticker-stamp { padding: 0 10px; gap: 6px; }
-  .ticker-stamp-label { display: none; }
   .ticker-track { gap: 6px; padding: 6px; }
   .ticker-chip { min-width: 150px; padding: 5px 10px; column-gap: 10px; }
   .ticker-chip-name small { display: none; }
