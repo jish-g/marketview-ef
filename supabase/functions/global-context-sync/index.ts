@@ -16,9 +16,9 @@
 // POST body: {} or {"mode":"backfill"} -- same x-cron-secret as the other cron'd functions.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { BASKET, HISTORY } from "./intelligence/config.ts";
+import { BASKET, GLOBAL_COMPONENTS, HISTORY, NEWS } from "./intelligence/config.ts";
 import { computeContext, type IndiaInputs, type Quote } from "./intelligence/engine.ts";
-import { computeStats, detectMoves, measureTransmission, type DailyBar } from "./intelligence/analytics.ts";
+import { computeStats, detectMoves, measureTransmission, scoreNews, type DailyBar, type NewsEventLite } from "./intelligence/analytics.ts";
 import { writeNarrative, type Narrative } from "./intelligence/narrative.ts";
 
 // The narrative is re-written only when the picture it describes has changed, or after this long.
@@ -163,12 +163,17 @@ Deno.serve(async (req: Request) => {
     pcrNifty: midPcr ?? num(pre?.pcr_nifty),
   };
 
+  // 3b. Analysed news events (written by news-sync) become the News component on both sides.
+  const { data: newsRows } = await admin.from("market_events").select("title, region, market_direction, global_relevance, india_relevance, confidence, event_time").eq("status", "active").not("cluster_key", "is", null).gte("event_time", new Date(now.getTime() - NEWS.lookbackHours * 3600_000).toISOString()).limit(60);
+  const newsEvents: NewsEventLite[] = (newsRows ?? []).map((r) => ({ title: String(r.title), region: String(r.region), market_direction: String(r.market_direction), global_relevance: Number(r.global_relevance), india_relevance: Number(r.india_relevance), confidence: Number(r.confidence), event_time: String(r.event_time) }));
+  const news = scoreNews(newsEvents, now, GLOBAL_COMPONENTS.news.scale);
+
   // 4. Analytics + engine.
   const liveChange = new Map(quotes.map((q) => [q.symbol, q.changePct]));
   const stats = computeStats(bars, liveChange);
   const measured = measureTransmission(bars);
   const moves = detectMoves(stats, liveChange, now);
-  const ctx = computeContext(quotes, india, now, measured);
+  const ctx = computeContext(quotes, india, now, measured, news);
 
   // 5. Persist events (upsert on dedupe key so an evolving intraday move updates, not duplicates).
   if (moves.length) {
@@ -212,7 +217,7 @@ Deno.serve(async (req: Request) => {
     what_is_driving: ctx.whatIsDriving, explanation: ctx.explanation,
     measured, asset_stats: stats,
     narrative, narrative_key: narrativeKey,
-    inputs: { quotes, india, premarket_trade_date: pre?.trade_date ?? null, midmarket_updated_at: mid?.updated_at ?? null, postmarket_trade_date: post?.trade_date ?? null, history_days: bars.length, skipped },
+    inputs: { quotes, india, news_events: newsEvents.length, news, premarket_trade_date: pre?.trade_date ?? null, midmarket_updated_at: mid?.updated_at ?? null, postmarket_trade_date: post?.trade_date ?? null, history_days: bars.length, skipped },
   });
   if (ctxErr) skipped.push(`global_context insert: ${ctxErr.message}`);
 

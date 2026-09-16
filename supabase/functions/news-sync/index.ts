@@ -137,7 +137,9 @@ Deno.serve(async (req: Request) => {
   const candidates = clusters
     .filter((c) => c.relevance >= ANALYSE.minRelevance)
     .map((c) => {
-      const assets = new Set([...c.entities.values()].flatMap((e) => e.assets));
+      // Primary asset only (the first symbol an entity maps to), so a Fed headline links to a
+      // 10Y move but a BOJ headline, whose primary asset is the Nikkei, does not.
+      const assets = new Set([...c.entities.values()].map((e) => e.assets[0]).filter(Boolean));
       const linked = moves.find((m) => (m.affected_assets ?? []).some((a) => assets.has(a))) ?? null;
       const qualifies = (ANALYSE.officialCounts && c.official) || c.sources.size >= ANALYSE.minSources || (ANALYSE.linkedMoveCounts && linked != null);
       const prev = eventByCluster.get(c.key);
