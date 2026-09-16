@@ -282,7 +282,8 @@ function describeBand(band: Band): string {
   return band.toLowerCase();
 }
 // Lowercase only the leading letter so "Higher US yields alongside FII selling" keeps its acronyms.
-const lcFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
+// "GIFT Nifty tracking US futures" keeps its capital: only a word that goes on in lowercase is lowered.
+const lcFirst = (t: string) => (/^[A-Z][a-z]/.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
 
 export function explain(res: Omit<ContextResult, "explanation" | "whatIsDriving">): { explanation: string; whatIsDriving: string[] } {
   const gTop = res.global.drivers.filter((d) => Math.abs(d.score) >= 0.2).slice(0, 3);
@@ -294,8 +295,8 @@ export function explain(res: Omit<ContextResult, "explanation" | "whatIsDriving"
   if (iTop.length === 0) lines.push("Indian inputs show no clear direction.");
   else for (const d of iTop) lines.push(`${d.reading}.`);
 
-  const gPhrase = gTop.length ? `${gTop.map((d) => d.label.toLowerCase()).join(", ")}` : "no dominant global factor";
-  const iPhrase = iTop.length ? `${iTop.map((d) => d.label.toLowerCase()).join(", ")}` : "no dominant domestic factor";
+  const gPhrase = gTop.length ? `${gTop.map((d) => d.label).join(", ")}` : "no dominant global factor";
+  const iPhrase = iTop.length ? `${iTop.map((d) => d.label).join(", ")}` : "no dominant domestic factor";
   let explanation: string;
   switch (res.transmission.label) {
     case "Strong global influence":

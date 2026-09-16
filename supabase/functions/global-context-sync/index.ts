@@ -19,7 +19,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { BASKET, GLOBAL_COMPONENTS, HISTORY, MAX_ABS_CHANGE_PCT, NEWS } from "./intelligence/config.ts";
 import { computeContext, type IndiaInputs, type Quote } from "./intelligence/engine.ts";
 import { computeStats, detectMoves, measureTransmission, scoreNews, type DailyBar, type NewsEventLite } from "./intelligence/analytics.ts";
-import { writeNarrative, type Narrative, type TimeContext } from "./intelligence/narrative.ts";
+import { NARRATIVE_VERSION, writeNarrative, type Narrative, type TimeContext } from "./intelligence/narrative.ts";
 
 // The narrative is re-written only when the picture it describes has changed, or after this long.
 const NARRATIVE_MAX_AGE_MS = 90 * 60_000;
@@ -197,7 +197,7 @@ Deno.serve(async (req: Request) => {
   // 5b. Narrative: four paragraphs from the model, explaining the numbers above and nothing else.
   //     Reused from the previous row while the verdicts, regime and event set are unchanged and
   //     the previous narrative is younger than NARRATIVE_MAX_AGE_MS; otherwise re-written.
-  const narrativeKey = [ctx.global.band, ctx.india.band, ctx.transmission.label, ctx.regime, ...moves.map((m) => m.dedupeKey)].join("|");
+  const narrativeKey = [`n${NARRATIVE_VERSION}`, ctx.global.band, ctx.india.band, ctx.transmission.label, ctx.regime, ...moves.map((m) => m.dedupeKey)].join("|");
   let narrative: Narrative | null = null;
   const { data: prevRow } = await admin.from("global_context").select("narrative, narrative_key").order("calculated_at", { ascending: false }).limit(1).maybeSingle();
   const prev = prevRow?.narrative as Narrative | null | undefined;
