@@ -971,14 +971,39 @@ button, input { font: inherit; }
   .chart-frame { height: clamp(260px, 44vh, 380px); }
 }
 
-/* GlobalCue/News screen: the overnight basket reuses .field-card; headlines get a plain list. */
+/* GlobalCue/News screen: Global View. Hero bands, transmission explanation, driver grids, basket. */
 .cues-view { display: grid; gap: var(--s-4); }
-.cues-grid .field-card strong { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
-.cues-grid .field-card strong .cue-delta { font-style: normal; opacity: 1; letter-spacing: 0; font-size: var(--text-label); }
-.cues-grid .field-card .cue-time { display: block; margin-top: 4px; color: var(--muted); font-size: var(--text-label); }
+.cues-hero { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.cues-hero-card { padding: 14px 16px; border: 1px solid var(--border); border-left-width: 4px; border-radius: var(--radius-sm); background: var(--surface); display: grid; gap: 4px; }
+.cues-hero-card span { color: var(--muted); font: 600 var(--text-label) var(--font-sans); letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.cues-hero-card strong { color: var(--ink); font-size: var(--text-value); font-weight: 700; letter-spacing: -.02em; line-height: 1.25; }
+.cues-hero-card small { color: var(--muted); font-size: var(--text-label); }
+.cues-hero-card--up { border-left-color: var(--up); }
+.cues-hero-card--down { border-left-color: var(--down); }
+.cues-hero-card--caution { border-left-color: var(--caution); }
+.cues-hero-card--neutral { border-left-color: var(--border); }
+.cues-explanation .prior-session-story { font-size: var(--text-meta); line-height: 1.6; }
+.cues-evidence { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 10px; }
+.cues-evidence ul { margin: 4px 0 0; padding-left: 18px; color: var(--ink-2); font-size: var(--text-label); line-height: 1.5; }
+.driving-list { margin: 0; padding-left: 22px; display: grid; gap: 6px; color: var(--ink); font-size: var(--text-meta); line-height: 1.5; }
+.drivers-grid .driver-card strong { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.drivers-grid .driver-card small { display: block; margin-top: 6px; color: var(--ink-2); font-size: var(--text-label); line-height: 1.45; opacity: 1; }
+.score-bar { position: relative; flex: 1; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.score-bar::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border); }
+.score-bar i { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--muted); }
+.score-bar--up i { background: var(--up); } .score-bar--down i { background: var(--down); } .score-bar--caution i { background: var(--caution); }
+.basket { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.basket-group { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); padding: 10px 12px; display: grid; gap: 6px; align-content: start; }
+.basket-row { display: grid; grid-template-columns: 1fr auto auto; gap: 4px 10px; align-items: baseline; }
+.basket-row .basket-label { color: var(--ink-2); font-size: var(--text-label); }
+.basket-row b { color: var(--ink); font-size: var(--text-meta); font-variant-numeric: tabular-nums; }
+.basket-row em { font-style: normal; }
+.basket-row small { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
 .news-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
 .news-list li { display: grid; gap: 2px; padding: 10px 12px; }
 .news-list li + li { border-top: 1px solid var(--border); }
 .news-list a { color: var(--ink); text-decoration: none; font-size: var(--text-meta); line-height: 1.45; }
 .news-list a:hover { text-decoration: underline; }
 .news-list small { color: var(--muted); font-size: var(--text-label); }
+@media (max-width: 760px) { .cues-hero { grid-template-columns: 1fr; } .drivers-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .drivers-grid { grid-template-columns: 1fr; } }
