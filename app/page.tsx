@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@supabase/supabase-js'
 import HomeClient from './home-client'
+import { fetchTicker } from '@/lib/ticker'
 
 export const revalidate = 60
 
@@ -68,7 +69,7 @@ async function getSnapshotData() {
   const tradeDate = todayIST()
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-  const [preRes, postRes] = await Promise.all([
+  const [preRes, postRes, ticker] = await Promise.all([
     supabase
       .from('premarket_dashboard')
       .select('prev_day_change_pct_nifty, prev_day_change_pct_sensex, prev_day_change_pts_nifty, prev_day_change_pts_sensex, india_vix, days_to_expiry_nifty, days_to_expiry_sensex, market_bias_nifty, market_bias_sensex')
@@ -79,17 +80,19 @@ async function getSnapshotData() {
       .select('day_change_pct_nifty, day_change_pct_sensex, day_high_nifty, day_low_nifty, day_high_sensex, day_low_sensex, recap_story_nifty, recap_story_sensex')
       .eq('trade_date', tradeDate)
       .maybeSingle(),
+    fetchTicker(supabase, tradeDate).catch(() => null),
   ])
 
   return {
     tradeDate,
+    initialTicker: ticker,
     initialPre: preRes.data ?? null,
     initialPost: postRes.data ?? null,
   }
 }
 
 export default async function Page() {
-  const { tradeDate, initialPre, initialPost } = await getSnapshotData()
+  const { tradeDate, initialPre, initialPost, initialTicker } = await getSnapshotData()
 
   return (
     <>
@@ -103,7 +106,7 @@ export default async function Page() {
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationJsonLd) }}
       />
-      <HomeClient tradeDate={tradeDate} initialPre={initialPre} initialPost={initialPost} />
+      <HomeClient tradeDate={tradeDate} initialPre={initialPre} initialPost={initialPost} initialTicker={initialTicker} />
     </>
   )
 }
