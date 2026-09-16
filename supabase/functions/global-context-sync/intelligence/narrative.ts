@@ -40,15 +40,18 @@ const SCHEMA = {
   required: ["summary", "global", "india", "link"],
 };
 
+// Numbers that are names, not figures: index suffixes and standard windows.
+const ALWAYS_ALLOWED = ["500", "100", "50", "200", "20", "10", "2", "5", "30"];
+
 // Every number the model is allowed to use, in the forms it might reasonably write them.
 function allowedNumbers(input: unknown): Set<string> {
-  const out = new Set<string>();
+  const out = new Set<string>(ALWAYS_ALLOWED);
   const walk = (v: unknown) => {
     if (typeof v === "number" && Number.isFinite(v)) {
       const a = Math.abs(v);
       for (const s of [a.toString(), a.toFixed(0), a.toFixed(1), a.toFixed(2), Math.round(a).toLocaleString("en-IN"), Math.round(a).toLocaleString("en-US")]) out.add(s.replace(/\.0+$/, ""));
     } else if (typeof v === "string") {
-      for (const m of v.matchAll(/\d[\d,]*(?:\.\d+)?/g)) out.add(m[0].replace(/,/g, "").replace(/\.0+$/, ""));
+      for (const m of v.matchAll(/\d+(?:,\d{3})*(?:\.\d+)?/g)) out.add(m[0].replace(/,/g, "").replace(/\.0+$/, ""));
     } else if (Array.isArray(v)) v.forEach(walk);
     else if (v && typeof v === "object") Object.values(v).forEach(walk);
   };
@@ -63,7 +66,7 @@ function validate(text: unknown, allowed: Set<string>, [min, max]: readonly [num
   const t = text.trim().replace(/\s+/g, " ");
   const words = t.split(" ").length;
   if (words < min || words > max) return { reason: `${words} words, slot is ${min}-${max}` };
-  for (const m of t.matchAll(/\d[\d,]*(?:\.\d+)?/g)) {
+  for (const m of t.matchAll(/\d+(?:,\d{3})*(?:\.\d+)?/g)) {
     const n = m[0].replace(/,/g, "").replace(/\.0+$/, "");
     if (!allowed.has(n)) return { reason: `cites ${m[0]}, not in the input` };
   }

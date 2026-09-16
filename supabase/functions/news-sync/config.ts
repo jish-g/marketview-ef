@@ -77,8 +77,9 @@ export const ANALYSE = {
   minRelevance: 0.5,            // best article relevance in the cluster
   minSources: 2,                // distinct outlets, OR
   officialCounts: true,         // an official source alone qualifies, OR
-  linkedMoveCounts: true,       // an entity whose instrument has a price_move event in the window
-  maxModelCallsPerRun: 6,
+  linkedMoveCounts: true,       // an entity whose instrument has a price_move event in the window ...
+  linkedMoveMinArticles: 2,     // ... but only for clusters with at least this many articles
+  maxModelCallsPerRun: 3,
   moveLookbackHours: 36,
 };
 
