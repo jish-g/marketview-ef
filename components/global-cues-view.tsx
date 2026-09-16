@@ -26,6 +26,7 @@ type ContextRow = {
   global_drivers: Driver[]; india_drivers: Driver[]; channels: string[]; counterforces: string[]
   what_is_driving: string[]; explanation: string
   measured?: Measured | null; asset_stats?: AssetStat[]
+  narrative?: { summary: string; global: string; india: string; link: string; written_at: string } | null
   inputs?: { postmarket_trade_date?: string | null }
 }
 type EventRow = { id: number; event_time: string; updated_at: string; category: string; title: string; summary: string; affected_assets: string[]; market_direction: string; global_relevance: number; india_relevance: number; confidence: number; india_impact: string; sources: { type: string; source: string; detail?: string }[]; evidence: { z?: number; asset?: string } }
@@ -227,7 +228,7 @@ export function GlobalCuesView() {
         <div className="thesis-hero-main">
           <Label tone="info">The read right now</Label>
           <strong className="thesis-hero-value">{headline(ctx)}</strong>
-          <p className="thesis-hero-note">{oneLine(ctx)}</p>
+          <p className="thesis-hero-note">{ctx.narrative?.summary ?? oneLine(ctx)}</p>
           {events.length > 0 && <div className="agent-badges">{events.slice(0, 3).map((e) => <button type="button" key={e.id} className={`ds-badge ${e.market_direction === 'risk_off' ? 'ds-badge--down' : e.market_direction === 'risk_on' ? 'ds-badge--up' : 'ds-badge--neutral'} gv-chip`} onClick={() => setTab('link')}>{stripPct(e.title)}</button>)}</div>}
         </div>
       </div>
@@ -249,7 +250,7 @@ export function GlobalCuesView() {
     </>}
 
     {tab === 'global' && <>
-      <div className="thesis-hero"><div className="thesis-hero-main"><Label tone="info">Global verdict</Label><strong className="thesis-hero-value">{ctx.global_band}</strong><p className="thesis-hero-note">Regime: {ctx.regime.toLowerCase()}. {gSub}</p></div></div>
+      <div className="thesis-hero"><div className="thesis-hero-main"><Label tone="info">Global verdict</Label><strong className="thesis-hero-value">{ctx.global_band}</strong><p className="thesis-hero-note">{ctx.narrative?.global ?? `Regime: ${ctx.regime.toLowerCase()}. ${gSub}`}</p></div></div>
       <section className="metric-group">
         <div className="group-heading"><h3>What is pulling the verdict</h3></div>
         <div className="field-grid gv-grid2">
@@ -262,7 +263,7 @@ export function GlobalCuesView() {
     </>}
 
     {tab === 'india' && <>
-      <div className="thesis-hero"><div className="thesis-hero-main"><Label tone="info">India verdict</Label><strong className="thesis-hero-value">{ctx.india_band}</strong><p className="thesis-hero-note">{iSub}</p></div></div>
+      <div className="thesis-hero"><div className="thesis-hero-main"><Label tone="info">India verdict</Label><strong className="thesis-hero-value">{ctx.india_band}</strong><p className="thesis-hero-note">{ctx.narrative?.india ?? iSub}</p></div></div>
       <section className="metric-group">
         <div className="group-heading"><h3>What is pulling the verdict</h3></div>
         <div className="field-grid gv-grid2">
@@ -275,7 +276,7 @@ export function GlobalCuesView() {
     </>}
 
     {tab === 'link' && <>
-      <div className="thesis-hero"><div className="thesis-hero-main"><Label tone="info">Global → India</Label><strong className="thesis-hero-value">{ctx.transmission_label}</strong><p className="thesis-hero-note">{ctx.explanation}</p></div></div>
+      <div className="thesis-hero"><div className="thesis-hero-main"><Label tone="info">Global → India</Label><strong className="thesis-hero-value">{ctx.transmission_label}</strong><p className="thesis-hero-note">{ctx.narrative?.link ?? ctx.explanation}</p></div></div>
       <section className="metric-group">
         <div className="group-heading"><h3>How it is transmitting</h3></div>
         <div className="field-grid">
@@ -345,7 +346,7 @@ export function GlobalCuesView() {
 
     <div className="gv-foot">
       <span>Data as of {ago(ctx.data_as_of, now)} · calculated {ago(ctx.calculated_at, now)}</span>
-      <span>Verdicts are computed from the inputs, not written by a language model</span>
+      <span>{ctx.narrative ? 'Verdicts are computed from the inputs; the prose explains them and cites only those figures' : 'Verdicts are computed from the inputs, not written by a language model'}</span>
     </div>
     <Disclaimer source="Yahoo Finance and the MarketCue pipeline" capturedAt={IST_DAY.format(new Date(ctx.calculated_at)) + ' IST'} />
   </section>
