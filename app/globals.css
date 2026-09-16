@@ -1077,19 +1077,29 @@ button, input { font: inherit; }
 .cues-view .thesis-hero-main { max-width: 720px; }
 .cues-view .thesis-hero-note { line-height: 1.55; }
 .gv-tabs { align-self: start; flex-wrap: wrap; }
+.gv-verdict strong em { font-style: normal; font-size: var(--text-label); letter-spacing: 0; margin-left: 8px; vertical-align: middle; text-transform: none; }
+.gv-verdict small, .gv-list small { display: block; margin-top: 6px; color: var(--ink-2); font-size: var(--text-label); line-height: 1.5; opacity: 1; }
+.gv-list ul + small { color: var(--muted); }
 .gv-grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.gv-verdict strong em, .gv-event strong em { font-style: normal; font-size: var(--text-label); letter-spacing: 0; margin-left: 8px; vertical-align: middle; text-transform: none; }
 .gv-band--up { color: var(--up); } .gv-band--down { color: var(--down); } .gv-band--caution { color: var(--caution); } .gv-band--neutral { color: var(--ink); }
-.gv-verdict small, .gv-list small, .gv-event small { display: block; margin-top: 6px; color: var(--ink-2); font-size: var(--text-label); line-height: 1.5; opacity: 1; }
 .gv-list ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink); font-size: var(--text-meta); line-height: 1.5; }
 .gv-list li { margin: 4px 0; }
-.gv-list ul + small, .gv-event .gv-event-meta { color: var(--muted); }
 .gv-chip { cursor: pointer; }
 .gv-chip:hover { border-color: var(--ink); }
 .gv-meter { display: block; height: 6px; margin-top: 8px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
 .gv-meter i { display: block; height: 100%; border-radius: 3px; background: var(--info); }
 .gv-list small.gv-meter-scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-top: 4px; }
 .gv-verdict span .gv-label-badge { margin-left: 8px; vertical-align: middle; text-transform: none; letter-spacing: 0; }
+/* Event cards: a plain stacked card, never the two-column evidence tile. */
+.gv-event { display: grid; gap: 6px; align-content: start; padding: var(--s-4); }
+.gv-event .gv-event-kicker { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); font-size: var(--text-label); }
+.gv-event .gv-event-kicker em { font-style: normal; margin-left: 4px; }
+.gv-event .gv-event-title { display: block; color: var(--ink); font: 600 var(--text-body) var(--font-sans); line-height: 1.35; letter-spacing: -.01em; }
+.gv-event small { display: block; margin: 0; color: var(--ink-2); font: 400 var(--text-label) var(--font-sans); line-height: 1.5; opacity: 1; }
+.gv-event .gv-event-what { color: var(--ink); }
+.gv-event .gv-event-why b { color: var(--ink); font-weight: 600; }
+.gv-event .gv-event-meta { color: var(--muted); }
+.gv-event .gv-event-meta a { color: var(--muted); text-decoration: underline; }
 .gv-foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; color: var(--muted); font-size: var(--text-label); }
 .drivers-grid .field-card strong { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .drivers-grid .field-card small, .measured-grid .field-card small { display: block; margin-top: 6px; color: var(--ink-2); font-size: var(--text-label); line-height: 1.45; opacity: 1; }

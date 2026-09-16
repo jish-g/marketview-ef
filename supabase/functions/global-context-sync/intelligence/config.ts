@@ -129,6 +129,11 @@ export const HISTORY = {
   minPairs: 12,              // minimum aligned India/US pairs before a correlation is trusted
 };
 
+// Plausibility bound on a single day's % change per group. A quote beyond it is a bad tick from
+// the feed (Yahoo has served a 10Y yield at half its level), not a market event: the quote is
+// dropped for that run, logged, and can never become a significant move.
+export const MAX_ABS_CHANGE_PCT: Record<string, number> = { rates: 12, volatility: 60, us_equity: 12, us_futures: 12, dollar: 4, crude: 20, metals: 12, asia: 12, china: 12, europe: 12, india: 12 };
+
 // A day's move is "significant" when |z| (today's % change over 20-day realised daily vol)
 // crosses these. Events are only raised for significant moves.
 export const MOVE_THRESHOLDS = { significant: 1.5, extreme: 2.5, minAbsPct: 0.5 };
