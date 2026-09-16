@@ -16,7 +16,7 @@ export const NARRATIVE_MODEL = "claude-sonnet-4-5-20250929";
 export const JUDGE_MODEL = "claude-sonnet-4-5-20250929";
 // Bump whenever the prompt, the input shape or the gate changes: it is part of the reuse key, so
 // a deploy forces a fresh, re-checked narrative instead of carrying the previous one forward.
-export const NARRATIVE_VERSION = "4";
+export const NARRATIVE_VERSION = "5";
 const TIMEOUT_MS = 30_000;
 const LIMITS = { summary: [50, 120], global: [40, 110], india: [40, 110], link: [40, 110] } as const;
 
@@ -33,6 +33,7 @@ Rules, all of them hard:
 - No advice, no predictions of levels, no adjectives like "massive" or "crash". No bullet points, no headings, no markdown. Plain prose only.
 - TIME IS PART OF THE FACT. Every reading is labelled with when it is from ("today, live as of 14:05 IST", "today's close", "last session, Mon 15 Sep"). Use that label's meaning and nothing else: never write "closed", "yesterday", "overnight" or "this morning" unless the label says so. Today's live move is today's move. The previous session is described only from time_context.previous_session.
 - USD/INR up means the rupee is WEAKER. Describe the rupee only as "weaker" or "firmer" and quote the USD/INR level; never say the rupee is "up" or "down".
+- Do not compute anything: no sums, differences, ratios or averages of input figures. Quote each figure as given (rounding is fine). A number you derived is a number that is not in the input.
 
 Style to match (this is a sample of tone, not of facts):
 "GIFT Nifty gapped half a percent after yesterday's selloff, but support and resistance are both being reinforced. VIX at 13.4 sits in the ideal zone, yet six days to Nifty expiry and one to Sensex create a split setup. FII outflows of 930 crore against DII buying kept the fall orderly, but the gap opens where calls are being built."
@@ -86,8 +87,13 @@ function validate(text: unknown, allowed: Set<string>, [min, max]: readonly [num
 
 // ------------------------------------------------------------------------------- judge
 const JUDGE_SYSTEM = `You are a fact checker for a market note. You receive the structured input the writer was given and one paragraph the writer produced. List only claims the input CONTRADICTS, of exactly these kinds: a move attributed to the wrong day (e.g. "closed yesterday" when the reading is labelled today), the wrong direction (up vs down), the wrong instrument, or a figure that differs from the input.
-Rules: a negative number in the input is a fall, so calling it a decline or a drop is correct. USD/INR rising means the rupee weakened, so "rupee weaker" with a positive USD/INR change is correct. Ignore hedged interpretation ("tends to", "consistent with"), rounding, and wording you would merely phrase differently. If, while explaining a problem, you conclude the paragraph is accurate to the input, it is not a problem: do not list it. Return ok=true with an empty list unless there is a real contradiction.`;
-const JUDGE_SCHEMA = { type: "object", properties: { ok: { type: "boolean" }, problems: { type: "array", items: { type: "string" } } }, required: ["ok", "problems"] };
+Rules: a negative number in the input is a fall, so calling it a decline or a drop is correct. USD/INR rising means the rupee weakened, so "rupee weaker" with a positive USD/INR change is correct. Rounding to any precision (1.195 written as 1.2, 1.20 or 1.19) is never a contradiction. Ignore hedged interpretation ("tends to", "consistent with") and wording you would merely phrase differently.
+For each claim you examine, write the claim, then what the input says, and only then decide contradiction true or false. A claim that turns out to match the input gets contradiction=false. The paragraph is rejected only on claims marked contradiction=true.`;
+const JUDGE_SCHEMA = {
+  type: "object",
+  properties: { checks: { type: "array", items: { type: "object", properties: { claim: { type: "string" }, input_says: { type: "string" }, contradiction: { type: "boolean" } }, required: ["claim", "input_says", "contradiction"] } } },
+  required: ["checks"],
+};
 
 async function judge(apiKey: string, input: unknown, key: string, text: string): Promise<{ ok: boolean; problems: string[] }> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -103,9 +109,11 @@ async function judge(apiKey: string, input: unknown, key: string, text: string):
   });
   if (!res.ok) throw new Error(`judge ${res.status}`);
   const json = await res.json();
-  const block = (json.content ?? []).find((c: { type: string }) => c.type === "tool_use") as { input?: { ok?: boolean; problems?: unknown } } | undefined;
-  const problems = Array.isArray(block?.input?.problems) ? block!.input!.problems.map(String).slice(0, 6) : [];
-  return { ok: block?.input?.ok === true && problems.length === 0, problems };
+  const block = (json.content ?? []).find((c: { type: string }) => c.type === "tool_use") as { input?: { checks?: unknown } } | undefined;
+  const checks = Array.isArray(block?.input?.checks) ? (block!.input!.checks as { claim?: unknown; input_says?: unknown; contradiction?: unknown }[]) : [];
+  // Only a check the judge marked as a contradiction, after writing out both sides, counts.
+  const problems = checks.filter((c) => c.contradiction === true).map((c) => `${String(c.claim ?? "")} (input: ${String(c.input_says ?? "")})`).slice(0, 6);
+  return { ok: problems.length === 0, problems };
 }
 
 // Deterministic direction check: an instrument named with an "up" word whose input change is
