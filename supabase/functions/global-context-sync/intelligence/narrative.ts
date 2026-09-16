@@ -14,7 +14,7 @@ export const NARRATIVE_MODEL = "claude-sonnet-4-5-20250929";
 const TIMEOUT_MS = 30_000;
 const LIMITS = { summary: [50, 120], global: [40, 110], india: [40, 110], link: [40, 110] } as const;
 
-export type Narrative = { summary: string; global: string; india: string; link: string; model: string; written_at: string; dropped: string[] };
+export type Narrative = { summary: string; global: string; india: string; link: string; model: string; written_at: string; dropped: string[]; rejected?: Record<string, { reason: string; text: string }> };
 
 const SYSTEM = `You write MarketCue's Global View: a plain-English read of how the world's markets are affecting India right now.
 
@@ -58,16 +58,16 @@ function allowedNumbers(input: unknown): Set<string> {
 
 // A paragraph passes if every number it cites is one the engine supplied (day counts like
 // "20 sessions" are in the input too) and its length sits inside the slot.
-function validate(text: unknown, allowed: Set<string>, [min, max]: readonly [number, number]): string | null {
-  if (typeof text !== "string") return null;
+function validate(text: unknown, allowed: Set<string>, [min, max]: readonly [number, number]): { ok: string } | { reason: string } {
+  if (typeof text !== "string") return { reason: "not a string" };
   const t = text.trim().replace(/\s+/g, " ");
   const words = t.split(" ").length;
-  if (words < min || words > max) return null;
+  if (words < min || words > max) return { reason: `${words} words, slot is ${min}-${max}` };
   for (const m of t.matchAll(/\d[\d,]*(?:\.\d+)?/g)) {
     const n = m[0].replace(/,/g, "").replace(/\.0+$/, "");
-    if (!allowed.has(n)) return null;
+    if (!allowed.has(n)) return { reason: `cites ${m[0]}, not in the input` };
   }
-  return t;
+  return { ok: t };
 }
 
 export async function writeNarrative(apiKey: string, ctx: ContextResult, measured: Measured, events: MoveEvent[], indiaAsOf: string | null): Promise<Narrative | null> {
@@ -99,12 +99,18 @@ export async function writeNarrative(apiKey: string, ctx: ContextResult, measure
   if (!block?.input) throw new Error("model returned no tool_use block");
 
   const dropped: string[] = [];
-  const pick = (k: keyof typeof LIMITS, fallback: string) => { const v = validate(block.input![k], allowed, LIMITS[k]); if (v == null) dropped.push(k); return v ?? fallback; };
+  const rejected: Record<string, { reason: string; text: string }> = {};
+  const pick = (k: keyof typeof LIMITS, fallback: string) => {
+    const v = validate(block.input![k], allowed, LIMITS[k]);
+    if ("ok" in v) return v.ok;
+    dropped.push(k); rejected[k] = { reason: v.reason, text: String(block.input![k] ?? "").slice(0, 600) };
+    return fallback;
+  };
   return {
     summary: pick("summary", ctx.explanation),
     global: pick("global", ctx.whatIsDriving.slice(0, 3).join(" ")),
     india: pick("india", ctx.whatIsDriving.slice(3, 6).join(" ")),
     link: pick("link", ctx.explanation),
-    model: NARRATIVE_MODEL, written_at: new Date().toISOString(), dropped,
+    model: NARRATIVE_MODEL, written_at: new Date().toISOString(), dropped, rejected,
   };
 }
