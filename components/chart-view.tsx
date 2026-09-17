@@ -113,9 +113,18 @@ async function fetchCandleSet(supabase: ReturnType<typeof createClient>, instrum
   }).filter(({ tradeDate: d, bar }) => d && [bar.open, bar.high, bar.low, bar.close].every(Number.isFinite))
 }
 
-export function ChartView({ row }: { row: Row }) {
-  const [instrument, setInstrument] = useState<Instrument>('NIFTY')
-  const [timeframe, setTimeframe] = useState<Timeframe>('5m')
+export function ChartView({ row, layout = 'embedded', initialInstrument, initialTimeframe }: {
+  row: Row
+  /** 'embedded' (default): the Chart tab inside the dashboard shell, unchanged. 'full': the
+   * standalone chart-only route (app/dashboard/chart) -- a slim nav bar in place of the
+   * eyebrow/title/notes/disclaimer, with the chart filling the rest of the viewport. Both share
+   * every hook and the whole chart-frame subtree below; only the surrounding chrome differs. */
+  layout?: 'embedded' | 'full'
+  initialInstrument?: Instrument
+  initialTimeframe?: Timeframe
+}) {
+  const [instrument, setInstrument] = useState<Instrument>(initialInstrument ?? 'NIFTY')
+  const [timeframe, setTimeframe] = useState<Timeframe>(initialTimeframe ?? '5m')
   const [candles, setCandles] = useState<Candle[]>([])
   const [futuresCandles, setFuturesCandles] = useState<Candle[]>([])
   const [state, setState] = useState<ChartState>(defaultState)
@@ -428,6 +437,139 @@ export function ChartView({ row }: { row: Row }) {
   const catalogue = useMemo(() => { const q = query.trim().toLowerCase(); return INDICATORS.filter((d) => !q || `${d.name} ${d.description} ${d.category}`.toLowerCase().includes(q)) }, [query])
   const drawerDef = drawerId ? byId(drawerId) : undefined
 
+  // Shared between both layouts: the instrument/timeframe/indicators/template controls, and the
+  // whole chart-frame subtree (canvas, legend, corner buttons, drawer, loading/empty overlay).
+  // Only the chrome around them differs by `layout`.
+  const instrumentSwitch = <div className="chart-switch" role="group" aria-label="Instrument">
+    {(['NIFTY', 'SENSEX'] as Instrument[]).map((i) => (
+      <button key={i} type="button" className={instrument === i ? 'is-active' : ''} aria-pressed={instrument === i} onClick={() => setInstrument(i)}>{i === 'NIFTY' ? 'Nifty 50' : 'Sensex'}</button>
+    ))}
+  </div>
+  const timeframeSwitch = <div className="chart-switch chart-switch-tf" role="group" aria-label="Timeframe">
+    {TIMEFRAMES.map((t) => (
+      <button key={t.key} type="button" className={timeframe === t.key ? 'is-active' : ''} aria-pressed={timeframe === t.key} onClick={() => setTimeframe(t.key)}>{t.key}</button>
+    ))}
+  </div>
+  const indicatorsButton = <button type="button" className="chart-menu-button" aria-haspopup="dialog" aria-expanded={dialogOpen} onClick={() => setDialogOpen(true)}>
+    <span aria-hidden="true">ƒ</span> Indicators{state.active.length > 0 && <b>{state.active.length}</b>}
+  </button>
+  const templateMenu = <div className="chart-menu" ref={tplRef}>
+    <button type="button" className={`chart-menu-button ${tplOpen ? 'is-open' : ''}`} aria-haspopup="menu" aria-expanded={tplOpen} onClick={() => setTplOpen((o) => !o)}>
+      Template <em>{state.template}</em> ▾
+    </button>
+    {tplOpen && <div className="chart-menu-panel chart-tpl-panel" role="menu">
+      {Object.entries(state.templates).map(([name, t]) => (
+        <button key={name} type="button" role="menuitemradio" aria-checked={state.template === name} className="chart-tpl-item" onClick={() => { applyTemplate(name); setTplOpen(false) }}>
+          <span>{state.template === name ? '●' : '○'} {name}</span><small>{t.ids.length} on</small>
+        </button>
+      ))}
+      <hr />
+      <button type="button" role="menuitem" className="chart-tpl-item" onClick={() => { saveTemplate(); setTplOpen(false) }}><span>Save current as…</span></button>
+    </div>}
+  </div>
+  const lastPriceChip = lastBar && <span className="chart-last"><span>Last</span><b>{fmt.level(lastBar.close)}</b></span>
+
+  // The standalone chart tab opens from here; it needs its own URL rather than the dashboard's,
+  // since that reopens whatever phase the dashboard happens to be on, not the chart.
+  const openFullPage = () => {
+    const url = new URL('/dashboard/chart', window.location.origin)
+    url.searchParams.set('instrument', instrument)
+    url.searchParams.set('tf', timeframe)
+    window.open(url.toString(), '_blank', 'noopener')
+  }
+
+  const frameBlock = <div className={`chart-frame ${fullscreen ? 'is-fullscreen' : ''} ${layout === 'full' ? 'is-fullpage' : ''}`} ref={frameRef}>
+    <div className="chart-canvas" ref={containerRef} />
+
+    <div className={`chart-legend-stack ${state.legendCollapsed ? 'is-collapsed' : ''}`}>
+      <div className="chart-legend-head">
+        <span>Legend · {state.active.length}</span>
+        <button type="button" onClick={() => update({ legendCollapsed: !state.legendCollapsed })} title={state.legendCollapsed ? 'Show legend' : 'Hide legend'} aria-expanded={!state.legendCollapsed}>{state.legendCollapsed ? '▸' : '▾'}</button>
+      </div>
+      {!state.legendCollapsed && state.active.map((id) => {
+        const def = byId(id); if (!def) return null
+        const off = state.hidden.includes(id)
+        return <div key={id} className={`chart-legend-row ${off ? 'is-off' : ''}`} tabIndex={0}>
+          <i className={`chart-legend-swatch swatch-${def.swatch}`} style={{ color: def.color, background: def.swatch === 'zone' || def.swatch === 'bar' ? def.color : undefined }} aria-hidden="true" />
+          <span className="chart-legend-name">{def.name}</span>
+          <span className="chart-legend-vals">{def.unavailable ? def.unavailable : results[id]?.summary ?? ''}</span>
+          <span className="chart-legend-acts">
+            <button type="button" onClick={() => toggleHidden(id)} title={off ? 'Show' : 'Hide'} aria-pressed={!off}>{off ? '◌' : '◉'}</button>
+            <button type="button" onClick={() => setDrawerId(id)} title="Settings">⚙</button>
+            <button type="button" onClick={() => removeIndicator(id)} title="Remove">×</button>
+          </span>
+        </div>
+      })}
+    </div>
+
+    <div className="chart-corner">
+      <button type="button" onClick={showToday} title="Back to today">⟲ Today</button>
+      {layout === 'embedded' && !fullscreen && (
+        <button type="button" onClick={openFullPage} title="Open chart in a new tab" aria-label="Open chart in a new tab">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+          </svg>
+        </button>
+      )}
+      <button type="button" className="chart-fullscreen" onClick={toggleFullscreen} aria-pressed={fullscreen} title={fullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}>{fullscreen ? 'Exit' : 'Fullscreen'}</button>
+    </div>
+
+    {drawerDef && <aside className="chart-drawer" aria-label={`${drawerDef.name} settings`}>
+      <div className="chart-drawer-head"><b>{drawerDef.name}</b><button type="button" onClick={() => setDrawerId(null)} aria-label="Close">×</button></div>
+      <div className="chart-drawer-body">
+        <p className="chart-drawer-desc">{drawerDef.description}</p>
+        {drawerDef.fields.map((f) => <SettingControl key={f.key} field={f} value={(state.settings[drawerDef.id] ?? drawerDef.defaults)[f.key]} onChange={(v) => setSetting(drawerDef.id, f.key, v)} />)}
+        {drawerDef.fields.length === 0 && <p className="chart-drawer-desc">No settings. This indicator is fixed by definition.</p>}
+      </div>
+      <div className="chart-drawer-foot">
+        <button type="button" onClick={() => resetSettings(drawerDef.id)}>Reset</button>
+        <button type="button" className="is-danger" onClick={() => removeIndicator(drawerDef.id)}>Remove</button>
+      </div>
+    </aside>}
+
+    {(isLoading || error || bars.length === 0) && <div className="chart-overlay">
+      {isLoading ? <Skeleton width={480} height={180} />
+        : error ? <EmptyState label="Chart" headline="Candles could not be loaded" reason="The request to Supabase failed. Reopening this screen retries." />
+        : <EmptyState label="Chart" headline={isToday ? 'No live candles recorded yet' : 'No candles on record'} reason={isToday ? 'Live one-minute candles appear once the market sync writes the first bar.' : 'The selected history is not present in the candle table.'} />}
+    </div>}
+  </div>
+
+  const dialogBlock = dialogOpen && <>
+    <div className="chart-scrim" onClick={() => setDialogOpen(false)} />
+    <div className="chart-dialog" role="dialog" aria-label="Indicators">
+      <div className="chart-dialog-head">
+        <h3>Indicators</h3>
+        <input type="search" placeholder="Search indicators…" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
+        <button type="button" onClick={() => setDialogOpen(false)} aria-label="Close">×</button>
+      </div>
+      <div className="chart-dialog-list">
+        {catalogue.map((d) => {
+          const added = state.active.includes(d.id)
+          return <div key={d.id} className="chart-dialog-item">
+            <i className={`chart-legend-swatch swatch-${d.swatch}`} style={{ color: d.color, background: d.swatch === 'zone' || d.swatch === 'bar' ? d.color : undefined }} aria-hidden="true" />
+            <div className="chart-dialog-text"><b>{d.name}<span className="chart-dialog-cat">{d.category}</span></b><small>{d.unavailable ? <em>{d.unavailable}</em> : d.description}</small></div>
+            <button type="button" className={`chart-dialog-add ${added ? 'is-added' : ''}`} disabled={Boolean(d.unavailable)} onClick={() => addIndicator(d.id)}>{d.unavailable ? 'Soon' : added ? 'Added ✓' : 'Add'}</button>
+          </div>
+        })}
+        {catalogue.length === 0 && <div className="chart-dialog-item"><span /><div className="chart-dialog-text"><b>No match</b><small>Try another word</small></div></div>}
+      </div>
+    </div>
+  </>
+
+  if (layout === 'full') {
+    return <div className="chart-fullpage">
+      <nav className="chart-navbar">
+        <a className="chart-navbar-back" href="/dashboard?phase=chart">← Dashboard</a>
+        <div className="chart-navbar-brand">MarketCue<small>Chart</small></div>
+        <div className="chart-navbar-scroll">{instrumentSwitch}{timeframeSwitch}{indicatorsButton}{templateMenu}</div>
+        <span className="chart-navbar-status"><i />{isToday ? 'Live' : tradeDate}</span>
+        {lastPriceChip}
+      </nav>
+      <div className="chart-fullpage-stage">{frameBlock}</div>
+      {dialogBlock}
+    </div>
+  }
+
   return <section className="phase-view chart-view">
     <div className="review-section-head">
       <div>
@@ -438,113 +580,15 @@ export function ChartView({ row }: { row: Row }) {
     </div>
 
     <div className="chart-controls">
-      <div className="chart-switch" role="group" aria-label="Instrument">
-        {(['NIFTY', 'SENSEX'] as Instrument[]).map((i) => (
-          <button key={i} type="button" className={instrument === i ? 'is-active' : ''} aria-pressed={instrument === i} onClick={() => setInstrument(i)}>{i === 'NIFTY' ? 'Nifty 50' : 'Sensex'}</button>
-        ))}
-      </div>
-      <div className="chart-switch chart-switch-tf" role="group" aria-label="Timeframe">
-        {TIMEFRAMES.map((t) => (
-          <button key={t.key} type="button" className={timeframe === t.key ? 'is-active' : ''} aria-pressed={timeframe === t.key} onClick={() => setTimeframe(t.key)}>{t.key}</button>
-        ))}
-      </div>
-      <button type="button" className="chart-menu-button" aria-haspopup="dialog" aria-expanded={dialogOpen} onClick={() => setDialogOpen(true)}>
-        <span aria-hidden="true">ƒ</span> Indicators{state.active.length > 0 && <b>{state.active.length}</b>}
-      </button>
-      <div className="chart-menu" ref={tplRef}>
-        <button type="button" className={`chart-menu-button ${tplOpen ? 'is-open' : ''}`} aria-haspopup="menu" aria-expanded={tplOpen} onClick={() => setTplOpen((o) => !o)}>
-          Template <em>{state.template}</em> ▾
-        </button>
-        {tplOpen && <div className="chart-menu-panel chart-tpl-panel" role="menu">
-          {Object.entries(state.templates).map(([name, t]) => (
-            <button key={name} type="button" role="menuitemradio" aria-checked={state.template === name} className="chart-tpl-item" onClick={() => { applyTemplate(name); setTplOpen(false) }}>
-              <span>{state.template === name ? '●' : '○'} {name}</span><small>{t.ids.length} on</small>
-            </button>
-          ))}
-          <hr />
-          <button type="button" role="menuitem" className="chart-tpl-item" onClick={() => { saveTemplate(); setTplOpen(false) }}><span>Save current as…</span></button>
-        </div>}
-      </div>
-      {lastBar && <span className="chart-last"><span>Last</span><b>{fmt.level(lastBar.close)}</b></span>}
+      {instrumentSwitch}
+      {timeframeSwitch}
+      {indicatorsButton}
+      {templateMenu}
+      {lastPriceChip}
     </div>
 
-    <div className={`chart-frame ${fullscreen ? 'is-fullscreen' : ''}`} ref={frameRef}>
-      <div className="chart-canvas" ref={containerRef} />
-
-      <div className={`chart-legend-stack ${state.legendCollapsed ? 'is-collapsed' : ''}`}>
-        <div className="chart-legend-head">
-          <span>Legend · {state.active.length}</span>
-          <button type="button" onClick={() => update({ legendCollapsed: !state.legendCollapsed })} title={state.legendCollapsed ? 'Show legend' : 'Hide legend'} aria-expanded={!state.legendCollapsed}>{state.legendCollapsed ? '▸' : '▾'}</button>
-        </div>
-        {!state.legendCollapsed && state.active.map((id) => {
-          const def = byId(id); if (!def) return null
-          const off = state.hidden.includes(id)
-          return <div key={id} className={`chart-legend-row ${off ? 'is-off' : ''}`} tabIndex={0}>
-            <i className={`chart-legend-swatch swatch-${def.swatch}`} style={{ color: def.color, background: def.swatch === 'zone' || def.swatch === 'bar' ? def.color : undefined }} aria-hidden="true" />
-            <span className="chart-legend-name">{def.name}</span>
-            <span className="chart-legend-vals">{def.unavailable ? def.unavailable : results[id]?.summary ?? ''}</span>
-            <span className="chart-legend-acts">
-              <button type="button" onClick={() => toggleHidden(id)} title={off ? 'Show' : 'Hide'} aria-pressed={!off}>{off ? '◌' : '◉'}</button>
-              <button type="button" onClick={() => setDrawerId(id)} title="Settings">⚙</button>
-              <button type="button" onClick={() => removeIndicator(id)} title="Remove">×</button>
-            </span>
-          </div>
-        })}
-      </div>
-
-      <div className="chart-corner">
-        <button type="button" onClick={showToday} title="Back to today">⟲ Today</button>
-        {!fullscreen && (
-          <button type="button" onClick={() => window.open(window.location.href, '_blank', 'noopener')} title="Open chart in a new tab" aria-label="Open chart in a new tab">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-            </svg>
-          </button>
-        )}
-        <button type="button" className="chart-fullscreen" onClick={toggleFullscreen} aria-pressed={fullscreen} title={fullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}>{fullscreen ? 'Exit' : 'Fullscreen'}</button>
-      </div>
-
-      {drawerDef && <aside className="chart-drawer" aria-label={`${drawerDef.name} settings`}>
-        <div className="chart-drawer-head"><b>{drawerDef.name}</b><button type="button" onClick={() => setDrawerId(null)} aria-label="Close">×</button></div>
-        <div className="chart-drawer-body">
-          <p className="chart-drawer-desc">{drawerDef.description}</p>
-          {drawerDef.fields.map((f) => <SettingControl key={f.key} field={f} value={(state.settings[drawerDef.id] ?? drawerDef.defaults)[f.key]} onChange={(v) => setSetting(drawerDef.id, f.key, v)} />)}
-          {drawerDef.fields.length === 0 && <p className="chart-drawer-desc">No settings. This indicator is fixed by definition.</p>}
-        </div>
-        <div className="chart-drawer-foot">
-          <button type="button" onClick={() => resetSettings(drawerDef.id)}>Reset</button>
-          <button type="button" className="is-danger" onClick={() => removeIndicator(drawerDef.id)}>Remove</button>
-        </div>
-      </aside>}
-
-      {(isLoading || error || bars.length === 0) && <div className="chart-overlay">
-        {isLoading ? <Skeleton width={480} height={180} />
-          : error ? <EmptyState label="Chart" headline="Candles could not be loaded" reason="The request to Supabase failed. Reopening this screen retries." />
-          : <EmptyState label="Chart" headline={isToday ? 'No live candles recorded yet' : 'No candles on record'} reason={isToday ? 'Live one-minute candles appear once the market sync writes the first bar.' : 'The selected history is not present in the candle table.'} />}
-      </div>}
-    </div>
-
-    {dialogOpen && <>
-      <div className="chart-scrim" onClick={() => setDialogOpen(false)} />
-      <div className="chart-dialog" role="dialog" aria-label="Indicators">
-        <div className="chart-dialog-head">
-          <h3>Indicators</h3>
-          <input type="search" placeholder="Search indicators…" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
-          <button type="button" onClick={() => setDialogOpen(false)} aria-label="Close">×</button>
-        </div>
-        <div className="chart-dialog-list">
-          {catalogue.map((d) => {
-            const added = state.active.includes(d.id)
-            return <div key={d.id} className="chart-dialog-item">
-              <i className={`chart-legend-swatch swatch-${d.swatch}`} style={{ color: d.color, background: d.swatch === 'zone' || d.swatch === 'bar' ? d.color : undefined }} aria-hidden="true" />
-              <div className="chart-dialog-text"><b>{d.name}<span className="chart-dialog-cat">{d.category}</span></b><small>{d.unavailable ? <em>{d.unavailable}</em> : d.description}</small></div>
-              <button type="button" className={`chart-dialog-add ${added ? 'is-added' : ''}`} disabled={Boolean(d.unavailable)} onClick={() => addIndicator(d.id)}>{d.unavailable ? 'Soon' : added ? 'Added ✓' : 'Add'}</button>
-            </div>
-          })}
-          {catalogue.length === 0 && <div className="chart-dialog-item"><span /><div className="chart-dialog-text"><b>No match</b><small>Try another word</small></div></div>}
-        </div>
-      </div>
-    </>}
+    {frameBlock}
+    {dialogBlock}
 
     {read && <p className="chart-read">{read}</p>}
 
