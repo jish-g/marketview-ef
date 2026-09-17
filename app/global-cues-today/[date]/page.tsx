@@ -99,6 +99,7 @@ export default async function Page({ params }: { params: Promise<{ date: string 
       transmissionLabel={day.transmission_label}
       narrative={day.narrative}
       archiveNav={{ prevHref: prev ? `/global-cues-today/${prev.slug}` : null, prevLabel: prev ? dateLabel(prev.trade_date) : null }}
+      dateMeta={{ isoDate: day.trade_date, dateLabel: label }}
       path={`/global-cues-today/${day.slug}`}
     />
   )

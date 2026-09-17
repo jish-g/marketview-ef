@@ -25,6 +25,9 @@ type Props = {
   /** Live page only: recent archived days, rendered as a scrollable feed below today's read --
    *  same "today first, scroll for history" pattern as /nifty-sensex-today. */
   recentDays?: { slug: string; label: string; globalBand: string; indiaBand: string; transmissionLabel: string }[]
+  /** Archive page only: the fixed IST date this page reports on, for Article JSON-LD -- the live
+   *  page has no fixed publish date, so it gets Dataset schema instead (below). */
+  dateMeta?: { isoDate: string; dateLabel: string }
   path: string
 }
 
@@ -35,14 +38,15 @@ const RELATED_EVERGREEN = [
   { href: '/nifty-support-resistance-today', label: 'Nifty support and resistance today' },
 ]
 
-export function GlobalCuesPublicPage({ eyebrow, h1, asOfLabel, isLive, globalBand, indiaBand, transmissionLabel, narrative, archiveNav, recentDays, path }: Props) {
+export function GlobalCuesPublicPage({ eyebrow, h1, asOfLabel, isLive, globalBand, indiaBand, transmissionLabel, narrative, archiveNav, recentDays, dateMeta, path }: Props) {
+  const url = `https://marketcue.in${path}`
   const breadcrumb = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'MarketCue', item: 'https://marketcue.in' },
       { '@type': 'ListItem', position: 2, name: 'Global cues today', item: 'https://marketcue.in/global-cues-today' },
-      ...(path === '/global-cues-today' ? [] : [{ '@type': 'ListItem', position: 3, name: h1, item: `https://marketcue.in${path}` }]),
+      ...(path === '/global-cues-today' ? [] : [{ '@type': 'ListItem', position: 3, name: h1, item: url }]),
     ],
   }
   const faqJsonLd = {
@@ -50,11 +54,44 @@ export function GlobalCuesPublicPage({ eyebrow, h1, asOfLabel, isLive, globalBan
     '@type': 'FAQPage',
     mainEntity: GLOBAL_CUES_FAQ.map((item) => ({ '@type': 'Question', name: item.question, acceptedAnswer: { '@type': 'Answer', text: item.answer } })),
   }
+  // Live page: no fixed publish date, so Dataset schema (continuously updated, not authored once)
+  // is the accurate type -- an answer engine citing "today's read" should see it as live data, not
+  // a dated article. temporalCoverage names the actual refresh cadence, not a vague "real-time"
+  // claim, since that is what the crawler can verify against the page's own lastModified.
+  const datasetJsonLd = isLive
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'Dataset',
+        name: 'MarketCue Global Cues',
+        description: 'A live, deterministic read of how global markets are shaping Indian equities, refreshed roughly every 15 minutes during the Indian trading session and hourly otherwise.',
+        url,
+        temporalCoverage: new Date().toISOString().slice(0, 10),
+        creator: { '@type': 'Organization', name: 'MarketCue', url: 'https://marketcue.in' },
+        variableMeasured: ['Global market sentiment', 'India market sentiment', 'Global to India transmission strength'],
+      }
+    : null
+  // Archive page: a fixed IST date makes this a dated report, so Article schema (matching the
+  // pattern the /nifty-sensex-today posts already use) is the accurate type here instead.
+  const articleJsonLd = dateMeta
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        headline: h1,
+        description: `Global ${globalBand}, India ${indiaBand}, ${transmissionLabel.toLowerCase()}.`,
+        datePublished: dateMeta.isoDate,
+        dateModified: dateMeta.isoDate,
+        author: { '@type': 'Organization', name: 'MarketCue', url: 'https://marketcue.in' },
+        publisher: { '@type': 'Organization', name: 'MarketCue', url: 'https://marketcue.in' },
+        mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+      }
+    : null
 
   return (
     <main className="rules-doc-shell">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+      {datasetJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(datasetJsonLd) }} />}
+      {articleJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />}
       <header className="rules-doc-topbar">
         <Link href="/" className="back-link"><ArrowLeft size={16} /> Back to MarketCue</Link>
         <div className="topbar-meta">
