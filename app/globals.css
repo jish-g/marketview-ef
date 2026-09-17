@@ -107,6 +107,10 @@ button, input { font: inherit; }
 .global-cues-asof .live-dot { position: relative; top: 0; }
 .global-cues-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .global-cues-hero-para { font-size: var(--text-value); line-height: 1.6; color: var(--ink); }
+.global-cues-recent ul { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
+.global-cues-recent li { color: var(--ink-2); font-size: var(--text-label); line-height: 1.6; }
+.global-cues-recent li a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+
 
 .about-doc-layout { grid-template-columns: minmax(0, 780px); } .about-doc-layout .doc-hero { border-bottom: 0; } .about-doc-layout .doc-hero p { margin-top: 14px; }
 .faq-block { padding: 30px 0; } .faq-block h2 { margin: 0 0 18px; font-size: var(--text-h3); letter-spacing: -.025em; } .faq-block dl { display: grid; gap: 18px; margin: 0; } .faq-item dt { font-weight: 600; font-size: var(--text-meta); color: var(--ink); } .faq-item dd { margin: 6px 0 0; color: var(--ink-2); font-size: var(--text-meta); line-height: 1.65; } 

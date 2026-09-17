@@ -177,7 +177,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           <div className={`landing-nav-links ${menuOpen ? 'is-open' : ''}`}>
             <Link href="/dashboard" className="topbar-link" onClick={() => setMenuOpen(false)}>Dashboard</Link>
             <Link href="/nifty-sensex-today" className="topbar-link" onClick={() => setMenuOpen(false)}>Nifty and Sensex today</Link>
-            <a href="https://t.me/marketcue_in" target="_blank" rel="noopener noreferrer" className="sign-in-link" onClick={() => setMenuOpen(false)}><Send size={13} /> Join Telegram</a>
+            <Link href="/global-cues-today" className="topbar-link" onClick={() => setMenuOpen(false)}>Global cues</Link>
             {!loading && (session ? (
               <button type="button" className="sign-in-link" onClick={() => { setMenuOpen(false); signOut() }}><LogOut size={13} /> Sign out</button>
             ) : (
@@ -200,7 +200,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           <p className="eyebrow">AI-Agentic Option Intelligence Platform for Indian Stock Market</p>
           <h1 className="landing-headline">MarketCue is an AI-Agentic Option Intelligence Platform for Indian Stock Market</h1>
           <div className="landing-hero-ctas">
-            <Link href="/dashboard" className="landing-cta-primary">Enter dashboard <ArrowRight size={15} /></Link>
+            <Link href="/dashboard" className="landing-cta-primary">Verdict <ArrowRight size={15} /></Link>
             <Link href="/nifty-sensex-today" className="landing-cta-secondary"><Newspaper size={15} /> Nifty and Sensex today</Link>
             <a href="https://t.me/marketcue_in" target="_blank" rel="noopener noreferrer" className="landing-cta-secondary"><Send size={15} /> Join Telegram</a>
           </div>
@@ -405,6 +405,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           <div className="landing-footer-col">
             <span>About</span>
             <Link href="/how-it-works">How it works</Link>
+            <Link href="/changelog">Changelog</Link>
             <Link href="/disclaimer">Disclaimer</Link>
           </div>
           <div className="landing-footer-col">
