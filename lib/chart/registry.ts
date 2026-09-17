@@ -24,8 +24,8 @@ export const byId = (id: string) => INDICATORS.find((d) => d.id === id)
 // Starter templates: which indicators are on. Settings come from each indicator's defaults
 // unless the user has changed them; user-saved templates capture both.
 export const STARTER_TEMPLATES: Record<string, string[]> = {
-  'Open': ['intraday', 'oiwalls', 'levels'],
-  'Mid-session': ['oiwalls', 'levels'],
+  'Open': ['intraday', 'oiwalls', 'levels', 'volume'],
+  'Mid-session': ['oiwalls', 'levels', 'volume'],
   'Expiry': ['intraday', 'oiwalls'],
   'Clean': [],
 }

@@ -12,7 +12,8 @@ import type { ChartColors } from '@/hooks/use-chart-colors'
 
 export type Row = Record<string, string | number | boolean | null>
 export type Instrument = 'NIFTY' | 'SENSEX'
-export type Bar = { time: UTCTimestamp; open: number; high: number; low: number; close: number }
+/** `volume` is present only for futures candles; index spot candles carry none. */
+export type Bar = { time: UTCTimestamp; open: number; high: number; low: number; close: number; volume?: number }
 /** A stored one-minute candle with the IST trade date it belongs to. */
 export type Candle = { tradeDate: string; bar: Bar }
 
@@ -25,6 +26,8 @@ export type Drawable =
   | { kind: 'zone'; from: number; to: number; color: string; label: string }
   /** Vertical marker at a bar time, e.g. the session open. */
   | { kind: 'vline'; time: UTCTimestamp; color: string; label?: string }
+  /** A line traced through points on the price axis, e.g. VWAP. Rendered as its own line series. */
+  | { kind: 'series'; points: { time: UTCTimestamp; value: number }[]; color: string; width?: 1 | 2; label: string }
 
 export type SettingField =
   | { type: 'toggle'; key: string; label: string; color?: string; unavailable?: string }
@@ -36,6 +39,9 @@ export type Settings = Record<string, unknown>
 
 export type IndicatorContext = {
   candles: Candle[]
+  /** One-minute futures candles for the current instrument's current-month contract, with
+   * volume. Empty until the sync writes NIFTY_FUT / SENSEX_FUT rows. */
+  futuresCandles: Candle[]
   tradeDate: string
   instrument: Instrument
   row: Row
@@ -44,10 +50,15 @@ export type IndicatorContext = {
   timeframeMinutes: number
 }
 
+export type HistogramPoint = { time: UTCTimestamp; value: number; color: string }
+
 export type IndicatorResult = {
   drawables: Drawable[]
   /** One-line live values for the legend row, plain text with `·` separators. */
   summary: string
+  /** Bars for a lower pane (currently: futures volume). At most one indicator should set this;
+   * the host shows a pane only while an active indicator provides one. */
+  histogram?: HistogramPoint[]
 }
 
 export type IndicatorCategory = 'Levels' | 'Options' | 'Trend' | 'Volatility' | 'Volume' | 'Structure'

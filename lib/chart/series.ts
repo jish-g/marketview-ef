@@ -32,8 +32,9 @@ export function aggregate(bars: Bar[], minutes: number): Bar[] {
       last.high = Math.max(last.high, b.high)
       last.low = Math.min(last.low, b.low)
       last.close = b.close
+      if (b.volume != null) last.volume = (last.volume ?? 0) + b.volume
     } else {
-      out.push({ time: start, open: b.open, high: b.high, low: b.low, close: b.close })
+      out.push({ time: start, open: b.open, high: b.high, low: b.low, close: b.close, ...(b.volume != null ? { volume: b.volume } : {}) })
     }
   }
   return out

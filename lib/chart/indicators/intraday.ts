@@ -4,26 +4,27 @@ import { previousTradeDate, sessionOpens } from '../series'
 import { fmt } from '@/lib/format'
 
 // Intraday: the day-open marker, the previous session's High / Low / Close, and VWAP.
-// Open, High, Low and Close come from the candles already loaded. VWAP needs volume, which index
-// candles do not carry (Nifty and Sensex are indices); it turns on when the sync also stores
-// current-month futures candles with volume. Its slot, colour and label are reserved here so
-// nothing moves on that day.
+// Open, High, Low and Close come from the candles already loaded. VWAP is the cumulative
+// volume-weighted typical price of the current-month futures contract, restarting at 09:15 each
+// day -- index candles carry no volume (Nifty and Sensex are indices, not traded instruments), so
+// this reads the NIFTY_FUT / SENSEX_FUT rows the sync writes alongside the index. It is a futures
+// figure and labelled as one; it stays off until at least one futures candle for today exists.
 export const intraday: IndicatorDef = {
   id: 'intraday',
   name: 'Intraday',
   category: 'Levels',
-  description: 'Day open marker · previous day High, Low, Close · VWAP',
+  description: 'Day open marker · previous day High, Low, Close · VWAP (futures)',
   color: PALETTE.amber,
   swatch: 'dash',
-  defaults: { open: true, high: true, low: true, close: true, vwap: false },
+  defaults: { open: true, high: true, low: true, close: true, vwap: true },
   fields: [
     { type: 'toggle', key: 'open', label: 'Day open 09:15', color: PALETTE.stone },
     { type: 'toggle', key: 'high', label: 'Prev day High', color: PALETTE.amber },
     { type: 'toggle', key: 'low', label: 'Prev day Low', color: PALETTE.amber },
     { type: 'toggle', key: 'close', label: 'Prev day Close', color: PALETTE.amber },
-    { type: 'toggle', key: 'vwap', label: 'VWAP', color: PALETTE.cyan, unavailable: 'Needs futures volume in the candle table' },
+    { type: 'toggle', key: 'vwap', label: 'VWAP · futures', color: PALETTE.cyan },
   ],
-  compute({ candles, tradeDate, row, instrument, timeframeMinutes }, s) {
+  compute({ candles, futuresCandles, tradeDate, row, instrument, timeframeMinutes }, s) {
     const drawables: Drawable[] = []
     const parts: string[] = []
 
@@ -48,6 +49,23 @@ export const intraday: IndicatorDef = {
     if (s.high && Number.isFinite(high)) { drawables.push({ kind: 'hline', price: high, color: PALETTE.amber, style: 'dashed', label: 'High' }); parts.push(`H ${fmt.level(high)}`) }
     if (s.low && Number.isFinite(low)) { drawables.push({ kind: 'hline', price: low, color: PALETTE.amber, style: 'dashed', label: 'Low' }); parts.push(`L ${fmt.level(low)}`) }
     if (s.close && Number.isFinite(close)) { drawables.push({ kind: 'hline', price: close, color: PALETTE.amber, style: 'dotted', alpha: 0.75, label: 'Close' }); parts.push(`C ${fmt.level(close)}`) }
+
+    if (s.vwap) {
+      const today = futuresCandles.filter((c) => c.tradeDate === tradeDate).map((c) => c.bar).sort((a, b) => a.time - b.time)
+      const points: { time: typeof today[number]['time']; value: number }[] = []
+      let cumPV = 0, cumV = 0
+      for (const b of today) {
+        const vol = b.volume ?? 0
+        if (vol <= 0) continue
+        cumPV += ((b.high + b.low + b.close) / 3) * vol
+        cumV += vol
+        if (cumV > 0) points.push({ time: b.time, value: cumPV / cumV })
+      }
+      if (points.length > 0) {
+        drawables.push({ kind: 'series', points, color: PALETTE.cyan, width: 2, label: 'VWAP · fut' })
+        parts.push(`VWAP ${fmt.level(points[points.length - 1].value)}`)
+      }
+    }
 
     return { drawables, summary: parts.join(' · ') || 'no previous session loaded' }
   },
