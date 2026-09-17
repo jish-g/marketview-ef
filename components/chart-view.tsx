@@ -298,24 +298,59 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
 
   useEffect(() => { if (chartReady && seriesRef.current) seriesRef.current.setData(bars) }, [bars, chartReady])
 
-  // Range: today fitted to the frame on intraday timeframes (scroll left for earlier sessions);
-  // the whole window on 1h and longer, where today is only a handful of bars. Once per view
-  // identity, so a live bar never yanks the axis from someone who has zoomed.
+  // Range: today plus the two sessions before it fitted to the frame on intraday timeframes
+  // (scroll left for older sessions, up to 30); the whole window on 1h and longer, where today is
+  // only a handful of bars. Three sessions of context is the readable default a terminal opens
+  // to -- PDH/PDL and the last couple of days' shape are visible without scrolling, and it is
+  // still a deliberate scroll away from the full 30-session history.
+  const CONTEXT_SESSIONS = 2
   const showToday = useCallback(() => {
     const chart = chartRef.current
     if (!chart || bars.length === 0) return
-    const firstToday = bars.findIndex((b) => todayBars.length > 0 && b.time === todayBars[0].time)
-    if (minutes > 0 && minutes <= 30 && firstToday >= 0) chart.timeScale().setVisibleLogicalRange({ from: firstToday - 2, to: bars.length - 1 + 6 })
-    else chart.timeScale().fitContent()
-  }, [bars, todayBars, minutes])
-  const fitKeyRef = useRef('')
+    if (minutes > 0 && minutes <= 30) {
+      const dates = Array.from(new Set(candles.map((c) => c.tradeDate))).sort()
+      const idx = dates.indexOf(tradeDate)
+      const cutoff = dates[Math.max(0, (idx === -1 ? dates.length - 1 : idx) - CONTEXT_SESSIONS)]
+      const contextBars = aggregate(candles.filter((c) => c.tradeDate >= cutoff).map((c) => c.bar), minutes)
+      // Time-based, not logical-index-based: with ~2,000+ bars loaded, setVisibleLogicalRange's
+      // index-to-time mapping was observed to desync from the series' actual data (axis ticks and
+      // coordinateToTime reported dates days off from what series.data() held at the same index),
+      // while the underlying candles were correct all along. Anchoring on the bars' own timestamps
+      // sidesteps that mapping entirely.
+      const from = contextBars.length ? contextBars[0].time : bars[0].time
+      const to = (bars[bars.length - 1].time + minutes * 60 * 6) as UTCTimestamp
+      chart.timeScale().setVisibleRange({ from, to })
+    } else {
+      chart.timeScale().fitContent()
+    }
+  }, [bars, candles, tradeDate, minutes])
+
+  // The 30-session fetch resolves in stages -- candles state updates one render after the SWR
+  // fetch itself completes, and a page of Realtime backfill can still be catching up for a few
+  // ticks after that. A one-shot "already fitted this view" guard was locking in whichever of
+  // those still-incomplete `bars` snapshots happened to be current on its single run, then never
+  // reapplying once the real 30-session data was actually in place -- the chart was left showing
+  // a fit computed against data that no longer matched what was on screen. So instead: keep
+  // recomputing and reapplying the default range on every relevant data change, and only stop
+  // once the user has actually touched the chart (a real pointer/wheel event on the canvas, not
+  // our own programmatic calls) -- that is still "never yank the axis from someone who has
+  // zoomed", just anchored to a genuine interaction instead of a single best-effort guess.
+  const userInteractedRef = useRef(false)
+  const viewKeyRef = useRef('')
   useEffect(() => {
-    if (!chartReady || bars.length === 0) return
+    const el = containerRef.current
+    if (!el) return
+    const mark = () => { userInteractedRef.current = true }
+    el.addEventListener('wheel', mark, { passive: true })
+    el.addEventListener('pointerdown', mark)
+    return () => { el.removeEventListener('wheel', mark); el.removeEventListener('pointerdown', mark) }
+  }, [])
+  useEffect(() => {
+    if (!chartReady || isLoading || bars.length === 0) return
     const key = `${instrument}|${timeframe}|${tradeDate}`
-    if (fitKeyRef.current === key) return
-    fitKeyRef.current = key
-    showToday()
-  }, [bars, chartReady, instrument, timeframe, tradeDate, showToday])
+    if (key !== viewKeyRef.current) { viewKeyRef.current = key; userInteractedRef.current = false }
+    if (!userInteractedRef.current) showToday()
+  }, [bars, chartReady, isLoading, instrument, timeframe, tradeDate, showToday])
 
   useEffect(() => {
     if (!chartReady || !chartRef.current || !seriesRef.current) return
