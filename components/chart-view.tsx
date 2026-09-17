@@ -136,6 +136,7 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
   const [drawerId, setDrawerId] = useState<string | null>(null)
   const [tplOpen, setTplOpen] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
+  const [crosshairOn, setCrosshairOn] = useState(true)
 
   const colors = useChartColors()
   const supabase = useMemo(() => createClient(), [])
@@ -358,6 +359,16 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
     seriesRef.current.applyOptions({ upColor: colors.up, downColor: colors.down, borderUpColor: colors.up, borderDownColor: colors.down, wickUpColor: colors.up, wickDownColor: colors.down })
   }, [colors, chartReady])
 
+  // Crosshair toggle: off means CrosshairMode.Hidden, so the cursor is just the plain arrow with
+  // no tracking lines. On is the default Normal mode.
+  useEffect(() => {
+    if (!chartReady || !chartRef.current) return
+    ;(async () => {
+      const { CrosshairMode } = await import('lightweight-charts')
+      chartRef.current?.applyOptions({ crosshair: { mode: crosshairOn ? CrosshairMode.Normal : CrosshairMode.Hidden } })
+    })()
+  }, [crosshairOn, chartReady])
+
   // Render pass: hlines become price lines (axis tag = price, title = short name on the plot);
   // zones and vlines go to the overlay; `series` drawables (VWAP) become their own line series;
   // every level price feeds the autoscale hint.
@@ -547,6 +558,7 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
     </div>
 
     <div className="chart-corner">
+      <button type="button" onClick={() => setCrosshairOn((v) => !v)} aria-pressed={crosshairOn} title={crosshairOn ? 'Hide crosshair' : 'Show crosshair'}>{crosshairOn ? '✛ Crosshair' : '✛ Off'}</button>
       <button type="button" onClick={showToday} title="Back to today">⟲ Today</button>
       {layout === 'embedded' && !fullscreen && (
         <button type="button" onClick={openFullPage} title="Open chart in a new tab" aria-label="Open chart in a new tab">
