@@ -175,7 +175,6 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
         </div>
         <div className="topbar-meta">
           <div className={`landing-nav-links ${menuOpen ? 'is-open' : ''}`}>
-            <Link href="/dashboard" className="topbar-link" onClick={() => setMenuOpen(false)}>Dashboard</Link>
             <Link href="/nifty-sensex-today" className="topbar-link" onClick={() => setMenuOpen(false)}>Nifty and Sensex today</Link>
             <Link href="/global-cues-today" className="topbar-link" onClick={() => setMenuOpen(false)}>Global cues</Link>
             {!loading && (session ? (
