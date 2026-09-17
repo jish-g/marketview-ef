@@ -240,5 +240,28 @@ Deno.serve(async (req: Request) => {
   });
   if (ctxErr) skipped.push(`global_context insert: ${ctxErr.message}`);
 
-  return new Response(JSON.stringify({ ok: !ctxErr, quotes: quotes.length, bars_written: newBars.length, history_rows: bars.length, events: moves.length, narrative: narrative ? (narrative === prev ? "reused" : "written") : "none", global: ctx.global.band, india: ctx.india.band, transmission: ctx.transmission.label, measured: measured.label, regime: ctx.regime, confidence: ctx.confidence.level, skipped }), { status: 200, headers: { "Content-Type": "application/json" } });
+  // 7. Public-page archive: freeze exactly one row per IST trading day, the first run after the
+  //    Indian session has closed, for the public /global-cues-today/[date] pages. Never more than
+  //    once a day -- a duplicate insert on trade_date is skipped, not overwritten, so the archived
+  //    day reads whatever the session's first post-close narrative said.
+  let archived = false;
+  if (!narrative) {
+    // no narrative this run (e.g. missing API key) -- nothing worth freezing as the day's page
+  } else {
+    const hmIST = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false }).format(now);
+    if (hmIST >= "15:30") {
+      const { data: already } = await admin.from("global_cues_daily").select("trade_date").eq("trade_date", today).maybeSingle();
+      if (!already) {
+        const dateLabel = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", day: "numeric", month: "long", year: "numeric" }).format(now);
+        const slug = dateLabel.toLowerCase().replace(/\s+/g, "-");
+        const { error: archErr } = await admin.from("global_cues_daily").insert({
+          trade_date: today, slug, narrative, global_band: ctx.global.band, india_band: ctx.india.band,
+          transmission_label: ctx.transmission.label, regime: ctx.regime, calculated_at: ctx.calculatedAt,
+        });
+        if (archErr) skipped.push(`global_cues_daily insert: ${archErr.message}`); else archived = true;
+      }
+    }
+  }
+
+  return new Response(JSON.stringify({ ok: !ctxErr, quotes: quotes.length, bars_written: newBars.length, history_rows: bars.length, events: moves.length, narrative: narrative ? (narrative === prev ? "reused" : "written") : "none", archived, global: ctx.global.band, india: ctx.india.band, transmission: ctx.transmission.label, measured: measured.label, regime: ctx.regime, confidence: ctx.confidence.level, skipped }), { status: 200, headers: { "Content-Type": "application/json" } });
 });
