@@ -67,6 +67,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/fii-dii-data-today`, lastModified: postmarketLastModified, changeFrequency: 'daily', priority: 0.7 },
     { url: `${SITE_URL}/global-cues-today`, changeFrequency: 'always', priority: 0.85 },
     { url: `${SITE_URL}/global-cues-today/archive`, changeFrequency: 'daily', priority: 0.4 },
+    { url: `${SITE_URL}/changelog`, changeFrequency: 'daily', priority: 0.5 },
   ]
 
   let globalCuesEntries: MetadataRoute.Sitemap = []
