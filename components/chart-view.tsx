@@ -51,13 +51,26 @@ class OverlayPrimitive implements ISeriesPrimitive<Time> {
         const series = this.series, chart = this.chart
         if (!series || !chart) return
         target.useMediaCoordinateSpace(({ context, mediaSize }) => {
+          // Stacked independently per edge, so a support wall and a resistance wall that both
+          // land off the same side (e.g. scrolled to a session where price was outside the whole
+          // band) get their own row instead of drawing on top of each other.
+          let topRow = 0, bottomRow = 0
           for (const z of this.zones) {
             const top = series.priceToCoordinate(z.to), bottom = series.priceToCoordinate(z.from)
             if (top == null || bottom == null) continue
             const off = Math.max(top, bottom) < 0 ? 'top' : Math.min(top, bottom) > mediaSize.height ? 'bottom' : null
             if (off && z.edge) {
-              context.save(); context.fillStyle = z.color; context.font = '600 11px system-ui, sans-serif'; context.textBaseline = off === 'top' ? 'top' : 'bottom'
-              context.fillText(`${off === 'top' ? '▲' : '▼'} ${z.edge}`, 6, off === 'top' ? 2 : mediaSize.height - 2)
+              // Right-aligned near the price axis, not the top-left corner -- the legend panel
+              // lives there and a left-aligned label collided with it.
+              const text = `${off === 'top' ? '▲' : '▼'} ${z.edge}`
+              context.save(); context.font = '600 11px system-ui, sans-serif'
+              const w = context.measureText(text).width
+              const row = off === 'top' ? topRow++ : bottomRow++
+              const y = off === 'top' ? 4 + row * 18 : mediaSize.height - 4 - row * 18
+              context.fillStyle = 'rgba(10, 10, 10, 0.75)'
+              context.fillRect(mediaSize.width - w - 14, off === 'top' ? y - 2 : y - 15, w + 10, 17)
+              context.fillStyle = z.color; context.textAlign = 'right'; context.textBaseline = off === 'top' ? 'top' : 'bottom'
+              context.fillText(text, mediaSize.width - 8, y)
               context.restore()
               continue
             }
