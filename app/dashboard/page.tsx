@@ -46,7 +46,9 @@ const phaseFields: Partial<Record<Phase, { label: string; key: string; pct?: boo
     ['Post-market status', 'post_market_status'], ['Nifty close', 'post_close_nifty'], ['Sensex close', 'post_close_sensex'], ['Nifty closing change', 'post_change_pct_nifty', true], ['Sensex closing change', 'post_change_pct_sensex', true], ['Final breadth', 'post_advance_decline_ratio'], ['Post-market note', 'post_market_notes'], 
   ] as const).map(([label, key, pct]) => ({ label, key, pct: Boolean(pct) })),
 }
-const visualRow: Row = {
+// Exported so the standalone chart tab (app/dashboard/chart) has the same placeholder to show
+// before its own row fetch resolves, matching what this dashboard shows before liveRow arrives.
+export const visualRow: Row = {
   trade_date: '2026-08-12', day_name: 'Wednesday', event_today: 'US CPI at 6:00 PM IST',
   india_vix: 11.9, india_vix_change_pct: -2.3, gift_nifty_gap_pct: 0.79, days_to_expiry_nifty: 8, days_to_expiry_sensex: 8,
   avg_move_5d_nifty: 132.4, avg_move_5d_sensex: 418.6, prev_day_change_pct_nifty: 0.34, prev_day_change_pct_sensex: 0.28,

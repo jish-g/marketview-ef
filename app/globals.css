@@ -976,6 +976,26 @@ button, input { font: inherit; }
 .chart-frame { position: relative; height: clamp(440px, 62vh, 720px); border: 1px solid var(--border); border-radius: var(--radius-md, 12px); background: var(--surface); overflow: hidden; }
 /* Fullscreen fills the screen edge to edge, so the rounding and border come off. */
 .chart-frame.is-fullscreen, .chart-frame:fullscreen { border-radius: 0; }
+/* The standalone chart tab (app/dashboard/chart): the frame fills its stage instead of the
+   clamped in-page height, same reason fullscreen drops the border and radius. */
+.chart-frame.is-fullpage { height: 100%; border: 0; border-radius: 0; }
+
+/* ---- Standalone chart tab shell: a slim nav bar in place of the dashboard's eyebrow, title,
+   notes paragraph and disclaimer, with the chart filling the rest of the viewport. Everything
+   below the bar -- legend, dialog, drawer, corner buttons -- is the same chart-frame markup the
+   embedded Chart tab uses; only this chrome differs. ---- */
+.chart-fullpage { height: 100dvh; display: grid; grid-template-rows: 46px 1fr; background: var(--ground); }
+.chart-navbar { display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-3); border-bottom: 1px solid var(--border); background: var(--surface); overflow: hidden; }
+.chart-navbar-back { flex: 0 0 auto; padding: 6px 8px; border-radius: 6px; color: var(--muted); font: 600 11px var(--font-sans); text-decoration: none; }
+.chart-navbar-back:hover { background: var(--ground); color: var(--ink); }
+.chart-navbar-brand { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding-right: var(--s-3); border-right: 1px solid var(--border); color: var(--ink); font-weight: 600; white-space: nowrap; }
+.chart-navbar-brand small { color: var(--muted); font-weight: 500; font-size: 11px; }
+.chart-navbar-scroll { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s-2); overflow-x: auto; scrollbar-width: none; }
+.chart-navbar-scroll::-webkit-scrollbar { display: none; }
+.chart-navbar-status { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding-left: var(--s-3); border-left: 1px solid var(--border); color: var(--muted); font: 600 10px var(--font-sans); letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.chart-navbar-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--up); }
+.chart-fullpage-stage { position: relative; min-height: 0; }
+@media (max-width: 760px) { .chart-navbar-brand small { display: none; } }
 .chart-canvas { position: absolute; inset: 0; }
 /* Sits over the canvas rather than replacing it: the chart is created once on mount and
    keeps its pan and zoom across an empty stretch, a reload and a theme flip. */
