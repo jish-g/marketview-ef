@@ -44,11 +44,33 @@ async function latestUpdatedAt(supabase: any, table: 'premarket_dashboard' | 'po
   }
 }
 
+// A real lastModified (not "now") is a freshness signal a crawler can actually verify against
+// the page's own content -- these two pages change every run, so this reads the latest row
+// rather than defaulting to the request time like the fallback above does.
+async function latestGlobalContext(supabase: any): Promise<Date> {
+  try {
+    const { data } = await supabase.from('global_context').select('calculated_at').order('calculated_at', { ascending: false }).limit(1).maybeSingle()
+    return data?.calculated_at ? new Date(data.calculated_at as string) : new Date()
+  } catch {
+    return new Date()
+  }
+}
+async function latestChangelogEntry(supabase: any): Promise<Date> {
+  try {
+    const { data } = await supabase.from('changelog_entries').select('created_at').order('created_at', { ascending: false }).limit(1).maybeSingle()
+    return data?.created_at ? new Date(data.created_at as string) : new Date()
+  } catch {
+    return new Date()
+  }
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
-  const [premarketLastModified, postmarketLastModified] = await Promise.all([
+  const [premarketLastModified, postmarketLastModified, globalContextLastModified, changelogLastModified] = await Promise.all([
     latestUpdatedAt(supabase, 'premarket_dashboard'),
     latestUpdatedAt(supabase, 'postmarket_summary'),
+    latestGlobalContext(supabase),
+    latestChangelogEntry(supabase),
   ])
 
   const staticEntries: MetadataRoute.Sitemap = [
@@ -65,9 +87,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     })),
     { url: `${SITE_URL}/fii-dii-data-today`, lastModified: postmarketLastModified, changeFrequency: 'daily', priority: 0.7 },
-    { url: `${SITE_URL}/global-cues-today`, changeFrequency: 'always', priority: 0.85 },
-    { url: `${SITE_URL}/global-cues-today/archive`, changeFrequency: 'daily', priority: 0.4 },
-    { url: `${SITE_URL}/changelog`, changeFrequency: 'daily', priority: 0.5 },
+    { url: `${SITE_URL}/global-cues-today`, lastModified: globalContextLastModified, changeFrequency: 'always', priority: 0.85 },
+    { url: `${SITE_URL}/global-cues-today/archive`, lastModified: changelogLastModified, changeFrequency: 'daily', priority: 0.4 },
+    { url: `${SITE_URL}/changelog`, lastModified: changelogLastModified, changeFrequency: 'daily', priority: 0.5 },
   ]
 
   let globalCuesEntries: MetadataRoute.Sitemap = []

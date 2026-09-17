@@ -392,6 +392,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           <div className="landing-footer-col">
             <span>Product</span>
             <Link href="/nifty-sensex-today">Nifty and Sensex today</Link>
+            <Link href="/global-cues-today/archive">Global cues archive</Link>
             <Link href="/rules">Playbook</Link>
             <Link href="/about">About</Link>
           </div>
