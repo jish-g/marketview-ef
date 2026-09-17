@@ -368,16 +368,17 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
     for (const line of priceLinesRef.current) series.removePriceLine(line)
     for (const ls of lineSeriesRef.current) chart.removeSeries(ls)
     lineSeriesRef.current = []
-    const lines: IPriceLine[] = [], zones: Zone[] = [], vlines: VLine[] = [], prices: number[] = [], lineSeries: ISeriesApi<'Line'>[] = []
+    const lines: IPriceLine[] = [], zones: Zone[] = [], vlines: VLine[] = [], prices: number[] = [], alwaysVisiblePrices: number[] = [], lineSeries: ISeriesApi<'Line'>[] = []
     ;(async () => {
       const { LineSeries, LineStyle } = await import('lightweight-charts')
       if (cancelled || chart !== chartRef.current) return
       for (const d of visibleDrawables) {
         if (d.kind === 'hline') {
-          prices.push(d.price)
+          (d.alwaysVisible ? alwaysVisiblePrices : prices).push(d.price)
           lines.push(series.createPriceLine({ price: d.price, color: d.color, lineWidth: d.width ?? 1, lineStyle: d.style === 'dashed' ? 2 : d.style === 'dotted' ? 1 : 0, axisLabelVisible: true, title: d.label }))
         } else if (d.kind === 'zone') {
           zones.push({ from: d.from, to: d.to, color: d.color })
+          ;(d.alwaysVisible ? alwaysVisiblePrices : prices).push(d.from, d.to)
           // A line-less price line gives the zone one axis tag at its centre and its name on the plot.
           lines.push(series.createPriceLine({ price: (d.from + d.to) / 2, color: d.color, lineVisible: false, axisLabelVisible: true, title: d.label }))
         } else if (d.kind === 'vline') {
@@ -395,11 +396,13 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
       // OI support does, whatever the current distance between them and the last close. Autoscale
       // is the only thing that stays selective: a level within 2% of the last close is allowed to
       // widen the visible range, so a month-old daily swing can never squash today's candles by
-      // forcing the axis out to reach it. A level further away simply isn't drawn until the user
-      // scrolls or zooms to where it lives.
+      // forcing the axis out to reach it -- UNLESS the level is marked `alwaysVisible` (the OI
+      // walls), which always gets to stretch the axis: a support/resistance wall is the reason
+      // someone opens this chart, and it must never silently scroll off just because price drifted
+      // more than 2% away from it.
       const last = bars.length ? bars[bars.length - 1].close : null
       const near = (p: number) => last == null || Math.abs(p - last) / last <= 0.02
-      const autoscalePrices = [...prices.filter(near), ...zones.flatMap((z) => [z.from, z.to]).filter(near)]
+      const autoscalePrices = [...prices.filter(near), ...alwaysVisiblePrices]
       overlay.set(zones, vlines, autoscalePrices)
     })()
     return () => { cancelled = true }
