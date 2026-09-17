@@ -20,10 +20,12 @@ export type Candle = { tradeDate: string; bar: Bar }
 export type LineStyle = 'solid' | 'dashed' | 'dotted'
 
 export type Drawable =
-  /** Horizontal price line. `label` is the short name shown on the plot; the axis tag shows the price. */
-  | { kind: 'hline'; price: number; color: string; style: LineStyle; width?: 1 | 2; label: string; alpha?: number }
+  /** Horizontal price line. `label` is the short name shown on the plot; the axis tag shows the price.
+   * `alwaysVisible`: exempt from the "within 2% of last close" autoscale limit -- for the handful of
+   * levels (OI walls) that are the point of looking at the chart and must never silently scroll off. */
+  | { kind: 'hline'; price: number; color: string; style: LineStyle; width?: 1 | 2; label: string; alpha?: number; alwaysVisible?: boolean }
   /** Shaded horizontal band behind the candles, with one axis tag at its centre. */
-  | { kind: 'zone'; from: number; to: number; color: string; label: string }
+  | { kind: 'zone'; from: number; to: number; color: string; label: string; alwaysVisible?: boolean }
   /** Vertical marker at a bar time, e.g. the session open. */
   | { kind: 'vline'; time: UTCTimestamp; color: string; label?: string }
   /** A line traced through points on the price axis, e.g. VWAP. Rendered as its own line series. */

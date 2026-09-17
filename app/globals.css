@@ -1009,6 +1009,10 @@ button, input { font: inherit; }
 .chart-fullpage-stage { position: relative; min-height: 0; }
 @media (max-width: 760px) { .chart-navbar-brand small { display: none; } }
 .chart-canvas { position: absolute; inset: 0; }
+/* lightweight-charts draws its own crosshair lines but never hides the OS pointer -- this just
+   makes sure nothing else (a stray inherited `cursor: none`/`crosshair`) ever does either, so the
+   plain arrow always stays visible alongside the crosshair. */
+.chart-canvas, .chart-canvas * { cursor: default; }
 /* Sits over the canvas rather than replacing it: the chart is created once on mount and
    keeps its pan and zoom across an empty stretch, a reload and a theme flip. */
 .chart-overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: var(--s-5); background: var(--surface); }

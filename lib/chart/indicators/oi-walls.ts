@@ -39,11 +39,11 @@ export const oiWalls: IndicatorDef = {
     const parts: string[] = []
     const sup = read(row, `oi_support_${suffix}`), res = read(row, `oi_resistance_${suffix}`), mp = read(row, `max_pain_${suffix}`)
     if (s.support && sup != null) {
-      drawables.push(half > 0 ? { kind: 'zone', from: sup - half, to: sup + half, color: colors.up, label: 'OI support' } : { kind: 'hline', price: sup, color: colors.up, style: 'solid', label: 'OI support' })
+      drawables.push(half > 0 ? { kind: 'zone', from: sup - half, to: sup + half, color: colors.up, label: 'OI support', alwaysVisible: true } : { kind: 'hline', price: sup, color: colors.up, style: 'solid', label: 'OI support', alwaysVisible: true })
       parts.push(`S ${fmt.level(sup)}`)
     }
     if (s.resistance && res != null) {
-      drawables.push(half > 0 ? { kind: 'zone', from: res - half, to: res + half, color: colors.down, label: 'OI resistance' } : { kind: 'hline', price: res, color: colors.down, style: 'solid', label: 'OI resistance' })
+      drawables.push(half > 0 ? { kind: 'zone', from: res - half, to: res + half, color: colors.down, label: 'OI resistance', alwaysVisible: true } : { kind: 'hline', price: res, color: colors.down, style: 'solid', label: 'OI resistance', alwaysVisible: true })
       parts.push(`R ${fmt.level(res)}`)
     }
     if (s.maxpain && mp != null) {
