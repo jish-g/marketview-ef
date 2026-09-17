@@ -18,6 +18,7 @@ import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, Candl
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 type Row = Record<string, string | number | boolean | null>
 type Phase = 'premarket' | 'cues' | 'open' | 'verdict' | 'chart' | 'mid' | 'post' | 'journal' | 'rules' | 'history' | 'trade'
+const PHASE_VALUES: Phase[] = ['premarket', 'cues', 'open', 'verdict', 'chart', 'mid', 'post', 'journal', 'rules', 'history', 'trade']
 const phases = [
   { id: 'cues' as Phase, label: 'GlobalCue/News', subtitle: 'Global → India intelligence', icon: Globe },
   { id: 'premarket' as Phase, label: 'Pre-market', subtitle: 'Overnight setup', icon: Clock3 },
@@ -1508,6 +1509,21 @@ export default function Dashboard() {
   useEffect(() => { if (isMobile === null) return; setNavOpen(!isMobile) }, [isMobile])
   // Picking a phase inside the mobile drawer should reveal the phase, not leave the drawer covering it.
   const selectPhase = (next: Phase) => { setPhase(next); if (isMobile) setNavOpen(false) }
+  // The phase lives in the URL too, the same way `session` does below, so a screen -- Chart in
+  // particular -- can be opened directly or in a new tab. Read once on mount (guarded to a known
+  // Phase); kept in sync on every change with replaceState rather than pushState, since switching
+  // screens is a view change, not a page navigation the back button should step through.
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get('phase')
+    if (v && (PHASE_VALUES as string[]).includes(v)) setPhase(v as Phase)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('phase') === phase) return
+    url.searchParams.set('phase', phase)
+    window.history.replaceState({}, '', url)
+  }, [phase])
   // Stop the page behind the drawer from scrolling while the overlay is up.
   useEffect(() => {
     if (!isMobile || !navOpen) return

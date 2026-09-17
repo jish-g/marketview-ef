@@ -87,10 +87,37 @@ function sessionRead(bars: Bar[], levels: { support?: number; resistance?: numbe
   return parts.join(' · ') + '.'
 }
 
+// One PostgREST fetch of a candle set for one instrument name, paginated: a response caps at
+// 1,000 rows and 30 sessions of one-minute bars is ~11,000. Shared by the index spot and the
+// futures contract, since both live in the same table under different instrument names.
+async function fetchCandleSet(supabase: ReturnType<typeof createClient>, instrumentName: string, fromDate: string, tradeDate: string): Promise<Candle[]> {
+  const PAGE = 1000
+  const base = () => supabase.from('index_candles').select('bucket, trade_date, open, high, low, close, volume', { count: 'exact' })
+    .eq('instrument', instrumentName).gte('trade_date', fromDate).lte('trade_date', tradeDate).order('bucket', { ascending: true })
+  const first = await base().range(0, PAGE - 1)
+  if (first.error) throw first.error
+  const total = first.count ?? (first.data?.length ?? 0)
+  const rest = await Promise.all(Array.from({ length: Math.max(0, Math.ceil(total / PAGE) - 1) }, (_, i) => base().range((i + 1) * PAGE, (i + 2) * PAGE - 1)))
+  for (const page of rest) if (page.error) throw page.error
+  const data = [...(first.data ?? []), ...rest.flatMap((p) => p.data ?? [])]
+  return (data as Row[]).map((c) => {
+    const vol = Number(c.volume)
+    return {
+      tradeDate: String(c.trade_date ?? ''),
+      bar: {
+        time: Math.floor(new Date(String(c.bucket)).getTime() / 1000) as UTCTimestamp,
+        open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
+        ...(Number.isFinite(vol) && vol > 0 ? { volume: vol } : {}),
+      },
+    }
+  }).filter(({ tradeDate: d, bar }) => d && [bar.open, bar.high, bar.low, bar.close].every(Number.isFinite))
+}
+
 export function ChartView({ row }: { row: Row }) {
   const [instrument, setInstrument] = useState<Instrument>('NIFTY')
   const [timeframe, setTimeframe] = useState<Timeframe>('5m')
   const [candles, setCandles] = useState<Candle[]>([])
+  const [futuresCandles, setFuturesCandles] = useState<Candle[]>([])
   const [state, setState] = useState<ChartState>(defaultState)
   const loadedRef = useRef(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -111,6 +138,8 @@ export function ChartView({ row }: { row: Row }) {
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const overlayRef = useRef<OverlayPrimitive | null>(null)
   const priceLinesRef = useRef<IPriceLine[]>([])
+  const lineSeriesRef = useRef<ISeriesApi<'Line'>[]>([])
+  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const [chartReady, setChartReady] = useState(false)
 
   // Remembered choices are applied after mount so the first client paint matches the HTML.
@@ -128,21 +157,7 @@ export function ChartView({ row }: { row: Row }) {
   const { data: fetched, error, isLoading } = useSWR<Candle[]>(
     ['index-candles', instrument, fromDate, tradeDate],
     async () => {
-      // PostgREST caps a response at 1,000 rows and 30 sessions of one-minute bars is ~11,000,
-      // so the window is read in pages: one count request, then every page in parallel.
-      const PAGE = 1000
-      const base = () => supabase.from('index_candles').select('bucket, trade_date, open, high, low, close', { count: 'exact' })
-        .eq('instrument', instrument).gte('trade_date', fromDate).lte('trade_date', tradeDate).order('bucket', { ascending: true })
-      const first = await base().range(0, PAGE - 1)
-      if (first.error) throw first.error
-      const total = first.count ?? (first.data?.length ?? 0)
-      const rest = await Promise.all(Array.from({ length: Math.max(0, Math.ceil(total / PAGE) - 1) }, (_, i) => base().range((i + 1) * PAGE, (i + 2) * PAGE - 1)))
-      for (const page of rest) if (page.error) throw page.error
-      const data = [...(first.data ?? []), ...rest.flatMap((p) => p.data ?? [])]
-      const mapped: Candle[] = (data as Row[]).map((c) => ({
-        tradeDate: String(c.trade_date ?? ''),
-        bar: { time: Math.floor(new Date(String(c.bucket)).getTime() / 1000) as UTCTimestamp, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) },
-      })).filter(({ tradeDate: d, bar }) => d && [bar.open, bar.high, bar.low, bar.close].every(Number.isFinite))
+      const mapped = await fetchCandleSet(supabase, instrument, fromDate, tradeDate)
       const keep = new Set(Array.from(new Set(mapped.map((c) => c.tradeDate))).sort().slice(-30))
       return mapped.filter((c) => keep.has(c.tradeDate))
     },
@@ -150,26 +165,45 @@ export function ChartView({ row }: { row: Row }) {
   )
   useEffect(() => { setCandles(fetched ?? []) }, [fetched])
 
+  // The current-month futures contract for this instrument, with volume. Empty until the sync
+  // writes NIFTY_FUT / SENSEX_FUT rows; every indicator that reads it treats an empty array as
+  // "not available yet" rather than an error.
+  const futuresInstrument = `${instrument}_FUT`
+  const { data: fetchedFutures } = useSWR<Candle[]>(
+    ['index-candles', futuresInstrument, fromDate, tradeDate],
+    () => fetchCandleSet(supabase, futuresInstrument, fromDate, tradeDate),
+    { revalidateOnFocus: false },
+  )
+  useEffect(() => { setFuturesCandles(fetchedFutures ?? []) }, [fetchedFutures])
+
   // Live updates for the current trading date only. index-candle-sync writes one-minute Kite
   // candles into Supabase and Realtime delivers those inserts and updates straight here.
   useEffect(() => {
     if (!isToday) return
+    const applyUpdate = (setter: typeof setCandles) => (payload: { new: Row | null }) => {
+      const next = payload.new
+      if (!next?.bucket || String(next.trade_date ?? '') !== tradeDate) return
+      const vol = Number(next.volume)
+      const bar: Bar = {
+        time: Math.floor(new Date(String(next.bucket)).getTime() / 1000) as UTCTimestamp,
+        open: Number(next.open), high: Number(next.high), low: Number(next.low), close: Number(next.close),
+        ...(Number.isFinite(vol) && vol > 0 ? { volume: vol } : {}),
+      }
+      if (![bar.open, bar.high, bar.low, bar.close].every(Number.isFinite)) return
+      setter((prev) => {
+        const at = prev.findIndex((c) => c.bar.time === bar.time)
+        if (at === -1) return [...prev, { tradeDate, bar }].sort((a, b) => a.bar.time - b.bar.time)
+        const cur = prev[at].bar
+        if (cur.close === bar.close && cur.high === bar.high && cur.low === bar.low && cur.open === bar.open && cur.volume === bar.volume) return prev
+        const copy = prev.slice(); copy[at] = { tradeDate, bar }; return copy
+      })
+    }
     const channel = supabase.channel(`index-candles-${instrument}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'index_candles', filter: `instrument=eq.${instrument}` }, (payload) => {
-        const next = payload.new as Row | null
-        if (!next?.bucket || String(next.trade_date ?? '') !== tradeDate) return
-        const bar: Bar = { time: Math.floor(new Date(String(next.bucket)).getTime() / 1000) as UTCTimestamp, open: Number(next.open), high: Number(next.high), low: Number(next.low), close: Number(next.close) }
-        if (![bar.open, bar.high, bar.low, bar.close].every(Number.isFinite)) return
-        setCandles((prev) => {
-          const at = prev.findIndex((c) => c.bar.time === bar.time)
-          if (at === -1) return [...prev, { tradeDate, bar }].sort((a, b) => a.bar.time - b.bar.time)
-          const cur = prev[at].bar
-          if (cur.close === bar.close && cur.high === bar.high && cur.low === bar.low && cur.open === bar.open) return prev
-          const copy = prev.slice(); copy[at] = { tradeDate, bar }; return copy
-        })
-      }).subscribe()
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'index_candles', filter: `instrument=eq.${instrument}` }, applyUpdate(setCandles))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'index_candles', filter: `instrument=eq.${futuresInstrument}` }, applyUpdate(setFuturesCandles))
+      .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [supabase, instrument, isToday, tradeDate])
+  }, [supabase, instrument, futuresInstrument, isToday, tradeDate])
 
   // Derived: the one-minute array is the only data state; everything below is a pure function
   // of it plus the switches, so a live update re-derives all of it in one render.
@@ -178,7 +212,7 @@ export function ChartView({ row }: { row: Row }) {
   const todayBars = useMemo(() => aggregate(candles.filter((c) => c.tradeDate === tradeDate).map((c) => c.bar), minutes), [candles, tradeDate, minutes])
 
   const results = useMemo(() => {
-    const ctx = { candles, tradeDate, instrument, row, colors, timeframeMinutes: minutes }
+    const ctx = { candles, futuresCandles, tradeDate, instrument, row, colors, timeframeMinutes: minutes }
     const out: Record<string, ReturnType<typeof INDICATORS[number]['compute']>> = {}
     for (const id of state.active) {
       const def = byId(id)
@@ -186,7 +220,7 @@ export function ChartView({ row }: { row: Row }) {
       try { out[id] = def.compute(ctx, state.settings[id] ?? def.defaults) } catch { out[id] = { drawables: [], summary: 'could not compute' } }
     }
     return out
-  }, [candles, tradeDate, instrument, row, colors, minutes, state.active, state.settings])
+  }, [candles, futuresCandles, tradeDate, instrument, row, colors, minutes, state.active, state.settings])
 
   const visibleDrawables = useMemo(() => {
     const hidden = new Set(state.hidden)
@@ -195,12 +229,24 @@ export function ChartView({ row }: { row: Row }) {
     return out
   }, [state.active, state.hidden, results])
 
+  // Lower pane data: the first active, visible indicator that supplies a histogram. Only Volume
+  // does today; the pane simply does not appear when nothing supplies one.
+  const activeHistogram = useMemo(() => {
+    const hidden = new Set(state.hidden)
+    for (const id of state.active) {
+      if (hidden.has(id)) continue
+      const h = results[id]?.histogram
+      if (h && h.length > 0) return h
+    }
+    return null
+  }, [state.active, state.hidden, results])
+
   // Chart creation. lightweight-charts touches document/canvas on construction, so it is imported
   // inside the effect: never during the server render, and in its own chunk.
   useEffect(() => {
     let disposed = false, chart: IChartApi | null = null, observer: ResizeObserver | null = null
     ;(async () => {
-      const { createChart, CandlestickSeries, ColorType, CrosshairMode, LineStyle } = await import('lightweight-charts')
+      const { createChart, CandlestickSeries, HistogramSeries, ColorType, CrosshairMode, LineStyle } = await import('lightweight-charts')
       const el = containerRef.current
       if (disposed || !el) return
       chart = createChart(el, {
@@ -221,14 +267,19 @@ export function ChartView({ row }: { row: Row }) {
       })
       const overlay = new OverlayPrimitive()
       series.attachPrimitive(overlay)
-      chartRef.current = chart; seriesRef.current = series; overlayRef.current = overlay
+      // Volume lives on its own price scale pinned to the bottom of the same pane -- the usual
+      // lightweight-charts technique for a "lower pane" without a second chart. Empty until an
+      // indicator supplies a histogram, so it is invisible when nothing needs it.
+      const volumeSeries = chart.addSeries(HistogramSeries, { priceScaleId: 'volume', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false })
+      chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 }, visible: false })
+      chartRef.current = chart; seriesRef.current = series; overlayRef.current = overlay; volumeSeriesRef.current = volumeSeries
       setChartReady(true)
       observer = new ResizeObserver(([entry]) => { if (entry) chart?.applyOptions({ width: Math.floor(entry.contentRect.width), height: Math.floor(entry.contentRect.height) }) })
       observer.observe(el)
     })()
     return () => {
       disposed = true; observer?.disconnect()
-      priceLinesRef.current = []; overlayRef.current = null; seriesRef.current = null; chartRef.current = null
+      priceLinesRef.current = []; lineSeriesRef.current = []; overlayRef.current = null; volumeSeriesRef.current = null; seriesRef.current = null; chartRef.current = null
       setChartReady(false); chart?.remove()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -262,32 +313,60 @@ export function ChartView({ row }: { row: Row }) {
   }, [colors, chartReady])
 
   // Render pass: hlines become price lines (axis tag = price, title = short name on the plot);
-  // zones and vlines go to the overlay; every level price feeds the autoscale hint.
+  // zones and vlines go to the overlay; `series` drawables (VWAP) become their own line series;
+  // every level price feeds the autoscale hint.
   useEffect(() => {
-    const series = seriesRef.current, overlay = overlayRef.current
-    if (!chartReady || !series || !overlay) return
+    const series = seriesRef.current, overlay = overlayRef.current, chart = chartRef.current
+    if (!chartReady || !series || !overlay || !chart) return
+    let cancelled = false
     for (const line of priceLinesRef.current) series.removePriceLine(line)
-    const lines: IPriceLine[] = [], zones: Zone[] = [], vlines: VLine[] = [], prices: number[] = []
-    for (const d of visibleDrawables) {
-      if (d.kind === 'hline') {
-        prices.push(d.price)
-        lines.push(series.createPriceLine({ price: d.price, color: d.color, lineWidth: d.width ?? 1, lineStyle: d.style === 'dashed' ? 2 : d.style === 'dotted' ? 1 : 0, axisLabelVisible: true, title: d.label }))
-      } else if (d.kind === 'zone') {
-        zones.push({ from: d.from, to: d.to, color: d.color })
-        // A line-less price line gives the zone one axis tag at its centre and its name on the plot.
-        lines.push(series.createPriceLine({ price: (d.from + d.to) / 2, color: d.color, lineVisible: false, axisLabelVisible: true, title: d.label }))
-      } else if (d.kind === 'vline') {
-        vlines.push({ time: d.time, color: d.color, label: d.label })
+    for (const ls of lineSeriesRef.current) chart.removeSeries(ls)
+    lineSeriesRef.current = []
+    const lines: IPriceLine[] = [], zones: Zone[] = [], vlines: VLine[] = [], prices: number[] = [], lineSeries: ISeriesApi<'Line'>[] = []
+    ;(async () => {
+      const { LineSeries, LineStyle } = await import('lightweight-charts')
+      if (cancelled || chart !== chartRef.current) return
+      for (const d of visibleDrawables) {
+        if (d.kind === 'hline') {
+          prices.push(d.price)
+          lines.push(series.createPriceLine({ price: d.price, color: d.color, lineWidth: d.width ?? 1, lineStyle: d.style === 'dashed' ? 2 : d.style === 'dotted' ? 1 : 0, axisLabelVisible: true, title: d.label }))
+        } else if (d.kind === 'zone') {
+          zones.push({ from: d.from, to: d.to, color: d.color })
+          // A line-less price line gives the zone one axis tag at its centre and its name on the plot.
+          lines.push(series.createPriceLine({ price: (d.from + d.to) / 2, color: d.color, lineVisible: false, axisLabelVisible: true, title: d.label }))
+        } else if (d.kind === 'vline') {
+          vlines.push({ time: d.time, color: d.color, label: d.label })
+        } else if (d.kind === 'series') {
+          const ls = chart.addSeries(LineSeries, { color: d.color, lineWidth: d.width ?? 2, lineStyle: LineStyle.Solid, priceLineVisible: true, lastValueVisible: false, title: d.label, crosshairMarkerVisible: false })
+          ls.setData(d.points)
+          lineSeries.push(ls)
+          if (d.points.length) prices.push(d.points[d.points.length - 1].value)
+        }
       }
-    }
-    priceLinesRef.current = lines
-    // Autoscale keeps nearby levels on screen but never lets a far one (a month-old daily swing)
-    // squash today's candles: only levels within 2% of the last close widen the scale. Far levels
-    // are still drawn; scroll or zoom out to reach them.
-    const last = bars.length ? bars[bars.length - 1].close : null
-    const near = (p: number) => last == null || Math.abs(p - last) / last <= 0.02
-    overlay.set(zones.filter((z) => near(z.from) || near(z.to)), vlines, prices.filter(near))
+      priceLinesRef.current = lines
+      lineSeriesRef.current = lineSeries
+      // Autoscale keeps nearby levels on screen but never lets a far one (a month-old daily swing)
+      // squash today's candles: only levels within 2% of the last close widen the scale. Far levels
+      // are still drawn; scroll or zoom out to reach them.
+      const last = bars.length ? bars[bars.length - 1].close : null
+      const near = (p: number) => last == null || Math.abs(p - last) / last <= 0.02
+      overlay.set(zones.filter((z) => near(z.from) || near(z.to)), vlines, prices.filter(near))
+    })()
+    return () => { cancelled = true }
   }, [visibleDrawables, chartReady, bars])
+
+  // Lower pane: shown only while an active indicator supplies bars.
+  useEffect(() => {
+    const chart = chartRef.current, vol = volumeSeriesRef.current
+    if (!chartReady || !chart || !vol) return
+    if (activeHistogram) {
+      vol.setData(activeHistogram.map((h) => ({ time: h.time, value: h.value, color: h.color })))
+      chart.priceScale('volume').applyOptions({ visible: true })
+    } else {
+      vol.setData([])
+      chart.priceScale('volume').applyOptions({ visible: false })
+    }
+  }, [activeHistogram, chartReady])
 
   // Fullscreen prefers the browser API; a CSS fallback pins the frame where it is refused.
   useEffect(() => {
@@ -415,6 +494,13 @@ export function ChartView({ row }: { row: Row }) {
 
       <div className="chart-corner">
         <button type="button" onClick={showToday} title="Back to today">⟲ Today</button>
+        {!fullscreen && (
+          <button type="button" onClick={() => window.open(window.location.href, '_blank', 'noopener')} title="Open chart in a new tab" aria-label="Open chart in a new tab">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+          </button>
+        )}
         <button type="button" className="chart-fullscreen" onClick={toggleFullscreen} aria-pressed={fullscreen} title={fullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}>{fullscreen ? 'Exit' : 'Fullscreen'}</button>
       </div>
 

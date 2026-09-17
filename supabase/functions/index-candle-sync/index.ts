@@ -32,7 +32,7 @@ const KITE_BASE = "https://api.kite.trade";
 const KITE_API_KEY_SECRET = "kite_api_key";
 
 // Instrument tokens from Kite's instruments dump (https://api.kite.trade/instruments). Index
-// spots, so the candles carry no meaningful volume -- the chart does not draw any.
+// spots, so these candles carry no volume; the futures targets below are what carry it.
 // Verify against a fresh dump before trusting a changed value; both are overridable by env so a
 // correction does not need a redeploy of this file.
 const INSTRUMENTS: { instrument: "NIFTY" | "SENSEX"; token: number }[] = [
@@ -40,7 +40,62 @@ const INSTRUMENTS: { instrument: "NIFTY" | "SENSEX"; token: number }[] = [
   { instrument: "SENSEX", token: Number(Deno.env.get("KITE_TOKEN_SENSEX") ?? 265) },
 ];
 
-type Candle = { instrument: string; bucket: string; trade_date: string; open: number; high: number; low: number; close: number };
+type Candle = { instrument: string; bucket: string; trade_date: string; open: number; high: number; low: number; close: number; volume?: number | null };
+
+// ---------------------------------------------------------------------------------------------
+// FUTURES. Index candles carry no volume, so the current-month NIFTY / SENSEX futures are fetched
+// alongside them and stored as NIFTY_FUT / SENSEX_FUT with volume: that is what VWAP and the
+// volume pane read. Which contract is "current month" comes from Kite's instrument list, resolved
+// once and cached in futures_contracts until the first run after its expiry. The list is large
+// (tens of thousands of rows), so it is streamed line by line and only the matching rows are kept.
+// ---------------------------------------------------------------------------------------------
+type Contract = { instrument: string; underlying: "NIFTY" | "SENSEX"; exchange: string; tradingsymbol: string; instrument_token: number; expiry: string; prev_token: number | null };
+const FUTURES: { underlying: "NIFTY" | "SENSEX"; exchange: "NFO" | "BFO" }[] = [
+  { underlying: "NIFTY", exchange: "NFO" },
+  { underlying: "SENSEX", exchange: "BFO" },
+];
+
+async function nearestFuture(exchange: string, underlying: string, today: string, apiKey: string, accessToken: string): Promise<{ tradingsymbol: string; token: number; expiry: string } | { error: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`${KITE_BASE}/instruments/${exchange}`, { headers: { "X-Kite-Version": "3", Authorization: `token ${apiKey}:${accessToken}` } });
+  } catch (e) { return { error: `instruments network: ${e}` }; }
+  if (!res.ok || !res.body) return { error: `instruments ${res.status}` };
+  // CSV columns: instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,strike,tick_size,lot_size,instrument_type,segment,exchange
+  let best: { tradingsymbol: string; token: number; expiry: string } | null = null;
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buf = "";
+  const consider = (line: string) => {
+    // Kite quotes the name column ("NIFTY") and nothing else; strip quotes before comparing.
+    const f = line.split(",").map((v) => v.replace(/^"|"$/g, ""));
+    if (f.length < 12 || f[3] !== underlying || f[9] !== "FUT") return;
+    const expiry = f[5];
+    if (!expiry || expiry < today) return;
+    if (!best || expiry < best.expiry) best = { tradingsymbol: f[2], token: Number(f[0]), expiry };
+  };
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += value;
+    let i: number;
+    while ((i = buf.indexOf("\n")) >= 0) { consider(buf.slice(0, i).trim()); buf = buf.slice(i + 1); }
+  }
+  if (buf.trim()) consider(buf.trim());
+  return best ?? { error: `no unexpired ${underlying} future on ${exchange}` };
+}
+
+async function resolveContract(admin: ReturnType<typeof createClient>, u: typeof FUTURES[number], today: string, apiKey: string, accessToken: string): Promise<Contract | { error: string }> {
+  const instrument = `${u.underlying}_FUT`;
+  const { data: row } = await admin.from("futures_contracts").select("*").eq("instrument", instrument).maybeSingle();
+  const cached = row as Contract | null;
+  if (cached && cached.expiry >= today) return cached;
+  const found = await nearestFuture(u.exchange, u.underlying, today, apiKey, accessToken);
+  if ("error" in found) return found;
+  const next: Contract = { instrument, underlying: u.underlying, exchange: u.exchange, tradingsymbol: found.tradingsymbol, instrument_token: found.token, expiry: found.expiry, prev_token: cached?.instrument_token ?? null };
+  const { error } = await admin.from("futures_contracts").upsert({ ...next, updated_at: new Date().toISOString() });
+  if (error) return { error: `futures_contracts upsert: ${error.message}` };
+  return next;
+}
 
 // ---------------------------------------------------------------------------------------------
 // IST helpers. Same Intl-based approach the rest of the pipeline uses (todayIST in
@@ -125,7 +180,7 @@ function backfillWindows(days: number, to: string): { from: string; to: string }
 type FetchResult = { candles: Candle[] } | { tokenMissing: true } | { error: string };
 
 async function fetchCandles(
-  instrument: "NIFTY" | "SENSEX",
+  instrument: string,
   token: number,
   from: string,
   to: string,
@@ -160,12 +215,15 @@ async function fetchCandles(
     if (Number.isNaN(at.getTime())) continue;
     const [open, high, low, close] = [Number(c[1]), Number(c[2]), Number(c[3]), Number(c[4])];
     if (![open, high, low, close].every(Number.isFinite)) continue;
+    const vol = Number(c[5]);
     candles.push({
       instrument,
       bucket: at.toISOString(),
       // The candle's own IST date, not today's -- a backfill spans several sessions.
       trade_date: todayIST(at),
       open, high, low, close,
+      // Index candles report 0; only futures rows carry a real figure. Stored as null for indices.
+      volume: Number.isFinite(vol) && vol > 0 ? vol : null,
     });
   }
   return { candles };
@@ -182,7 +240,7 @@ function changedRows(fetched: Candle[], existing: Map<string, Candle>): Candle[]
   for (const c of fetched) {
     const prev = existing.get(`${c.instrument}|${c.bucket}`);
     if (!prev) { out.push(c); continue; }
-    if (Number(prev.open) !== c.open || Number(prev.high) !== c.high || Number(prev.low) !== c.low || Number(prev.close) !== c.close) out.push(c);
+    if (Number(prev.open) !== c.open || Number(prev.high) !== c.high || Number(prev.low) !== c.low || Number(prev.close) !== c.close || (prev.volume ?? null) !== (c.volume ?? null)) out.push(c);
   }
   return out;
 }
@@ -238,9 +296,23 @@ Deno.serve(async (req: Request) => {
 
   const windows = mode === "backfill" ? backfillWindows(days, to) : [{ from, to }];
 
-  for (const { instrument, token } of INSTRUMENTS) for (const w of windows) {
+  // Targets: the two index spots, then the current-month future of each. A contract that cannot
+  // be resolved is reported and skipped; the index rows never wait on it.
+  const targets: { instrument: string; token: number; prevToken: number | null }[] = INSTRUMENTS.map((i) => ({ ...i, prevToken: null }));
+  for (const u of FUTURES) {
+    const c = await resolveContract(admin, u, today, String(apiKey), String(accessToken));
+    if ("error" in c) { skipped.push(`${u.underlying}_FUT: ${c.error}`); continue; }
+    targets.push({ instrument: c.instrument, token: c.instrument_token, prevToken: c.prev_token });
+  }
+
+  for (const { instrument, token, prevToken } of targets) for (const w of windows) {
     if (tokenMissing) break;
-    const result = await fetchCandles(instrument, token, w.from, w.to, String(apiKey), String(accessToken));
+    let result = await fetchCandles(instrument, token, w.from, w.to, String(apiKey), String(accessToken));
+    // A window from before this contract listed comes back empty; the contract that just expired
+    // still serves its history for a while, so read the gap from there.
+    if ("candles" in result && result.candles.length === 0 && prevToken && mode === "backfill") {
+      result = await fetchCandles(instrument, prevToken, w.from, w.to, String(apiKey), String(accessToken));
+    }
 
     if ("tokenMissing" in result) { tokenMissing = true; skipped.push(`${instrument}: Kite session not established for today`); continue; }
     if ("error" in result) { skipped.push(`${instrument}: ${result.error}`); continue; }
@@ -254,7 +326,7 @@ Deno.serve(async (req: Request) => {
     const last = result.candles[result.candles.length - 1].bucket;
     const { data: existingRows, error: readError } = await admin
       .from("index_candles")
-      .select("instrument, bucket, open, high, low, close")
+      .select("instrument, bucket, open, high, low, close, volume")
       .eq("instrument", instrument)
       .gte("bucket", first)
       .lte("bucket", last);
