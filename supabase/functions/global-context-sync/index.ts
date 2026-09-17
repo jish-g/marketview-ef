@@ -250,15 +250,29 @@ Deno.serve(async (req: Request) => {
   } else {
     const hmIST = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false }).format(now);
     if (hmIST >= "15:30") {
+      const dateLabel = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", day: "numeric", month: "long", year: "numeric" }).format(now);
       const { data: already } = await admin.from("global_cues_daily").select("trade_date").eq("trade_date", today).maybeSingle();
       if (!already) {
-        const dateLabel = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", day: "numeric", month: "long", year: "numeric" }).format(now);
         const slug = dateLabel.toLowerCase().replace(/\s+/g, "-");
         const { error: archErr } = await admin.from("global_cues_daily").insert({
           trade_date: today, slug, narrative, global_band: ctx.global.band, india_band: ctx.india.band,
           transmission_label: ctx.transmission.label, regime: ctx.regime, calculated_at: ctx.calculatedAt,
         });
         if (archErr) skipped.push(`global_cues_daily insert: ${archErr.message}`); else archived = true;
+      }
+
+      // 7b. Public changelog: one automated row per IST trading day, so /changelog's content
+      //     changes every day even with no manual entry -- a plain freshness signal for crawlers.
+      // Independent of the archive-dedupe above (its own unique index backstops a race), so a
+      // day that already archived earlier still gets logged if this is the first run to try.
+      const { data: alreadyLogged } = await admin.from("changelog_entries").select("id").eq("entry_date", today).eq("kind", "daily").maybeSingle();
+      if (!alreadyLogged) {
+        const { error: logErr } = await admin.from("changelog_entries").insert({
+          entry_date: today, kind: "daily",
+          title: `Global cues updated for ${dateLabel}`,
+          body: `Global read: ${ctx.global.band.toLowerCase()}. India read: ${ctx.india.band.toLowerCase()}. ${ctx.transmission.label}. Regime: ${ctx.regime.toLowerCase()}.`,
+        });
+        if (logErr) skipped.push(`changelog_entries insert: ${logErr.message}`);
       }
     }
   }

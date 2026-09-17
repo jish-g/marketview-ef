@@ -22,6 +22,9 @@ type Props = {
   narrative: GlobalCuesNarrative
   /** For the archive page: link to the live page and the prior archived day. Omitted on the live page itself. */
   archiveNav?: { prevHref: string | null; prevLabel: string | null }
+  /** Live page only: recent archived days, rendered as a scrollable feed below today's read --
+   *  same "today first, scroll for history" pattern as /nifty-sensex-today. */
+  recentDays?: { slug: string; label: string; globalBand: string; indiaBand: string; transmissionLabel: string }[]
   path: string
 }
 
@@ -32,7 +35,7 @@ const RELATED_EVERGREEN = [
   { href: '/nifty-support-resistance-today', label: 'Nifty support and resistance today' },
 ]
 
-export function GlobalCuesPublicPage({ eyebrow, h1, asOfLabel, isLive, globalBand, indiaBand, transmissionLabel, narrative, archiveNav, path }: Props) {
+export function GlobalCuesPublicPage({ eyebrow, h1, asOfLabel, isLive, globalBand, indiaBand, transmissionLabel, narrative, archiveNav, recentDays, path }: Props) {
   const breadcrumb = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -103,16 +106,25 @@ export function GlobalCuesPublicPage({ eyebrow, h1, asOfLabel, isLive, globalBan
 
           <p className="doc-hero-links"><Link href="/rules"><BookOpen size={13} style={{ display: 'inline', verticalAlign: '-2px', marginRight: '4px' }} />Read the full MarketCue scoring methodology</Link></p>
 
-          {archiveNav && (
+          {!isLive && archiveNav && (
             <section className="doc-section evergreen-related">
-              {isLive ? (
-                <p className="doc-hero-links"><Link href="/global-cues-today/archive">See past days →</Link></p>
-              ) : (
-                <>
-                  <p className="doc-hero-links"><Link href="/global-cues-today">See today’s live read →</Link></p>
-                  {archiveNav.prevHref && <p className="doc-hero-links"><Link href={archiveNav.prevHref}>{archiveNav.prevLabel} →</Link></p>}
-                </>
-              )}
+              <p className="doc-hero-links"><Link href="/global-cues-today">See today’s live read →</Link></p>
+              {archiveNav.prevHref && <p className="doc-hero-links"><Link href={archiveNav.prevHref}>{archiveNav.prevLabel} →</Link></p>}
+            </section>
+          )}
+
+          {isLive && recentDays && recentDays.length > 0 && (
+            <section className="doc-section global-cues-recent">
+              <h2>Recent days</h2>
+              <ul>
+                {recentDays.map((d) => (
+                  <li key={d.slug}>
+                    <Link href={`/global-cues-today/${d.slug}`}>{d.label}</Link>
+                    {' — '}Global {d.globalBand}, India {d.indiaBand}, {d.transmissionLabel.toLowerCase()}
+                  </li>
+                ))}
+              </ul>
+              <p className="doc-hero-links"><Link href="/global-cues-today/archive">See the full archive →</Link></p>
             </section>
           )}
 

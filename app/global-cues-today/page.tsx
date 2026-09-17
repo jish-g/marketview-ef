@@ -31,6 +31,28 @@ async function getLatestContext(): Promise<ContextRow | null> {
   }
 }
 
+type RecentDay = { slug: string; label: string; globalBand: string; indiaBand: string; transmissionLabel: string }
+
+async function getRecentDays(): Promise<RecentDay[]> {
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+    const { data } = await supabase
+      .from('global_cues_daily')
+      .select('trade_date, slug, global_band, india_band, transmission_label')
+      .order('trade_date', { ascending: false })
+      .limit(20)
+    return ((data ?? []) as { trade_date: string; slug: string; global_band: string; india_band: string; transmission_label: string }[]).map((d) => ({
+      slug: d.slug,
+      label: new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${d.trade_date}T00:00:00`)),
+      globalBand: d.global_band,
+      indiaBand: d.india_band,
+      transmissionLabel: d.transmission_label,
+    }))
+  } catch {
+    return []
+  }
+}
+
 function asOfLabel(calculatedAt: string): string {
   const d = new Date(calculatedAt)
   const date = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
@@ -64,7 +86,7 @@ export const metadata: Metadata = {
 }
 
 export default async function Page() {
-  const row = await getLatestContext()
+  const [row, recentDays] = await Promise.all([getLatestContext(), getRecentDays()])
   const narrative: GlobalCuesNarrative = row?.narrative
     ? { summary: row.narrative.summary, global: row.narrative.global, india: row.narrative.india, link: row.narrative.link }
     : FALLBACK_NARRATIVE
@@ -79,7 +101,7 @@ export default async function Page() {
       indiaBand={row?.india_band ?? 'Neutral'}
       transmissionLabel={row?.transmission_label ?? 'Limited global influence'}
       narrative={narrative}
-      archiveNav={{ prevHref: null, prevLabel: null }}
+      recentDays={recentDays}
       path="/global-cues-today"
     />
   )
