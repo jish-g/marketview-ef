@@ -27,7 +27,12 @@ const IST_FULL = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', da
 
 // Everything the built-in price-line API cannot draw: shaded zones under the candles, vertical
 // markers at bar times, and an autoscale hint so every active level stays on screen.
-type Zone = { from: number; to: number; color: string }
+// `edge`: for a zone that matters even when off-screen (the OI walls) -- rather than stretching
+// the axis to reach it, which squashes today's candles flat when the wall sits far from price,
+// the zone gets a small pinned arrow+label at the top or bottom of the pane instead, pointing the
+// way to it. Set only on zones that should get this treatment; everything else just isn't drawn
+// once it's outside the visible price range, same as before.
+type Zone = { from: number; to: number; color: string; edge?: string }
 type VLine = { time: UTCTimestamp; color: string; label?: string }
 class OverlayPrimitive implements ISeriesPrimitive<Time> {
   private zones: Zone[] = []
@@ -49,6 +54,14 @@ class OverlayPrimitive implements ISeriesPrimitive<Time> {
           for (const z of this.zones) {
             const top = series.priceToCoordinate(z.to), bottom = series.priceToCoordinate(z.from)
             if (top == null || bottom == null) continue
+            const off = Math.max(top, bottom) < 0 ? 'top' : Math.min(top, bottom) > mediaSize.height ? 'bottom' : null
+            if (off && z.edge) {
+              context.save(); context.fillStyle = z.color; context.font = '600 11px system-ui, sans-serif'; context.textBaseline = off === 'top' ? 'top' : 'bottom'
+              context.fillText(`${off === 'top' ? '▲' : '▼'} ${z.edge}`, 6, off === 'top' ? 2 : mediaSize.height - 2)
+              context.restore()
+              continue
+            }
+            if (off) continue
             context.save(); context.globalAlpha = 0.18; context.fillStyle = z.color
             context.fillRect(0, Math.min(top, bottom), mediaSize.width, Math.max(1, Math.abs(bottom - top)))
             context.restore()
@@ -379,17 +392,17 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
     for (const line of priceLinesRef.current) series.removePriceLine(line)
     for (const ls of lineSeriesRef.current) chart.removeSeries(ls)
     lineSeriesRef.current = []
-    const lines: IPriceLine[] = [], zones: Zone[] = [], vlines: VLine[] = [], prices: number[] = [], alwaysVisiblePrices: number[] = [], lineSeries: ISeriesApi<'Line'>[] = []
+    const lines: IPriceLine[] = [], zones: Zone[] = [], vlines: VLine[] = [], prices: number[] = [], lineSeries: ISeriesApi<'Line'>[] = []
     ;(async () => {
       const { LineSeries, LineStyle } = await import('lightweight-charts')
       if (cancelled || chart !== chartRef.current) return
       for (const d of visibleDrawables) {
         if (d.kind === 'hline') {
-          (d.alwaysVisible ? alwaysVisiblePrices : prices).push(d.price)
+          prices.push(d.price)
           lines.push(series.createPriceLine({ price: d.price, color: d.color, lineWidth: d.width ?? 1, lineStyle: d.style === 'dashed' ? 2 : d.style === 'dotted' ? 1 : 0, axisLabelVisible: true, title: d.label }))
         } else if (d.kind === 'zone') {
-          zones.push({ from: d.from, to: d.to, color: d.color })
-          ;(d.alwaysVisible ? alwaysVisiblePrices : prices).push(d.from, d.to)
+          zones.push({ from: d.from, to: d.to, color: d.color, edge: d.alwaysVisible ? `${d.label} ${fmt.level((d.from + d.to) / 2)}` : undefined })
+          prices.push(d.from, d.to)
           // A line-less price line gives the zone one axis tag at its centre and its name on the plot.
           lines.push(series.createPriceLine({ price: (d.from + d.to) / 2, color: d.color, lineVisible: false, axisLabelVisible: true, title: d.label }))
         } else if (d.kind === 'vline') {
@@ -406,14 +419,14 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
       // Every zone and vline is always drawn -- OI resistance must show up exactly as reliably as
       // OI support does, whatever the current distance between them and the last close. Autoscale
       // is the only thing that stays selective: a level within 2% of the last close is allowed to
-      // widen the visible range, so a month-old daily swing can never squash today's candles by
-      // forcing the axis out to reach it -- UNLESS the level is marked `alwaysVisible` (the OI
-      // walls), which always gets to stretch the axis: a support/resistance wall is the reason
-      // someone opens this chart, and it must never silently scroll off just because price drifted
-      // more than 2% away from it.
+      // widen the visible range, so a month-old daily swing (or a far OI wall) can never squash
+      // today's candles flat by forcing the axis out to reach it. A zone marked `alwaysVisible`
+      // (the OI walls) that falls outside that 2% still isn't force-included here -- instead it
+      // gets a small pinned arrow+label at the top/bottom edge of the pane (see OverlayPrimitive),
+      // so it stays visible without ever costing candle readability.
       const last = bars.length ? bars[bars.length - 1].close : null
       const near = (p: number) => last == null || Math.abs(p - last) / last <= 0.02
-      const autoscalePrices = [...prices.filter(near), ...alwaysVisiblePrices]
+      const autoscalePrices = prices.filter(near)
       overlay.set(zones, vlines, autoscalePrices)
     })()
     return () => { cancelled = true }
