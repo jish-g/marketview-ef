@@ -31,6 +31,36 @@ export const SEED_FAQ: FaqItem[] = [
   },
 ]
 
+// Shared between the live /global-cues-today page and each archived /global-cues-today/[date]
+// page, same reasoning as SEED_FAQ above: the visible text and the FAQPage JSON-LD must match.
+export const GLOBAL_CUES_FAQ: FaqItem[] = [
+  {
+    question: 'What is the GIFT Nifty gap?',
+    answer:
+      'GIFT Nifty is Nifty 50 futures traded in Gujarat, hours before India’s exchanges open. Its move relative to Nifty’s prior close is read as the market’s implied opening gap.',
+  },
+  {
+    question: 'What do FII and DII flows mean?',
+    answer:
+      'FII (foreign institutional investors) and DII (domestic institutional investors) net cash flows show whether foreign or domestic money was buying or selling Indian equities that session.',
+  },
+  {
+    question: 'What does "transmission" mean on this page?',
+    answer:
+      'How strongly a global move is actually reaching Indian markets that day, measured against the 20-session historical correlation between Nifty’s daily move and the prior US session.',
+  },
+  {
+    question: 'How is the Global and India read calculated?',
+    answer:
+      'A deterministic engine scores about 25 free market instruments (US and Asian indices, crude, gold, yields, the dollar) plus India’s own breadth, options positioning and institutional flows. A language model only writes the plain-English explanation of those scores, and every sentence is checked against the underlying figures before it publishes.',
+  },
+  {
+    question: 'How often does this page update?',
+    answer:
+      'Roughly every 15 minutes while Indian markets are open, and hourly otherwise. The explanation itself is only rewritten when the picture actually changes.',
+  },
+]
+
 export function faqJsonLd(items: FaqItem[]) {
   return {
     '@context': 'https://schema.org',

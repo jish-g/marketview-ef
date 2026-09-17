@@ -65,7 +65,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     })),
     { url: `${SITE_URL}/fii-dii-data-today`, lastModified: postmarketLastModified, changeFrequency: 'daily', priority: 0.7 },
+    { url: `${SITE_URL}/global-cues-today`, changeFrequency: 'always', priority: 0.85 },
+    { url: `${SITE_URL}/global-cues-today/archive`, changeFrequency: 'daily', priority: 0.4 },
   ]
+
+  let globalCuesEntries: MetadataRoute.Sitemap = []
+  try {
+    const { data } = await supabase
+      .from('global_cues_daily')
+      .select('slug, trade_date')
+      .order('trade_date', { ascending: false })
+      .limit(1000)
+
+    globalCuesEntries = ((data ?? []) as { slug: string; trade_date: string }[]).map((row) => ({
+      url: `${SITE_URL}/global-cues-today/${row.slug}`,
+      lastModified: new Date(row.trade_date),
+      changeFrequency: 'never' as const,
+      priority: 0.65,
+    }))
+  } catch {
+    // Same fallback as blog_posts below -- a briefly unreachable table serves a smaller sitemap,
+    // not a broken one.
+  }
 
   let postEntries: MetadataRoute.Sitemap = []
   try {
@@ -86,5 +107,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // than a broken sitemap -- Google will pick up new posts on a later crawl.
   }
 
-  return [...staticEntries, ...postEntries]
+  return [...staticEntries, ...globalCuesEntries, ...postEntries]
 }

@@ -359,6 +359,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           <h2 className="eyebrow">Today's numbers</h2>
           <p className="landing-body-text">Live, single-metric reads that update on every checkpoint — each one pulled straight from the same rules engine behind the daily pre-market and post-market calls.</p>
           <div className="landing-evergreen-grid">
+            <Link href="/global-cues-today" className="landing-evergreen-link">Global cues today</Link>
             <Link href="/india-vix-today" className="landing-evergreen-link">India VIX today</Link>
             <Link href="/gift-nifty-today" className="landing-evergreen-link">GIFT Nifty today</Link>
             <Link href="/sensex-option-chain" className="landing-evergreen-link">Sensex option chain</Link>
