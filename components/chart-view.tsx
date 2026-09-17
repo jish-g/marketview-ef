@@ -32,7 +32,10 @@ type VLine = { time: UTCTimestamp; color: string; label?: string }
 class OverlayPrimitive implements ISeriesPrimitive<Time> {
   private zones: Zone[] = []
   private vlines: VLine[] = []
-  private prices: number[] = []
+  // Separate from `zones`/drawing: only the prices within the "keep on screen" rule feed the
+  // autoscale hint. Every zone and vline is always drawn regardless of this list -- a level that
+  // isn't near the last close just doesn't stretch the axis to reach it.
+  private autoscalePrices: number[] = []
   private series: ISeriesApi<'Candlestick'> | null = null
   private chart: IChartApi | null = null
   private requestUpdate: (() => void) | null = null
@@ -68,11 +71,10 @@ class OverlayPrimitive implements ISeriesPrimitive<Time> {
   detached() { this.chart = null; this.series = null; this.requestUpdate = null }
   paneViews() { return [this.view] }
   autoscaleInfo() {
-    const vals = [...this.prices, ...this.zones.flatMap((z) => [z.from, z.to])]
-    if (vals.length === 0) return null
-    return { priceRange: { minValue: Math.min(...vals), maxValue: Math.max(...vals) } }
+    if (this.autoscalePrices.length === 0) return null
+    return { priceRange: { minValue: Math.min(...this.autoscalePrices), maxValue: Math.max(...this.autoscalePrices) } }
   }
-  set(zones: Zone[], vlines: VLine[], prices: number[]) { this.zones = zones; this.vlines = vlines; this.prices = prices; this.requestUpdate?.() }
+  set(zones: Zone[], vlines: VLine[], autoscalePrices: number[]) { this.zones = zones; this.vlines = vlines; this.autoscalePrices = autoscalePrices; this.requestUpdate?.() }
 }
 
 function sessionRead(bars: Bar[], levels: { support?: number; resistance?: number }): string | null {
@@ -354,12 +356,16 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
       }
       priceLinesRef.current = lines
       lineSeriesRef.current = lineSeries
-      // Autoscale keeps nearby levels on screen but never lets a far one (a month-old daily swing)
-      // squash today's candles: only levels within 2% of the last close widen the scale. Far levels
-      // are still drawn; scroll or zoom out to reach them.
+      // Every zone and vline is always drawn -- OI resistance must show up exactly as reliably as
+      // OI support does, whatever the current distance between them and the last close. Autoscale
+      // is the only thing that stays selective: a level within 2% of the last close is allowed to
+      // widen the visible range, so a month-old daily swing can never squash today's candles by
+      // forcing the axis out to reach it. A level further away simply isn't drawn until the user
+      // scrolls or zooms to where it lives.
       const last = bars.length ? bars[bars.length - 1].close : null
       const near = (p: number) => last == null || Math.abs(p - last) / last <= 0.02
-      overlay.set(zones.filter((z) => near(z.from) || near(z.to)), vlines, prices.filter(near))
+      const autoscalePrices = [...prices.filter(near), ...zones.flatMap((z) => [z.from, z.to]).filter(near)]
+      overlay.set(zones, vlines, autoscalePrices)
     })()
     return () => { cancelled = true }
   }, [visibleDrawables, chartReady, bars])
