@@ -1,6 +1,6 @@
 import type { Drawable, IndicatorDef } from '../types'
 import { PALETTE } from '../palette'
-import { previousTradeDate, sessionOpens } from '../series'
+import { previousTradeDate } from '../series'
 import { fmt } from '@/lib/format'
 
 // Intraday: the day-open marker, the previous session's High / Low / Close, and VWAP.
@@ -28,10 +28,11 @@ export const intraday: IndicatorDef = {
     const drawables: Drawable[] = []
     const parts: string[] = []
 
-    // A marker at every session start is useful on intraday bars and noise on 4h / 1d, where a
-    // day is one or two bars anyway.
+    // Just today's open, not every session's: with 30 sessions loaded a mark on each one is a
+    // page of dotted lines, not a landmark. Noise on 4h / 1d too, where a day is one or two bars.
     if (s.open && timeframeMinutes > 0 && timeframeMinutes < 240) {
-      for (const o of sessionOpens(candles)) drawables.push({ kind: 'vline', time: o.time, color: PALETTE.stone, label: o.tradeDate === tradeDate ? '09:15 open' : undefined })
+      const todayOpen = candles.find((c) => c.tradeDate === tradeDate)
+      if (todayOpen) drawables.push({ kind: 'vline', time: todayOpen.bar.time, color: PALETTE.stone, label: '09:15 open' })
     }
 
     const prev = previousTradeDate(candles, tradeDate)
