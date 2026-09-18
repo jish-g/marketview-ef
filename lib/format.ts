@@ -80,6 +80,15 @@ export const fmt = {
     return `${v < 0 ? MINUS : '+'}₹${body}`
   },
 
+  /** Rupees in crores, thousands separator, always signed. Net GEX's sign is a regime
+   *  (long/short gamma), not a gain/loss, but it is still a signed magnitude. `+₹23,169 Cr` */
+  crores(n: number | null | undefined) {
+    if (n == null || Number.isNaN(Number(n))) return 'Not available'
+    const v = Number(n) / 1e7
+    const body = Math.abs(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+    return `${v < 0 ? MINUS : '+'}₹${body} Cr`
+  },
+
   /** Time: 24-hour, always with IST. `08:45 IST` */
   timeIST(value: string | number | Date | null | undefined) {
     if (!value) return null
