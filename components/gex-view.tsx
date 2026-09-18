@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import useSWR from 'swr'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, freshness } from '@/lib/format'
-import { Card, Disclaimer, EmptyState, FreshnessStamp, Label, Metric, Num, PhaseHeader } from '@/components/ui/ds'
+import { Banner, Card, Disclaimer, EmptyState, FreshnessStamp, Label, Metric, Num, PhaseHeader } from '@/components/ui/ds'
 
 // Nifty Gamma Exposure (GEX): presentation only. The marketcue-gex-worker Railway process reads
 // live Kite ticks, computes IV/gamma/GEX itself, and writes the single current row to
@@ -50,12 +50,22 @@ export function GexView() {
   const lowCoverage = coveragePct != null && coveragePct < 60
 
   return (
-    <div className="ds-phase">
+    <div className="ds-stack">
       <PhaseHeader
         eyebrow="Nifty options"
         title="Gamma Exposure"
         aside={data && <FreshnessStamp state={stamp.state} label={stamp.label} capturedAt={data.updated_at} />}
       />
+
+      <Banner tone="info" label="How to read this">
+        Gamma Exposure (GEX) estimates how NSE market-makers may hedge as Nifty moves, based on live options
+        positioning — it is not a price prediction. A positive net GEX (<b>long gamma</b>) means their hedging
+        tends to dampen price swings, a calmer and more range-bound day. A negative net GEX (<b>short gamma</b>)
+        means hedging tends to amplify moves, bigger and faster swings than usual. The <b>zero-gamma flip</b> marks
+        the level where that regime switches. The <b>call wall</b> and <b>put wall</b> are the strikes carrying the
+        heaviest hedging weight on each side, and often act like support or resistance. <b>Peak gamma</b> is
+        whichever single strike carries the most weight overall, on either side.
+      </Banner>
 
       {error && (
         <EmptyState label="GEX" headline="Unavailable" reason="Could not reach the GEX worker's data — try again shortly." />
@@ -71,7 +81,7 @@ export function GexView() {
 
       {data && (
         <>
-          <div className="ds-grid--3">
+          <div className="ds-grid ds-grid--3">
             <Metric label="Spot" value={fmt.level(data.spot)} weight="primary" />
             <Metric label="ATM strike" value={<Num>{fmt.strike(data.atm_strike)}</Num>} />
             <Metric label="Expiry" value={<Num>{data.expiry}</Num>} />
@@ -92,7 +102,7 @@ export function GexView() {
           )}
 
           {!lowCoverage && (
-            <div className="ds-grid--3">
+            <div className="ds-grid ds-grid--3">
               <Metric label="Zero-gamma flip" value={<Num>{fmt.strike(data.flip_strike)}</Num>} sub="Regime pivot level" />
               <Metric label="Call wall" value={<Num>{fmt.strike(data.call_wall_strike)}</Num>} sub="Largest call-side gamma" />
               <Metric label="Put wall" value={<Num>{fmt.strike(data.put_wall_strike)}</Num>} sub="Largest put-side gamma" />
