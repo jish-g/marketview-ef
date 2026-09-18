@@ -28,8 +28,11 @@ export type Drawable =
   | { kind: 'zone'; from: number; to: number; color: string; label: string; alwaysVisible?: boolean }
   /** Vertical marker at a bar time, e.g. the session open. */
   | { kind: 'vline'; time: UTCTimestamp; color: string; label?: string }
-  /** A line traced through points on the price axis, e.g. VWAP. Rendered as its own line series. */
-  | { kind: 'series'; points: { time: UTCTimestamp; value: number }[]; color: string; width?: 1 | 2; label: string }
+  /** A line traced through points on the price axis, e.g. VWAP. Rendered as its own line series.
+   * `priceScaleId`: pin it to a pane other than the main price scale -- 'volume' shares the
+   * existing volume pane (its own scale within that pane, so a cumulative figure like the
+   * CVD-proxy never has to share the candles' price axis). Omit for the default price scale. */
+  | { kind: 'series'; points: { time: UTCTimestamp; value: number }[]; color: string; width?: 1 | 2; label: string; priceScaleId?: 'volume' }
 
 export type SettingField =
   | { type: 'toggle'; key: string; label: string; color?: string; unavailable?: string }
