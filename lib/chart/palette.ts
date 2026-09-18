@@ -9,7 +9,7 @@ export const PALETTE = {
   teal: '#2FC4B2',       // chart levels 1H (and the intraday ramp below)
   blue: '#5B8DEF',       // chart levels 1D
   pink: '#EE6FB0',       // EMA 20 (future)
-  orange: '#F0883E',     // EMA 50 (future)
+  orange: '#F0883E',     // volume profile point of control
   cyan: '#35C6E8',       // VWAP
   periwinkle: '#9AA8E8', // opening range (future)
   olive: '#A9B36B',      // ATR bands (future)

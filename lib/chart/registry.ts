@@ -4,11 +4,12 @@ import { oiWalls } from './indicators/oi-walls'
 import { chartLevels } from './indicators/chart-levels'
 import { pivots } from './indicators/pivots'
 import { volume } from './indicators/volume'
+import { volumeProfile } from './indicators/volume-profile'
 
 // The catalogue. Order is the order in the dialog. To add an indicator: one module in
 // ./indicators, one line here. Duplicate ids or colours are refused at module load so the
 // palette rule cannot erode as the list grows.
-export const INDICATORS: IndicatorDef[] = [intraday, oiWalls, chartLevels, pivots, volume]
+export const INDICATORS: IndicatorDef[] = [intraday, oiWalls, chartLevels, pivots, volume, volumeProfile]
 
 {
   const ids = new Set<string>(), colors = new Set<string>()
