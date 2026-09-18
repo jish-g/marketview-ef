@@ -38,6 +38,28 @@ build regardless of how the hosting environment is configured.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Nifty Gamma Exposure (GEX)
+
+Estimated dealer gamma positioning for Nifty options, shown in its own tab (Chart → **GEX** →
+Mid-market) and again below the existing content on the **Trade** tab. Presentation only here —
+all computation happens in a separate, isolated worker.
+
+**Architecture (three independently deployed pieces):**
+
+| Piece | Where | What it does |
+|---|---|---|
+| Compute worker | [jish-g/marketcue-gex-worker](https://github.com/jish-g/marketcue-gex-worker) (Railway) | Holds a persistent Kite WebSocket connection (the one piece of this stack that needs a long-running process — Supabase Edge Functions and Vercel Functions are both request-scoped and can't hold a socket open for a 6-hour session). Solves implied volatility via Black-Scholes bisection, computes gamma/GEX per strike, derives the zero-gamma flip, call wall, put wall and peak-gamma levels. |
+| Storage | Supabase, table `nifty_gex_current` | A single row (singleton, `id = true`, same pattern as `kite_session`), overwritten every 5s during market hours. Own migration, own RLS read policy (`anon`/`authenticated`) — no other function or table touches it. |
+| Display | [`components/gex-view.tsx`](components/gex-view.tsx) | Polls `nifty_gex_current` via SWR every 5s and renders it, following `app/design-system.css`. No computation happens client-side. |
+
+**Locked scope:** NIFTY 50 only, ±20 strikes around ATM on the nearest weekly expiry. Flip/wall/peak
+levels are withheld below 60% strike coverage rather than publishing an unreliable level on thin
+data.
+
+**Why a separate repo:** everything else in this pipeline (`supabase/functions/*`) is a
+cron-triggered Edge Function — request-scoped, no persistent process. GEX needed one, so it's the
+only piece of MarketCue's stack that isn't Supabase Edge Functions or Vercel.
+
 ## Learn More
 
 To learn more, take a look at the following resources:
