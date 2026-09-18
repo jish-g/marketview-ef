@@ -11,6 +11,7 @@ import { fmt } from '@/lib/format'
 import type { Bar, Candle, Drawable, Instrument, Row, SettingField, Settings } from '@/lib/chart/types'
 import { TIMEFRAMES, type Timeframe, aggregate, tfMinutes } from '@/lib/chart/series'
 import { INDICATORS, byId } from '@/lib/chart/registry'
+import { INDICATOR_SECTIONS } from '@/lib/indicators-content'
 import { type ChartState, defaultState, loadState, saveState } from '@/lib/chart/store'
 
 // ---------------------------------------------------------------------------------------------
@@ -709,13 +710,11 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
       <h3>Indicators</h3>
       <div className="chart-indicators-doc-list">
         {INDICATORS.map((def) => <div className="chart-indicators-doc-item" key={def.id}>
-          <div className="chart-indicators-doc-item-head">
-            <h4>{def.name}</h4>
-            <a href={`/indicators/${def.id}`} target="_blank" rel="noopener noreferrer">Read more <ArrowUpRight size={12} /></a>
-          </div>
-          <p>{def.description}</p>
+          <h4>{def.name}</h4>
+          <p>{INDICATOR_SECTIONS.find((s) => s.id === def.id)?.intro ?? def.description}</p>
         </div>)}
       </div>
+      <a className="chart-indicators-doc-cta" href="/indicators" target="_blank" rel="noopener noreferrer">See the full indicator reference <ArrowUpRight size={13} /></a>
     </div>
   </section>
 }
