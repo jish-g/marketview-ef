@@ -421,10 +421,13 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
         } else if (d.kind === 'vline') {
           vlines.push({ time: d.time, color: d.color, label: d.label })
         } else if (d.kind === 'series') {
-          const ls = chart.addSeries(LineSeries, { color: d.color, lineWidth: d.width ?? 2, lineStyle: LineStyle.Solid, priceLineVisible: true, lastValueVisible: false, title: d.label, crosshairMarkerVisible: false })
+          const ls = chart.addSeries(LineSeries, { color: d.color, lineWidth: d.width ?? 2, lineStyle: LineStyle.Solid, priceLineVisible: !d.priceScaleId, lastValueVisible: false, title: d.label, crosshairMarkerVisible: false, ...(d.priceScaleId ? { priceScaleId: d.priceScaleId } : {}) })
           ls.setData(d.points)
           lineSeries.push(ls)
-          if (d.points.length) prices.push(d.points[d.points.length - 1].value)
+          // A series pinned to another pane's scale (the CVD-proxy on the volume pane) has its
+          // own cumulative magnitude -- feeding it into the main price autoscale would distort the
+          // candle axis for a number that was never a price to begin with.
+          if (d.points.length && !d.priceScaleId) prices.push(d.points[d.points.length - 1].value)
         }
       }
       priceLinesRef.current = lines
@@ -445,18 +448,16 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
     return () => { cancelled = true }
   }, [visibleDrawables, chartReady, bars])
 
-  // Lower pane: shown only while an active indicator supplies bars.
+  // Lower pane: shown while an active indicator supplies bars, or a series (the CVD-proxy) is
+  // pinned to this pane's scale -- either alone is reason enough to keep the pane visible.
+  const hasVolumeScaleSeries = useMemo(() => visibleDrawables.some((d) => d.kind === 'series' && d.priceScaleId === 'volume'), [visibleDrawables])
   useEffect(() => {
     const chart = chartRef.current, vol = volumeSeriesRef.current
     if (!chartReady || !chart || !vol) return
-    if (activeHistogram) {
-      vol.setData(activeHistogram.map((h) => ({ time: h.time, value: h.value, color: h.color })))
-      chart.priceScale('volume').applyOptions({ visible: true })
-    } else {
-      vol.setData([])
-      chart.priceScale('volume').applyOptions({ visible: false })
-    }
-  }, [activeHistogram, chartReady])
+    if (activeHistogram) vol.setData(activeHistogram.map((h) => ({ time: h.time, value: h.value, color: h.color })))
+    else vol.setData([])
+    chart.priceScale('volume').applyOptions({ visible: activeHistogram != null || hasVolumeScaleSeries })
+  }, [activeHistogram, hasVolumeScaleSeries, chartReady])
 
   // Fullscreen prefers the browser API; a CSS fallback pins the frame where it is refused.
   useEffect(() => {
