@@ -11,7 +11,7 @@ export const PALETTE = {
   pink: '#EE6FB0',       // CVD proxy
   orange: '#F0883E',     // volume profile point of control
   cyan: '#35C6E8',       // VWAP
-  periwinkle: '#9AA8E8', // opening range (future)
+  periwinkle: '#9AA8E8', // FII/DII
   olive: '#A9B36B',      // ATR bands (future)
   taupe: '#C4B2A3',      // CPR (future)
   rose: '#D08C9C',       // gap zone (future)

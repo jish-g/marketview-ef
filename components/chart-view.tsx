@@ -215,6 +215,27 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
   )
   useEffect(() => { setFuturesCandles(fetchedFutures ?? []) }, [fetchedFutures])
 
+  // Most recent FII/DII cash-market net flow on record -- a daily, end-of-day pipeline figure
+  // (market-data-sync's post-fii phase), already written to postmarket_summary; this only reads
+  // it. Not keyed to tradeDate: the latest row on or before today is whatever's actually current,
+  // since post-fii runs at day's end and the underlying data itself can lag its own trade_date.
+  const { data: fetchedPostmarket } = useSWR(
+    ['postmarket-summary', tradeDate],
+    async () => {
+      const { data, error } = await supabase.from('postmarket_summary')
+        .select('fii_net_cash_cr, dii_net_cash_cr, fii_dii_data_date')
+        .lte('trade_date', tradeDate).order('trade_date', { ascending: false }).limit(1).maybeSingle()
+      if (error) throw error
+      return data
+    },
+    { revalidateOnFocus: false },
+  )
+  const postmarketSummary = useMemo(() => fetchedPostmarket ? {
+    fiiNetCr: fetchedPostmarket.fii_net_cash_cr != null ? Number(fetchedPostmarket.fii_net_cash_cr) : null,
+    diiNetCr: fetchedPostmarket.dii_net_cash_cr != null ? Number(fetchedPostmarket.dii_net_cash_cr) : null,
+    dataDate: fetchedPostmarket.fii_dii_data_date ? String(fetchedPostmarket.fii_dii_data_date) : null,
+  } : null, [fetchedPostmarket])
+
   // Live updates for the current trading date only. index-candle-sync writes one-minute Kite
   // candles into Supabase and Realtime delivers those inserts and updates straight here.
   useEffect(() => {
@@ -251,7 +272,7 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
   const todayBars = useMemo(() => aggregate(candles.filter((c) => c.tradeDate === tradeDate).map((c) => c.bar), minutes), [candles, tradeDate, minutes])
 
   const results = useMemo(() => {
-    const ctx = { candles, futuresCandles, tradeDate, instrument, row, colors, timeframeMinutes: minutes }
+    const ctx = { candles, futuresCandles, tradeDate, instrument, row, colors, timeframeMinutes: minutes, postmarketSummary }
     const out: Record<string, ReturnType<typeof INDICATORS[number]['compute']>> = {}
     for (const id of state.active) {
       const def = byId(id)
@@ -259,7 +280,7 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
       try { out[id] = def.compute(ctx, state.settings[id] ?? def.defaults) } catch { out[id] = { drawables: [], summary: 'could not compute' } }
     }
     return out
-  }, [candles, futuresCandles, tradeDate, instrument, row, colors, minutes, state.active, state.settings])
+  }, [candles, futuresCandles, tradeDate, instrument, row, colors, minutes, postmarketSummary, state.active, state.settings])
 
   const visibleDrawables = useMemo(() => {
     const hidden = new Set(state.hidden)
