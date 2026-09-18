@@ -1,0 +1,79 @@
+// The chart indicators reference -- one section per shipped indicator in lib/chart/indicators/*.ts,
+// shared between /indicators (visible page) and the short in-chart blurb (components/chart-view.tsx).
+// Keep this in sync with each indicator's actual compute() logic; it documents what is implemented,
+// not an aspiration.
+export const INDICATOR_SECTIONS = [
+  {
+    id: 'intraday',
+    title: '1. Intraday — Day Open, Previous Day Levels & VWAP',
+    intro:
+      "A dotted marker at today's 09:15 IST session open (intraday timeframes only, hidden on 4H and 1D where a day is one or two bars), the previous session's High, Low and Close, and VWAP. Since NIFTY and SENSEX are indices and carry no real traded volume, VWAP is computed from the current-month futures contract instead and labelled \"VWAP · futures\" -- it restarts at 09:15 each session.",
+    columns: ['Element', 'Source', 'Notes'],
+    rows: [
+      ['Day open', "Today's first loaded candle", 'Intraday timeframes only'],
+      ['Prev day High / Low / Close', 'Previous session’s candles (or the dashboard row if no prior session is loaded)', 'Amber, dashed for High/Low, dotted for Close'],
+      ['VWAP', 'Cumulative volume-weighted typical price of the current-month futures contract', 'Off until at least one futures candle for today exists'],
+    ],
+  },
+  {
+    id: 'oiwalls',
+    title: '2. OI Walls — Support, Resistance & Max Pain',
+    intro:
+      "Support and resistance zones from the options chain, and max pain, read from the pre-market dashboard row. Each wall is a strike ± half a strike step, scaled by a configurable band width so the zone can be widened or collapsed to a single line. A wall further than 2% from the last close still draws in full -- it just stops stretching the price axis, showing instead as a small pinned arrow and price at the edge of the pane, so it never costs the candles' readability.",
+    columns: ['Instrument', 'Strike step', 'Zone width'],
+    rows: [
+      ['NIFTY', '50 points', 'Band % × 50, centred on the strike'],
+      ['SENSEX', '100 points', 'Band % × 100, centred on the strike'],
+    ],
+  },
+  {
+    id: 'levels',
+    title: '3. Chart Levels — Swing Support & Resistance',
+    intro:
+      'For each enabled timeframe, the loaded candles are aggregated to that timeframe and scanned for swing highs and lows -- a bar whose high (or low) beats every bar within a configurable number of bars on either side. The nearest swing above the last price draws as resistance, the nearest below as support, one or two levels per side. Every timeframe is its own independent switch, so any combination -- 1H with 1D, or 4H with 30m -- is available at once.',
+    columns: ['Setting', 'Range', 'Default'],
+    rows: [
+      ['Timeframes', '5m, 15m, 30m, 1H, 4H, 1D', '1H and 1D'],
+      ['Swing width', '2–8 bars each side', '4 bars'],
+      ['Levels per side', '1 or 2', '1'],
+    ],
+  },
+  {
+    id: 'pivots',
+    title: '4. Pivots — Pre-Market Support & Resistance',
+    intro:
+      "The chart's own pivot support and resistance, computed once before the market opens and read directly from the dashboard row -- the same figures the Verdict screen uses. Off by default.",
+    columns: ['Element', 'Source'],
+    rows: [['Pivot support / resistance', 'Pre-market dashboard row, computed before open']],
+  },
+  {
+    id: 'volume',
+    title: '5. Volume — Futures Volume by Bar',
+    intro:
+      'A lower-pane histogram of volume per bar. NIFTY and SENSEX candles carry no volume of their own -- these bars are the current-month futures contract, aggregated to the chart’s own timeframe and coloured by that bar’s own direction, always labelled as futures volume rather than index volume.',
+    columns: ['Element', 'Source', 'Notes'],
+    rows: [['Volume bars', 'Current-month futures contract', 'Hidden until a futures candle for today exists']],
+  },
+  {
+    id: 'volumeprofile',
+    title: '6. Volume Profile — Point of Control',
+    intro:
+      "Every other volume view on this chart aggregates by time; this aggregates the same futures volume by price instead. Each 1-minute bar's volume is spread evenly across every price bucket its high-low range touches -- the standard approximation for a volume profile when only open/high/low/close/volume is available, not individual trades. The Point of Control is the bucket that received the most volume: the price the market actually did the most business at, a different read from VWAP (an average) or the day's high/low (extremes).",
+    columns: ['Instrument', 'Bucket size', 'Period'],
+    rows: [
+      ['NIFTY', '25 points', 'Day or week, toggled in settings'],
+      ['SENSEX', '50 points', 'Day or week, toggled in settings'],
+    ],
+  },
+  {
+    id: 'cvdproxy',
+    title: '7. CVD (proxy) — Approximate Order Flow',
+    intro:
+      "Zerodha's Kite Connect API exposes one-minute candles, not individual trades with a buyer or seller side, so genuine order flow cannot be read directly. This approximates it: for each bar, where the close sits within that bar's own high-low range -- weighted by the bar's futures volume -- estimates whether the bar leaned toward buying or selling pressure. Summed running through the session, it becomes a proxy Cumulative Volume Delta line, sharing the volume pane on its own scale since its cumulative value was never a price. The number itself matters less than its direction relative to price -- a new price high the proxy does not confirm is the signal worth noticing, not the absolute level.",
+    columns: ['Element', 'Formula', 'Notes'],
+    rows: [
+      ['Per-bar delta', '((close − low) − (high − close)) ÷ (high − low) × volume', 'Futures volume; zero when the bar has no range or no volume'],
+      ['CVD-proxy line', 'Running sum of the per-bar delta, reset each session at 09:15', 'Shares the volume pane’s own scale'],
+    ],
+  },
+]

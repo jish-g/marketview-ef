@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
+import { ArrowUpRight } from 'lucide-react'
 import type { IChartApi, IPriceLine, IPrimitivePaneRenderer, IPrimitivePaneView, ISeriesApi, ISeriesPrimitive, SeriesAttachedParameter, Time, UTCTimestamp } from 'lightweight-charts'
 import { createClient } from '@/lib/supabase/client'
 import { useChartColors } from '@/hooks/use-chart-colors'
@@ -682,6 +683,17 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
     </p>
 
     <Disclaimer source="Zerodha Kite Connect" capturedAt={lastCandleAt ? fmt.timeIST(lastCandleAt) : null} />
+
+    <div className="chart-indicators-doc">
+      <h3>Indicators</h3>
+      <div className="chart-indicators-doc-list">
+        {INDICATORS.map((def) => <div className="chart-indicators-doc-item" key={def.id}>
+          <h4>{def.name}</h4>
+          <p>{def.description}</p>
+          <a href={`/indicators#${def.id}`} target="_blank" rel="noopener noreferrer">Read detail <ArrowUpRight size={12} /></a>
+        </div>)}
+      </div>
+    </div>
   </section>
 }
 
