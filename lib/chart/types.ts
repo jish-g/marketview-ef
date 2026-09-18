@@ -53,6 +53,11 @@ export type IndicatorContext = {
   colors: ChartColors
   /** Minutes per bar on screen; 0 means one bar per session. Lets an indicator adapt its density. */
   timeframeMinutes: number
+  /** The most recent post-market FII/DII cash-market net flow on record, from `postmarket_summary`
+   * (a daily, end-of-day pipeline figure -- not intraday). `dataDate` is the date the flow figures
+   * actually describe, which can lag `tradeDate` by several days depending on when the upstream
+   * source publishes it; null until the pipeline has written at least one row. */
+  postmarketSummary: { fiiNetCr: number | null; diiNetCr: number | null; dataDate: string | null } | null
 }
 
 export type HistogramPoint = { time: UTCTimestamp; value: number; color: string }

@@ -76,4 +76,15 @@ export const INDICATOR_SECTIONS = [
       ['CVD-proxy line', 'Running sum of the per-bar delta, reset each session at 09:15', 'Shares the volume pane’s own scale'],
     ],
   },
+  {
+    id: 'fiidii',
+    title: '8. FII / DII — Cash Market Net Flow',
+    intro:
+      "The most recent FII and DII cash-market net flow on record, read from the daily post-market pipeline job. Unlike every other indicator on this chart, it draws nothing -- it's a legend-only line, because it isn't a price level and isn't an intraday signal. It's a slow, end-of-day figure, and the underlying data itself can lag by several days depending on when the upstream source publishes it, which is why the data date is always shown alongside the numbers rather than implying it's today's flow. Read it as regime context -- who's been net buying or selling the cash market lately -- not as something to react to bar by bar.",
+    columns: ['Element', 'Source', 'Notes'],
+    rows: [
+      ['FII / DII net (₹cr)', "market-data-sync's daily post-fii phase, ~8pm IST", 'Cash market (NSE_EQ), not derivatives'],
+      ['Data date', 'The date the flow figures actually describe', 'Can lag the pipeline’s own run date by several days'],
+    ],
+  },
 ]
