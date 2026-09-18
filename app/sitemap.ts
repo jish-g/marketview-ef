@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { createClient } from '@supabase/supabase-js'
+import { INDICATOR_SECTIONS } from '@/lib/indicators-content'
 
 // Auto-generated sitemap, served at /sitemap.xml by Next.js's built-in convention
 // (this file is picked up automatically -- no route registration needed).
@@ -77,6 +78,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/`, changeFrequency: 'daily', priority: 1 },
     { url: `${SITE_URL}/nifty-sensex-today`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${SITE_URL}/rules`, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${SITE_URL}/indicators`, changeFrequency: 'monthly', priority: 0.5 },
+    // Static content (lib/indicators-content.ts), not Supabase-backed -- no try/catch needed.
+    ...INDICATOR_SECTIONS.map((s) => ({ url: `${SITE_URL}/indicators/${s.id}`, changeFrequency: 'monthly' as const, priority: 0.4 })),
     { url: `${SITE_URL}/about`, changeFrequency: 'monthly', priority: 0.3 },
     { url: `${SITE_URL}/how-it-works`, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${SITE_URL}/disclaimer`, changeFrequency: 'yearly', priority: 0.2 },

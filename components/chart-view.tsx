@@ -709,9 +709,11 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
       <h3>Indicators</h3>
       <div className="chart-indicators-doc-list">
         {INDICATORS.map((def) => <div className="chart-indicators-doc-item" key={def.id}>
-          <h4>{def.name}</h4>
+          <div className="chart-indicators-doc-item-head">
+            <h4>{def.name}</h4>
+            <a href={`/indicators/${def.id}`} target="_blank" rel="noopener noreferrer">Read more <ArrowUpRight size={12} /></a>
+          </div>
           <p>{def.description}</p>
-          <a href={`/indicators#${def.id}`} target="_blank" rel="noopener noreferrer">Read detail <ArrowUpRight size={12} /></a>
         </div>)}
       </div>
     </div>
