@@ -7,6 +7,7 @@ import useSWR from 'swr'
 import { CheckCircle2, ArrowDown, RotateCcw } from 'lucide-react'
 import { calculateVerdict } from '@/app/dashboard/page'
 import { createClient } from '@/lib/supabase/client'
+import { GexView } from '@/components/gex-view'
 
 type Row = Record<string, string | number | boolean | null>
 type Instrument = 'NIFTY' | 'SENSEX'
@@ -328,5 +329,6 @@ export function TradeView() {
       </table></div>}
     </section>
     <Disclaimer capturedAt={fmt.timeIST(new Date())} />
+    <GexView />
   </section>
 }
