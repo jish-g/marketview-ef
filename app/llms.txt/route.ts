@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { INDICATOR_SECTIONS } from '@/lib/indicators-content'
 
 export const revalidate = 300
 
@@ -53,7 +54,12 @@ MarketCue publishes descriptive market reads for the Nifty 50 and Sensex indices
 - [Nifty & Sensex Today](${SITE_URL}/nifty-sensex-today): Full archive of daily pre-market and post-market reads.
 - [How MarketCue works](${SITE_URL}/how-it-works): How the intelligence layer reads a day -- the pre-open read, the 09:35 view of record, hourly checkpoints against its own invalidation, the grade after the close.
 - [The playbook](${SITE_URL}/rules): The weighted rules the intelligence layer is trained on; every view starts here and departures are stated.
+- [Chart indicators](${SITE_URL}/indicators): What every indicator on the live chart draws and how it's computed.
 - [Disclaimer](${SITE_URL}/disclaimer): What MarketCue is and is not. Not investment advice.
+
+## Chart indicators
+
+${INDICATOR_SECTIONS.map((s) => `- [${s.title.replace(/^\d+\. /, '')}](${SITE_URL}/indicators/${s.id}): ${s.intro.length > 120 ? `${s.intro.slice(0, 117)}...` : s.intro}`).join('\n')}
 
 ## Today's numbers
 

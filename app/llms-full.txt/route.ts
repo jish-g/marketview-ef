@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { rulesAsPlainText } from '@/lib/rules-content'
+import { indicatorsAsPlainText } from '@/lib/indicators-content'
 
 export const revalidate = 300
 
@@ -94,6 +95,10 @@ Each page states the current reading, what the reading means, and which part of 
 ## Playbook methodology (what the intelligence layer is trained on)
 
 ${rulesAsPlainText()}
+
+## Chart indicators (what the live chart draws and how it's computed)
+
+${indicatorsAsPlainText()}
 
 ## Archive index (trade_date, phase, title, url)
 

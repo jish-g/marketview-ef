@@ -1,7 +1,8 @@
 // The chart indicators reference -- one section per shipped indicator in lib/chart/indicators/*.ts,
-// shared between /indicators (visible page) and the short in-chart blurb (components/chart-view.tsx).
-// Keep this in sync with each indicator's actual compute() logic; it documents what is implemented,
-// not an aspiration.
+// shared between /indicators/[slug] (visible pages), the short in-chart blurb
+// (components/chart-view.tsx), and the AI-SEO plain-text exports (llms.txt, llms-full.txt).
+// Keep this in sync with each indicator's actual compute() logic; it documents what is
+// implemented, not an aspiration.
 export const INDICATOR_SECTIONS = [
   {
     id: 'intraday',
@@ -88,3 +89,16 @@ export const INDICATOR_SECTIONS = [
     ],
   },
 ]
+
+// Markdown rendering of the above, used by /llms-full.txt -- mirrors lib/rules-content.ts's
+// rulesAsPlainText() so the two AI-SEO exports read consistently.
+export function indicatorsAsPlainText(): string {
+  const sectionText = INDICATOR_SECTIONS.map((s) => {
+    const header = `| ${s.columns.join(' | ')} |`
+    const divider = `| ${s.columns.map(() => '---').join(' | ')} |`
+    const rows = s.rows.map((r) => `| ${r.join(' | ')} |`).join('\n')
+    return `## ${s.title}\n\n${s.intro}\n\n${header}\n${divider}\n${rows}`
+  }).join('\n\n')
+
+  return `What each indicator on the MarketCue chart draws and how it's computed. No indicator here reads more into the market than its own note says; see /rules for the separate scoring methodology the pre-market and post-market reads are trained on.\n\n${sectionText}`
+}
