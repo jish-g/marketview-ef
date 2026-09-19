@@ -1,96 +1,46 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Banner, Disclaimer } from '@/components/ui/ds'
+import useSWR from 'swr'
+import { Banner, Disclaimer, EmptyState } from '@/components/ui/ds'
+import { createClient } from '@/lib/supabase/client'
 import { useChartColors } from '@/hooks/use-chart-colors'
 import { PALETTE } from '@/lib/chart/palette'
 import { fmt } from '@/lib/format'
 import type { Instrument } from '@/lib/chart/types'
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
-// Frontend-only pass: reads no table yet. `oi_snapshot_log` (see
-// supabase/migrations/20260918090000_oi_snapshot_log.sql) already exists and is being written by
-// the 1-min cron, so wiring this up later is a straight swap -- replace MOCK_SESSIONS with a
-// useSWR query keyed on [instrument, trade_date] selecting
-// captured_at, pcr, max_pain, oi_support, oi_resistance, oi_support_change, oi_resistance_change
-// ordered by captured_at, same shape as the rows below. The "Session read" paragraphs are a
-// second, separate backend (an LLM call over those figures) and stay as placeholder copy until
-// that lands -- everything else on this screen is real-shaped sample data, not invented numbers.
+// Reads oi_snapshot_log's 1-min PCR/max-pain/OI-support-resistance history for today, for the
+// selected instrument. This is the real swap the earlier sample-data version (PR #177) was built
+// to make: same shapes, same components, now sourced from the live pipeline instead of
+// MOCK_SESSIONS. The "Session read" narrative paragraphs from that version are deliberately
+// dropped, not replaced with new placeholder copy -- that prose was written to match specific
+// fabricated numbers, and fabricated narrative next to real figures would misrepresent live
+// data. It comes back once the actual narrative backend (a separate LLM call over these figures)
+// ships; until then the chart and event list speak for themselves.
 
 type ChangeAction = 'Addition' | 'Unwinding' | 'Flat'
 
 type SnapshotPoint = {
   time: string // HH:mm IST
-  pcr: number
-  maxPain: number
-  support: number
-  resistance: number
+  pcr: number | null
+  maxPain: number | null
+  support: number | null
+  resistance: number | null
   supportChange: ChangeAction
   resistanceChange: ChangeAction
 }
 
-type SessionMock = {
-  points: SnapshotPoint[]
-  reads: { pcr: string[]; sr: string[]; events: string[] }
+function todayIST() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 }
 
-const MOCK_SESSIONS: Record<Instrument, SessionMock> = {
-  NIFTY: {
-    points: [
-      { time: '09:15', pcr: 0.94, maxPain: 24700, support: 24500, resistance: 24850, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '10:00', pcr: 1.00, maxPain: 24700, support: 24500, resistance: 24850, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '10:45', pcr: 1.05, maxPain: 24700, support: 24550, resistance: 24850, supportChange: 'Addition', resistanceChange: 'Flat' },
-      { time: '11:30', pcr: 1.02, maxPain: 24700, support: 24550, resistance: 24850, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '12:15', pcr: 1.10, maxPain: 24700, support: 24550, resistance: 24800, supportChange: 'Flat', resistanceChange: 'Unwinding' },
-      { time: '13:00', pcr: 1.08, maxPain: 24750, support: 24550, resistance: 24800, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '13:45', pcr: 1.14, maxPain: 24750, support: 24600, resistance: 24800, supportChange: 'Addition', resistanceChange: 'Flat' },
-      { time: '14:30', pcr: 1.12, maxPain: 24750, support: 24600, resistance: 24800, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '15:15', pcr: 1.19, maxPain: 24750, support: 24600, resistance: 24800, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '15:30', pcr: 1.18, maxPain: 24750, support: 24600, resistance: 24800, supportChange: 'Flat', resistanceChange: 'Flat' },
-    ],
-    reads: {
-      pcr: [
-        'Put-call ratio opened the session at 0.94 and has climbed steadily since, last printing 1.18 — a shift toward put-side positioning relative to calls, most of it building after 12:00.',
-        'Max pain held at 24,700 through the first half of the session, then stepped once to 24,750 at 12:45 and has not moved since — one checkpoint change in an otherwise flat max-pain day.',
-      ],
-      sr: [
-        'Support has stepped up twice today: 24,500 to 24,550 at 09:40, then 24,550 to 24,600 at 13:15, both tagged Addition — fresh OI building at each new level rather than the strike simply rolling.',
-        'Resistance moved once, from 24,850 to 24,800 at 12:30, tagged Unwinding — OI came off the higher strike rather than a new wall forming below it. This describes where OI sits; it is not a signal to act on.',
-      ],
-      events: [
-        'Six checkpoints logged since the open: two Addition events at support, one Unwinding event at resistance, and the rest confirming the levels held between moves.',
-        "The session's shape so far is a small number of discrete steps rather than continuous drift — each change happened at one minute and then held, which is what the chart above is drawing.",
-      ],
-    },
-  },
-  SENSEX: {
-    points: [
-      { time: '09:15', pcr: 0.97, maxPain: 80400, support: 80200, resistance: 80800, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '10:00', pcr: 0.95, maxPain: 80400, support: 80200, resistance: 80800, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '10:45', pcr: 0.93, maxPain: 80400, support: 80200, resistance: 80800, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '11:30', pcr: 0.96, maxPain: 80600, support: 80200, resistance: 80800, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '12:15', pcr: 0.92, maxPain: 80600, support: 80200, resistance: 80800, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '13:00', pcr: 0.90, maxPain: 80600, support: 80200, resistance: 80800, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '13:45', pcr: 0.89, maxPain: 80600, support: 80200, resistance: 80800, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '14:30', pcr: 0.91, maxPain: 80600, support: 80200, resistance: 81000, supportChange: 'Flat', resistanceChange: 'Addition' },
-      { time: '15:15', pcr: 0.90, maxPain: 80600, support: 80200, resistance: 81000, supportChange: 'Flat', resistanceChange: 'Flat' },
-      { time: '15:30', pcr: 0.91, maxPain: 80600, support: 80200, resistance: 81000, supportChange: 'Flat', resistanceChange: 'Flat' },
-    ],
-    reads: {
-      pcr: [
-        'Put-call ratio opened at 0.97 and has eased through the session to 0.91 — a modest drift toward call-side activity, not a sharp move.',
-        'Max pain stepped from 80,400 to 80,600 once, at 11:20, and has held there since — the only checkpoint change in an otherwise flat max-pain session.',
-      ],
-      sr: [
-        'Support has not moved today: 80,200 has held flat at every checkpoint since the open. Resistance came in once, stepping from 80,800 to 81,000 at 14:05, tagged Addition.',
-        'Unlike a session where both levels move, only resistance has shifted here — and it moved outward, not inward. This describes where OI sits; it is not a signal to act on.',
-      ],
-      events: [
-        'Six checkpoints logged since the open, but only one strike-level change: resistance stepping to 81,000 at 14:05, tagged Addition. Support held Flat across the rest of the session.',
-        "The max-pain shift at 11:20 is logged separately since it isn't a support/resistance change — it's tracked on this same timeline for context, not as a level move.",
-      ],
-    },
-  },
+function timeIST(iso: string) {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso))
+}
+
+function asChange(v: string | null): ChangeAction {
+  return v === 'Addition' || v === 'Unwinding' ? v : 'Flat'
 }
 
 function actionTone(action: ChangeAction): 'up' | 'down' | 'flat' {
@@ -107,7 +57,7 @@ function buildEvents(points: SnapshotPoint[]) {
     if (cur.resistance !== prev.resistance) out.push({ time: cur.time, level: 'Resistance', strike: `${fmt.strike(prev.resistance)} → ${fmt.strike(cur.resistance)}`, change: cur.resistanceChange })
   }
   out.reverse()
-  out.push({ time: points[0].time, level: 'Session open', strike: `S ${fmt.strike(points[0].support)} · R ${fmt.strike(points[0].resistance)}`, change: 'Flat' })
+  if (points.length) out.push({ time: points[0].time, level: 'Session open', strike: `S ${fmt.strike(points[0].support)} · R ${fmt.strike(points[0].resistance)}`, change: 'Flat' })
   return out
 }
 
@@ -117,28 +67,40 @@ function ChangeTag({ change }: { change: ChangeAction }) {
   return <span className={`oi-change-tag oi-change-tag--${tone}`}><i aria-hidden="true">{tone === 'up' ? '▲' : '▼'}</i>{change}</span>
 }
 
-function SessionRead({ paragraphs }: { paragraphs: string[] }) {
-  return (
-    <div className="oi-read">
-      <p className="oi-read-label">Session read</p>
-      {paragraphs.map((p, i) => <p key={i}>{p}</p>)}
-      <p className="oi-read-foot">Written from the figures in this panel only — nothing here is generated independent of the data above. Sample copy: the narrative backend isn't connected yet.</p>
-    </div>
-  )
-}
-
 export function OiHistoryView() {
   const [instrument, setInstrument] = useState<Instrument>('NIFTY')
   const colors = useChartColors()
-  const session = MOCK_SESSIONS[instrument]
-  const points = session.points
+  const supabase = createClient()
+  const tradeDate = todayIST()
 
-  const latest = points[points.length - 1]
+  const { data, isLoading } = useSWR(
+    ['oi-snapshot-log', instrument, tradeDate],
+    async () => {
+      const { data: rows, error } = await supabase.from('oi_snapshot_log')
+        .select('captured_at, pcr, max_pain, oi_support, oi_resistance, oi_support_change, oi_resistance_change')
+        .eq('instrument', instrument).eq('trade_date', tradeDate)
+        .order('captured_at', { ascending: true })
+      if (error) throw error
+      return (rows ?? []).map((r): SnapshotPoint => ({
+        time: timeIST(r.captured_at as string),
+        pcr: r.pcr != null ? Number(r.pcr) : null,
+        maxPain: r.max_pain != null ? Number(r.max_pain) : null,
+        support: r.oi_support != null ? Number(r.oi_support) : null,
+        resistance: r.oi_resistance != null ? Number(r.oi_resistance) : null,
+        supportChange: asChange(r.oi_support_change as string | null),
+        resistanceChange: asChange(r.oi_resistance_change as string | null),
+      }))
+    },
+    { revalidateOnFocus: false, refreshInterval: 60_000 },
+  )
+
+  const points = data ?? []
   const first = points[0]
+  const latest = points[points.length - 1]
   const events = useMemo(() => buildEvents(points), [points])
 
-  const pcrDelta = latest.pcr - first.pcr
-  const maxPainMoved = latest.maxPain !== first.maxPain
+  const pcrDelta = first && latest && first.pcr != null && latest.pcr != null ? latest.pcr - first.pcr : null
+  const maxPainMoved = first && latest ? latest.maxPain !== first.maxPain : false
   const supportEvent = [...events].reverse().find((e) => e.level === 'Support')
   const resistanceEvent = [...events].reverse().find((e) => e.level === 'Resistance')
 
@@ -165,93 +127,102 @@ export function OiHistoryView() {
         not a price prediction or a trade signal.
       </Banner>
 
-      <div className="oi-card">
-        <div className="oi-tile-grid">
-          <div className="oi-tile">
-            <span className="oi-tile-label">PCR</span>
-            <strong className="oi-tile-value">{fmt.ratio(latest.pcr)}</strong>
-            <span className={`oi-tile-sub ${pcrDelta === 0 ? '' : pcrDelta > 0 ? 'positive' : 'negative'}`}>
-              {pcrDelta === 0 ? 'Flat since open' : `${pcrDelta > 0 ? '+' : '−'}${Math.abs(pcrDelta).toFixed(2)} since open`}
-            </span>
-          </div>
-          <div className="oi-tile">
-            <span className="oi-tile-label">Max pain</span>
-            <strong className="oi-tile-value">{fmt.strike(latest.maxPain)}</strong>
-            <span className="oi-tile-sub">{maxPainMoved ? `Was ${fmt.strike(first.maxPain)} at open` : 'Unchanged since open'}</span>
-          </div>
-          <div className="oi-tile">
-            <span className="oi-tile-label">OI support</span>
-            <strong className="oi-tile-value">{fmt.strike(latest.support)}</strong>
-            <span className={`oi-tile-sub ${actionTone(supportEvent?.change ?? 'Flat') === 'flat' ? '' : actionTone(supportEvent?.change ?? 'Flat') === 'up' ? 'positive' : 'negative'}`}>
-              {supportEvent ? `${supportEvent.change} · ${supportEvent.time}` : 'Flat since open'}
-            </span>
-          </div>
-          <div className="oi-tile">
-            <span className="oi-tile-label">OI resistance</span>
-            <strong className="oi-tile-value">{fmt.strike(latest.resistance)}</strong>
-            <span className={`oi-tile-sub ${actionTone(resistanceEvent?.change ?? 'Flat') === 'flat' ? '' : actionTone(resistanceEvent?.change ?? 'Flat') === 'up' ? 'positive' : 'negative'}`}>
-              {resistanceEvent ? `${resistanceEvent.change} · ${resistanceEvent.time}` : 'Flat since open'}
-            </span>
-          </div>
+      {isLoading ? null : points.length === 0 ? (
+        <div className="oi-card">
+          <EmptyState
+            label="OI History"
+            headline="No snapshots for today yet"
+            reason="oi-snapshot-log logs every minute during market hours (09:15–15:30 IST) — check back once the session is live."
+          />
         </div>
-      </div>
-
-      <div className="oi-card">
-        <div className="oi-card-head"><h3>PCR &amp; max pain — full session</h3><span className="oi-group-range">09:15 – 15:30 IST</span></div>
-        <ResponsiveContainer width="100%" height={160}>
-          <LineChart data={points} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
-            <XAxis dataKey="time" stroke={colors.faint} fontSize={10} tickLine={false} axisLine={{ stroke: colors.rule }} interval="preserveStartEnd" />
-            <YAxis yAxisId="pcr" stroke={colors.faint} fontSize={10} tickLine={false} axisLine={false} width={32} domain={['dataMin - 0.08', 'dataMax + 0.08']} />
-            <YAxis yAxisId="mp" orientation="right" stroke={colors.faint} fontSize={10} tickLine={false} axisLine={false} width={54} domain={['dataMin - 60', 'dataMax + 60']} />
-            <Tooltip contentStyle={{ background: colors.surface, border: `1px solid ${colors.rule}`, borderRadius: 8, fontSize: 12 }} labelStyle={{ color: colors.faint }} />
-            <Line yAxisId="pcr" type="monotone" dataKey="pcr" name="PCR" stroke={colors.caution} strokeWidth={2} dot={false} isAnimationActive={false} />
-            <Line yAxisId="mp" type="stepAfter" dataKey="maxPain" name="Max pain" stroke={PALETTE.violet} strokeWidth={1.5} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
-          </LineChart>
-        </ResponsiveContainer>
-        <div className="oi-legend">
-          <span><i className="oi-swatch" style={{ background: colors.caution }} />PCR</span>
-          <span><i className="oi-swatch oi-swatch--dashed" style={{ borderColor: PALETTE.violet }} />Max pain</span>
-        </div>
-        <SessionRead paragraphs={session.reads.pcr} />
-      </div>
-
-      <div className="oi-card">
-        <div className="oi-card-head"><h3>OI support / resistance — full session</h3><span className="oi-group-range">strike, ₹</span></div>
-        <ResponsiveContainer width="100%" height={160}>
-          <LineChart data={points} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
-            <XAxis dataKey="time" stroke={colors.faint} fontSize={10} tickLine={false} axisLine={{ stroke: colors.rule }} interval="preserveStartEnd" />
-            <YAxis stroke={colors.faint} fontSize={10} tickLine={false} axisLine={false} width={54} domain={['dataMin - 80', 'dataMax + 80']} />
-            <Tooltip contentStyle={{ background: colors.surface, border: `1px solid ${colors.rule}`, borderRadius: 8, fontSize: 12 }} labelStyle={{ color: colors.faint }} />
-            <Line type="stepAfter" dataKey="resistance" name="OI resistance" stroke={colors.down} strokeWidth={2} dot={false} isAnimationActive={false} />
-            <Line type="stepAfter" dataKey="support" name="OI support" stroke={colors.up} strokeWidth={2} dot={false} isAnimationActive={false} />
-          </LineChart>
-        </ResponsiveContainer>
-        <div className="oi-legend">
-          <span><i className="oi-swatch" style={{ background: colors.up }} />OI support</span>
-          <span><i className="oi-swatch" style={{ background: colors.down }} />OI resistance</span>
-          <span><i className="oi-swatch oi-swatch--tri-up" />Addition</span>
-          <span><i className="oi-swatch oi-swatch--tri-down" />Unwinding</span>
-        </div>
-        <SessionRead paragraphs={session.reads.sr} />
-      </div>
-
-      <div className="oi-card">
-        <div className="oi-card-head"><h3>Support / resistance events</h3><span className="oi-group-range">{events.length} today</span></div>
-        <div className="oi-event-list">
-          {events.map((e, i) => (
-            <div className="oi-event-row" key={i}>
-              <span className="oi-event-time">{e.time}<small>IST</small></span>
-              <span>
-                <span className="oi-event-head"><b>{e.level}</b> <span className="ds-num">{e.strike}</span></span>
-                <ChangeTag change={e.change} />
-              </span>
+      ) : (
+        <>
+          <div className="oi-card">
+            <div className="oi-tile-grid">
+              <div className="oi-tile">
+                <span className="oi-tile-label">PCR</span>
+                <strong className="oi-tile-value">{fmt.ratio(latest.pcr)}</strong>
+                <span className={`oi-tile-sub ${pcrDelta == null || pcrDelta === 0 ? '' : pcrDelta > 0 ? 'positive' : 'negative'}`}>
+                  {pcrDelta == null ? '–' : pcrDelta === 0 ? 'Flat since open' : `${pcrDelta > 0 ? '+' : '−'}${Math.abs(pcrDelta).toFixed(2)} since open`}
+                </span>
+              </div>
+              <div className="oi-tile">
+                <span className="oi-tile-label">Max pain</span>
+                <strong className="oi-tile-value">{fmt.strike(latest.maxPain)}</strong>
+                <span className="oi-tile-sub">{maxPainMoved ? `Was ${fmt.strike(first.maxPain)} at open` : 'Unchanged since open'}</span>
+              </div>
+              <div className="oi-tile">
+                <span className="oi-tile-label">OI support</span>
+                <strong className="oi-tile-value">{fmt.strike(latest.support)}</strong>
+                <span className={`oi-tile-sub ${actionTone(supportEvent?.change ?? 'Flat') === 'flat' ? '' : actionTone(supportEvent?.change ?? 'Flat') === 'up' ? 'positive' : 'negative'}`}>
+                  {supportEvent ? `${supportEvent.change} · ${supportEvent.time}` : 'Flat since open'}
+                </span>
+              </div>
+              <div className="oi-tile">
+                <span className="oi-tile-label">OI resistance</span>
+                <strong className="oi-tile-value">{fmt.strike(latest.resistance)}</strong>
+                <span className={`oi-tile-sub ${actionTone(resistanceEvent?.change ?? 'Flat') === 'flat' ? '' : actionTone(resistanceEvent?.change ?? 'Flat') === 'up' ? 'positive' : 'negative'}`}>
+                  {resistanceEvent ? `${resistanceEvent.change} · ${resistanceEvent.time}` : 'Flat since open'}
+                </span>
+              </div>
             </div>
-          ))}
-        </div>
-        <SessionRead paragraphs={session.reads.events} />
-      </div>
+          </div>
 
-      <Disclaimer source="Upstox option chain (oi_snapshot_log, sample data — not yet wired)" />
+          <div className="oi-card">
+            <div className="oi-card-head"><h3>PCR &amp; max pain — full session</h3><span className="oi-group-range">09:15 – 15:30 IST</span></div>
+            <ResponsiveContainer width="100%" height={160}>
+              <LineChart data={points} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
+                <XAxis dataKey="time" stroke={colors.faint} fontSize={10} tickLine={false} axisLine={{ stroke: colors.rule }} interval="preserveStartEnd" />
+                <YAxis yAxisId="pcr" stroke={colors.faint} fontSize={10} tickLine={false} axisLine={false} width={32} domain={['dataMin - 0.08', 'dataMax + 0.08']} />
+                <YAxis yAxisId="mp" orientation="right" stroke={colors.faint} fontSize={10} tickLine={false} axisLine={false} width={54} domain={['dataMin - 60', 'dataMax + 60']} />
+                <Tooltip contentStyle={{ background: colors.surface, border: `1px solid ${colors.rule}`, borderRadius: 8, fontSize: 12 }} labelStyle={{ color: colors.faint }} />
+                <Line yAxisId="pcr" type="monotone" dataKey="pcr" name="PCR" stroke={colors.caution} strokeWidth={2} dot={false} isAnimationActive={false} connectNulls />
+                <Line yAxisId="mp" type="stepAfter" dataKey="maxPain" name="Max pain" stroke={PALETTE.violet} strokeWidth={1.5} strokeDasharray="4 3" dot={false} isAnimationActive={false} connectNulls />
+              </LineChart>
+            </ResponsiveContainer>
+            <div className="oi-legend">
+              <span><i className="oi-swatch" style={{ background: colors.caution }} />PCR</span>
+              <span><i className="oi-swatch oi-swatch--dashed" style={{ borderColor: PALETTE.violet }} />Max pain</span>
+            </div>
+          </div>
+
+          <div className="oi-card">
+            <div className="oi-card-head"><h3>OI support / resistance — full session</h3><span className="oi-group-range">strike, ₹</span></div>
+            <ResponsiveContainer width="100%" height={160}>
+              <LineChart data={points} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
+                <XAxis dataKey="time" stroke={colors.faint} fontSize={10} tickLine={false} axisLine={{ stroke: colors.rule }} interval="preserveStartEnd" />
+                <YAxis stroke={colors.faint} fontSize={10} tickLine={false} axisLine={false} width={54} domain={['dataMin - 80', 'dataMax + 80']} />
+                <Tooltip contentStyle={{ background: colors.surface, border: `1px solid ${colors.rule}`, borderRadius: 8, fontSize: 12 }} labelStyle={{ color: colors.faint }} />
+                <Line type="stepAfter" dataKey="resistance" name="OI resistance" stroke={colors.down} strokeWidth={2} dot={false} isAnimationActive={false} connectNulls />
+                <Line type="stepAfter" dataKey="support" name="OI support" stroke={colors.up} strokeWidth={2} dot={false} isAnimationActive={false} connectNulls />
+              </LineChart>
+            </ResponsiveContainer>
+            <div className="oi-legend">
+              <span><i className="oi-swatch" style={{ background: colors.up }} />OI support</span>
+              <span><i className="oi-swatch" style={{ background: colors.down }} />OI resistance</span>
+              <span><i className="oi-swatch oi-swatch--tri-up" />Addition</span>
+              <span><i className="oi-swatch oi-swatch--tri-down" />Unwinding</span>
+            </div>
+          </div>
+
+          <div className="oi-card">
+            <div className="oi-card-head"><h3>Support / resistance events</h3><span className="oi-group-range">{events.length} today</span></div>
+            <div className="oi-event-list">
+              {events.map((e, i) => (
+                <div className="oi-event-row" key={i}>
+                  <span className="oi-event-time">{e.time}<small>IST</small></span>
+                  <span>
+                    <span className="oi-event-head"><b>{e.level}</b> <span className="ds-num">{e.strike}</span></span>
+                    <ChangeTag change={e.change} />
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      <Disclaimer source="Upstox option chain (oi_snapshot_log)" capturedAt={latest ? `${latest.time} IST` : undefined} />
     </section>
   )
 }
