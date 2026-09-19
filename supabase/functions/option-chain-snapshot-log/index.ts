@@ -23,7 +23,12 @@ const INSTR = {
 } as const;
 
 const STRIKE_STEP: Record<"NIFTY" | "SENSEX", number> = { NIFTY: 50, SENSEX: 100 };
-const STRIKE_WINDOW = 20; // ATM +/- this many steps, matches market-data-sync's legPremiumRows
+// ATM +/- this many steps. Verified against a live NIFTY chain (2026-09-19, 96 strikes): +/-20
+// only captured ~74% of total OI (concentration extends further than market-data-sync's
+// legPremiumRows window, which serves a different purpose -- leg pricing near ATM, not chain
+// coverage). +/-30 captures ~89% combined CE+PE OI, a representative picture without pulling in
+// the long, thin far-OTM tail.
+const STRIKE_WINDOW = 30;
 
 function nowIST(): Date {
   return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));

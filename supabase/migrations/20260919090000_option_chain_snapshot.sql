@@ -1,5 +1,11 @@
--- option_chain_snapshot: per-strike option-chain history for NIFTY and SENSEX, ATM +/- 20 strikes,
+-- option_chain_snapshot: per-strike option-chain history for NIFTY and SENSEX, ATM +/- 30 strikes,
 -- captured every 3 minutes during market hours.
+--
+-- The +/-30 window is verified, not guessed: a live NIFTY chain pulled 2026-09-19 showed +/-20
+-- strikes captures only ~74% of total CE+PE open interest (OI concentration extends further than
+-- market-data-sync's legPremiumRows window, which serves a different purpose -- leg pricing near
+-- ATM). +/-30 captures ~89% combined, a representative picture without the long, thin far-OTM
+-- tail.
 --
 -- Written only by the option-chain-snapshot-log Edge Function (service role), a new isolated
 -- function that calls the same Upstox option-chain endpoint oi-snapshot-log already uses, but
