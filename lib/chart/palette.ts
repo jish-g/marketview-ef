@@ -19,6 +19,7 @@ export const PALETTE = {
   sage: '#8FBF9F',       // market profile TPO
   maroon: '#A6455C',     // power scanner OI events
   denim: '#5D7FA8',      // market pulse
+  clay: '#B57B5D',       // derivatives positioning
 } as const
 
 // Timeframe ramp for chart levels: the intraday frames share the teal family and step darker as

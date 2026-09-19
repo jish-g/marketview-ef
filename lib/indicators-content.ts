@@ -39,8 +39,20 @@ export const INDICATOR_SECTIONS = [
     ],
   },
   {
+    id: 'derivativespositioning',
+    title: '4. Derivatives Positioning — PCR, OI-Wall Momentum & Max-Pain Pull',
+    intro:
+      "A one-line rollup of three things already read elsewhere on this chart, not a new data source: PCR bias (from the pre-market dashboard row, same field OI Walls reads), OI-wall momentum (whether the support or resistance strike's open interest is currently building or leaving, from Power Scanner's own 1-minute history), and how far the last price sits from max pain. Draws nothing -- legend-only, a positioning snapshot rather than a level to react to.",
+    columns: ['Element', 'Basis', 'Notes'],
+    rows: [
+      ['PCR bias', 'PCR > 1.3 = bullish tilt, < 0.8 = bearish tilt', "Same field OI Walls' summary reads"],
+      ['OI-wall momentum', "Latest Addition/Unwinding state at the support and resistance strikes", "Reuses Power Scanner's oi_snapshot_log read"],
+      ['Max-pain pull', 'Signed point distance from the last price to max pain', 'Positive = price trading above max pain'],
+    ],
+  },
+  {
     id: 'levels',
-    title: '4. Chart Levels — Swing Support & Resistance',
+    title: '5. Chart Levels — Swing Support & Resistance',
     intro:
       'For each enabled timeframe, the loaded candles are aggregated to that timeframe and scanned for swing highs and lows -- a bar whose high (or low) beats every bar within a configurable number of bars on either side. The nearest swing above the last price draws as resistance, the nearest below as support, one or two levels per side. Every timeframe is its own independent switch, so any combination -- 1H with 1D, or 4H with 30m -- is available at once.',
     columns: ['Setting', 'Range', 'Default'],
@@ -52,7 +64,7 @@ export const INDICATOR_SECTIONS = [
   },
   {
     id: 'pivots',
-    title: '5. Pivots — Pre-Market Support & Resistance',
+    title: '6. Pivots — Pre-Market Support & Resistance',
     intro:
       "The chart's own pivot support and resistance, computed once before the market opens and read directly from the dashboard row -- the same figures the Verdict screen uses. Off by default.",
     columns: ['Element', 'Source'],
@@ -60,7 +72,7 @@ export const INDICATOR_SECTIONS = [
   },
   {
     id: 'volume',
-    title: '6. Volume — Futures Volume by Bar',
+    title: '7. Volume — Futures Volume by Bar',
     intro:
       'A lower-pane histogram of volume per bar. NIFTY and SENSEX candles carry no volume of their own -- these bars are the current-month futures contract, aggregated to the chart’s own timeframe and coloured by that bar’s own direction, always labelled as futures volume rather than index volume.',
     columns: ['Element', 'Source', 'Notes'],
@@ -68,7 +80,7 @@ export const INDICATOR_SECTIONS = [
   },
   {
     id: 'volumeprofile',
-    title: '7. Volume Profile — Point of Control',
+    title: '8. Volume Profile — Point of Control',
     intro:
       "Every other volume view on this chart aggregates by time; this aggregates the same futures volume by price instead. Each 1-minute bar's volume is spread evenly across every price bucket its high-low range touches -- the standard approximation for a volume profile when only open/high/low/close/volume is available, not individual trades. The Point of Control is the bucket that received the most volume: the price the market actually did the most business at, a different read from VWAP (an average) or the day's high/low (extremes).",
     columns: ['Instrument', 'Bucket size', 'Period'],
@@ -79,7 +91,7 @@ export const INDICATOR_SECTIONS = [
   },
   {
     id: 'marketprofile',
-    title: '8. Market Profile (TPO) — Value Area & Time-Price Point of Control',
+    title: '9. Market Profile (TPO) — Value Area & Time-Price Point of Control',
     intro:
       "Volume Profile aggregates today's futures volume by price; this aggregates the session's own bars by price instead, weighting every 30-minute period equally regardless of how much traded in it -- the classic Time Price Opportunity read. The TPO Point of Control is the price the session spent the most time at, not the most business (that's Volume Profile) or the average (that's VWAP). The value area is the tightest band of price levels holding 70% of the session's periods, built outward from the point of control.",
     columns: ['Instrument', 'Bucket size', 'Period length'],
@@ -90,7 +102,7 @@ export const INDICATOR_SECTIONS = [
   },
   {
     id: 'cvdproxy',
-    title: '9. CVD (proxy) — Approximate Order Flow',
+    title: '10. CVD (proxy) — Approximate Order Flow',
     intro:
       "Zerodha's Kite Connect API exposes one-minute candles, not individual trades with a buyer or seller side, so genuine order flow cannot be read directly. This approximates it: for each bar, where the close sits within that bar's own high-low range -- weighted by the bar's futures volume -- estimates whether the bar leaned toward buying or selling pressure. Summed running through the session, it becomes a proxy Cumulative Volume Delta line, sharing the volume pane on its own scale since its cumulative value was never a price. The number itself matters less than its direction relative to price -- a new price high the proxy does not confirm is the signal worth noticing, not the absolute level.",
     columns: ['Element', 'Formula', 'Notes'],
@@ -101,7 +113,7 @@ export const INDICATOR_SECTIONS = [
   },
   {
     id: 'marketpulse',
-    title: '10. Market Pulse — Session Regime & CVD Confirmation',
+    title: '11. Market Pulse — Session Regime & CVD Confirmation',
     intro:
       "A one-line session read combining two things already computed elsewhere on this chart, not a new data source. Regime is a light heuristic -- how much of today's own high-low range the net move actually covers -- not the calibrated, history-trained session classifier used elsewhere in the product's own scoring; a close near the open despite a wide range reads as range-bound, a close near one extreme reads as trending. CVD confirmation restates whether today's net move and the CVD-proxy's running sign agree. Draws nothing -- legend-only, context rather than a level to react to bar by bar.",
     columns: ['Element', 'Basis', 'Notes'],
@@ -112,7 +124,7 @@ export const INDICATOR_SECTIONS = [
   },
   {
     id: 'fiidii',
-    title: '11. FII / DII — Cash Market Net Flow',
+    title: '12. FII / DII — Cash Market Net Flow',
     intro:
       "The most recent FII and DII cash-market net flow on record, read from the daily post-market pipeline job. Unlike every other indicator on this chart, it draws nothing -- it's a legend-only line, because it isn't a price level and isn't an intraday signal. It's a slow, end-of-day figure, and the underlying data itself can lag by several days depending on when the upstream source publishes it, which is why the data date is always shown alongside the numbers rather than implying it's today's flow. Read it as regime context -- who's been net buying or selling the cash market lately -- not as something to react to bar by bar.",
     columns: ['Element', 'Source', 'Notes'],
