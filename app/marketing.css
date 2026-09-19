@@ -260,9 +260,162 @@
   pointer-events: none;
 }
 
+/* ============================================================
+   Pass two, extended: the other three pre-login shells.
+
+   Home (.landing-shell) got the depth pass above. Everything else
+   pre-login uses one of three other shells -- .rules-doc-shell
+   (rules, about, how-it-works, disclaimer, changelog, indicators
+   and its slugs, the 8 single-metric evergreen pages, and
+   global-cues-today/archive/[date] -- about 15 routes), plus
+   .blog-index-shell and .blog-post-shell for the daily reads
+   archive and its per-day articles. Same rules as before: CSS-only,
+   no copy, no markup, tokens only so both themes stay correct.
+   ============================================================ */
+
+/* ---- Doc pages: the hero gets the same wash as home's, the FAQ
+   pairs -- currently a bare <dl>, no box at all -- become cards, and
+   the formula cards / nav links get the same hover language as
+   every card grid on the homepage now has. ---- */
+.rules-doc-shell .doc-hero {
+  position: relative;
+  isolation: isolate;
+}
+.rules-doc-shell .doc-hero::before {
+  content: '';
+  position: absolute;
+  inset: -40px -10% 0;
+  z-index: -1;
+  background: radial-gradient(ellipse 55% 90% at 85% 0%, color-mix(in srgb, var(--brand) 11%, transparent), transparent 65%);
+  pointer-events: none;
+}
+
+.rules-doc-shell .formula-card {
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+.rules-doc-shell .formula-card:hover {
+  transform: translateY(-2px);
+  border-left-color: var(--brand);
+}
+
+.rules-doc-shell .doc-note {
+  box-shadow: 0 12px 32px -22px rgba(0, 0, 0, 0.45);
+}
+
+/* faq-item was a bare dt/dd pair with no border at all -- the one
+   place left on these pages where repeated content had zero frame. */
+.rules-doc-shell .faq-item {
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+.rules-doc-shell .faq-item:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+}
+
+.rules-doc-shell .rules-doc-nav a {
+  border-radius: var(--radius-sm);
+  padding-inline: 10px;
+  transition: background 140ms ease, color 140ms ease;
+}
+.rules-doc-shell .rules-doc-nav a:hover { background: var(--surface-2); }
+
+.rules-doc-shell .global-cues-badges .ds-badge {
+  transition: transform 140ms ease;
+}
+.rules-doc-shell .global-cues-badges .ds-badge:hover { transform: translateY(-1px); }
+
+/* ---- Daily reads index: "today" gets the wash and the lift, the
+   most recent month's table gets a touch more weight than the
+   archive scrolling below it, same "one thing promoted" rule the
+   homepage grids use. ---- */
+.blog-index-shell .archive-hero {
+  position: relative;
+  isolation: isolate;
+  box-shadow: 0 26px 60px -30px rgba(0, 0, 0, 0.5);
+}
+.blog-index-shell .archive-hero::before {
+  content: '';
+  position: absolute;
+  inset: -20% -10% 0;
+  z-index: -1;
+  background: radial-gradient(ellipse 60% 100% at 20% 0%, color-mix(in srgb, var(--brand) 12%, transparent), transparent 65%);
+  pointer-events: none;
+}
+
+.blog-index-shell .archive-month:first-of-type .archive-table {
+  border-color: var(--border-strong);
+  box-shadow: 0 20px 48px -32px rgba(0, 0, 0, 0.5);
+}
+
+.blog-index-shell .archive-filter button[aria-pressed='true'] {
+  box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- Daily read article: the scorecard is the one thing on this
+   page a reader actually came for, so it gets the brand-tinted
+   "feature" treatment home's differentiators grid uses; the closing
+   CTA gets home's closing-band wash; related reads become pills. ---- */
+.blog-post-shell .blog-scorecard {
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--border));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--brand) 7%, var(--surface)), color-mix(in srgb, var(--surface) 70%, var(--ground)) 65%);
+  box-shadow: 0 26px 60px -32px rgba(0, 0, 0, 0.5);
+}
+.blog-post-shell .blog-scorecard-tile,
+.blog-post-shell .blog-scorecard-compare-card {
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+.blog-post-shell .blog-scorecard-tile:hover,
+.blog-post-shell .blog-scorecard-compare-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+}
+
+.blog-post-shell .blog-post-cta {
+  position: relative;
+  isolation: isolate;
+}
+.blog-post-shell .blog-post-cta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(ellipse 70% 140% at 100% 50%, color-mix(in srgb, var(--brand) 10%, transparent), transparent 70%);
+  pointer-events: none;
+}
+
+.blog-post-shell .blog-post-related ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.blog-post-shell .blog-post-related li a {
+  display: inline-flex;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.blog-post-shell .blog-post-related li a:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  text-decoration: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing-shell .landing-diff-card,
   .landing-shell .landing-feature,
   .landing-shell .landing-evergreen-link,
-  .landing-shell .landing-testimonial-card { transition: none; }
+  .landing-shell .landing-testimonial-card,
+  .rules-doc-shell .formula-card,
+  .rules-doc-shell .faq-item,
+  .rules-doc-shell .rules-doc-nav a,
+  .rules-doc-shell .global-cues-badges .ds-badge,
+  .blog-post-shell .blog-scorecard-tile,
+  .blog-post-shell .blog-scorecard-compare-card,
+  .blog-post-shell .blog-post-related li a { transition: none; }
 }
