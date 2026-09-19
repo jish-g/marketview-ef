@@ -17,6 +17,7 @@ export const PALETTE = {
   rose: '#D08C9C',       // gap zone (future)
   stone: '#8B8F96',      // structure: day open, volume
   sage: '#8FBF9F',       // market profile TPO
+  denim: '#5D7FA8',      // market pulse
 } as const
 
 // Timeframe ramp for chart levels: the intraday frames share the teal family and step darker as
