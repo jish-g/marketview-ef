@@ -58,6 +58,15 @@ export type IndicatorContext = {
    * actually describe, which can lag `tradeDate` by several days depending on when the upstream
    * source publishes it; null until the pipeline has written at least one row. */
   postmarketSummary: { fiiNetCr: number | null; diiNetCr: number | null; dataDate: string | null } | null
+  /** Today's OI support/resistance snapshots from `oi_snapshot_log` (1-min, current instrument),
+   * oldest first. Empty until the pipeline has logged at least one row for today. */
+  oiSnapshotHistory: {
+    time: UTCTimestamp
+    oiSupport: number | null
+    oiResistance: number | null
+    oiSupportChange: string | null
+    oiResistanceChange: string | null
+  }[]
 }
 
 export type HistogramPoint = { time: UTCTimestamp; value: number; color: string }

@@ -237,6 +237,29 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
     dataDate: fetchedPostmarket.fii_dii_data_date ? String(fetchedPostmarket.fii_dii_data_date) : null,
   } : null, [fetchedPostmarket])
 
+  // Today's OI support/resistance history for this instrument, from oi-snapshot-log's 1-min feed
+  // (oi_snapshot_log) -- read-only, isolated pipeline, same posture as postmarket_summary above.
+  // Polled rather than Realtime-subscribed: a 1-min-cadence table doesn't need sub-second delivery,
+  // and this avoids adding the table to the realtime publication for a feature this lightweight.
+  const { data: fetchedOiSnapshots } = useSWR(
+    ['oi-snapshot-log', instrument, tradeDate],
+    async () => {
+      const { data, error } = await supabase.from('oi_snapshot_log')
+        .select('captured_at, oi_support, oi_resistance, oi_support_change, oi_resistance_change')
+        .eq('instrument', instrument).eq('trade_date', tradeDate).order('captured_at', { ascending: true })
+      if (error) throw error
+      return data
+    },
+    { revalidateOnFocus: false, refreshInterval: isToday ? 60_000 : 0 },
+  )
+  const oiSnapshotHistory = useMemo(() => (fetchedOiSnapshots ?? []).map((r) => ({
+    time: Math.floor(new Date(String(r.captured_at)).getTime() / 1000) as UTCTimestamp,
+    oiSupport: r.oi_support != null ? Number(r.oi_support) : null,
+    oiResistance: r.oi_resistance != null ? Number(r.oi_resistance) : null,
+    oiSupportChange: r.oi_support_change ?? null,
+    oiResistanceChange: r.oi_resistance_change ?? null,
+  })), [fetchedOiSnapshots])
+
   // Live updates for the current trading date only. index-candle-sync writes one-minute Kite
   // candles into Supabase and Realtime delivers those inserts and updates straight here.
   useEffect(() => {
@@ -273,7 +296,7 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
   const todayBars = useMemo(() => aggregate(candles.filter((c) => c.tradeDate === tradeDate).map((c) => c.bar), minutes), [candles, tradeDate, minutes])
 
   const results = useMemo(() => {
-    const ctx = { candles, futuresCandles, tradeDate, instrument, row, colors, timeframeMinutes: minutes, postmarketSummary }
+    const ctx = { candles, futuresCandles, tradeDate, instrument, row, colors, timeframeMinutes: minutes, postmarketSummary, oiSnapshotHistory }
     const out: Record<string, ReturnType<typeof INDICATORS[number]['compute']>> = {}
     for (const id of state.active) {
       const def = byId(id)
@@ -281,7 +304,7 @@ export function ChartView({ row, layout = 'embedded', initialInstrument, initial
       try { out[id] = def.compute(ctx, state.settings[id] ?? def.defaults) } catch { out[id] = { drawables: [], summary: 'could not compute' } }
     }
     return out
-  }, [candles, futuresCandles, tradeDate, instrument, row, colors, minutes, postmarketSummary, state.active, state.settings])
+  }, [candles, futuresCandles, tradeDate, instrument, row, colors, minutes, postmarketSummary, oiSnapshotHistory, state.active, state.settings])
 
   const visibleDrawables = useMemo(() => {
     const hidden = new Set(state.hidden)

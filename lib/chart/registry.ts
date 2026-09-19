@@ -9,11 +9,12 @@ import { cvdProxy } from './indicators/cvd-proxy'
 import { fiiDii } from './indicators/fii-dii'
 import { marketProfile } from './indicators/market-profile'
 import { marketPulse } from './indicators/market-pulse'
+import { powerScanner } from './indicators/power-scanner'
 
 // The catalogue. Order is the order in the dialog. To add an indicator: one module in
 // ./indicators, one line here. Duplicate ids or colours are refused at module load so the
 // palette rule cannot erode as the list grows.
-export const INDICATORS: IndicatorDef[] = [intraday, oiWalls, chartLevels, pivots, volume, volumeProfile, marketProfile, cvdProxy, marketPulse, fiiDii]
+export const INDICATORS: IndicatorDef[] = [intraday, oiWalls, powerScanner, chartLevels, pivots, volume, volumeProfile, marketProfile, cvdProxy, marketPulse, fiiDii]
 
 {
   const ids = new Set<string>(), colors = new Set<string>()
