@@ -1,18 +1,12 @@
-// Backs the Users section of /admin in the Next.js app.
+// Backs the Users section of /admin in the Next.js app: lists everyone with a login via
+// this project's own auth.users, using the service-role admin API (auth.users isn't
+// queryable any other way).
 //
-// IMPORTANT: this does NOT belong in supabase/functions/ -- everything in that folder
-// deploys to the "rolecamp" market-data project (see supabase/functions/admin-api,
-// which powers the rest of the admin panel). This function needs a DIFFERENT project's
-// data: the app's login lives in a separate, single-admin Supabase auth project
-// (see lib/supabase/auth-client.ts), and only that project's `auth.users` table and
-// service-role key can answer "who has an account and when did they last sign in".
-//
-// Deploy this file to that auth project specifically, e.g.:
-//   supabase functions deploy admin-users --project-ref <auth-project-ref> --no-verify-jwt
-// <auth-project-ref> is the subdomain of NEXT_PUBLIC_SUPABASE_URL
-// (https://<ref>.supabase.co). No new secrets needed -- SUPABASE_URL and
-// SUPABASE_SERVICE_ROLE_KEY are provided automatically to every edge function by
-// the project it's deployed to.
+// lib/supabase/auth-client.ts's comment claims the app's login lives in a separate
+// "single-admin auth project" from the market-data one -- that's stale. Both
+// NEXT_PUBLIC_SUPABASE_URL and the market-data project resolve to the same project
+// (confirmed by querying auth.users directly), so this function deploys alongside
+// admin-api/deploy-changelog like any other function in supabase/functions/.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const ADMIN_EMAIL = 'jishnu@ziovy.com'
