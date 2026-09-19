@@ -1,14 +1,15 @@
-// Auto-populates changelog_entries from Vercel's production-deployment webhook, so a
-// changelog entry appears every time a merge to main actually ships -- no manual admin
-// entry needed (see app/admin/changelog/page.tsx, which is read-only).
+// Auto-populates changelog_entries whenever a merge lands on main, so no manual admin
+// entry is needed (see app/admin/changelog/page.tsx, which is read-only).
 //
-// One-time setup (both steps are outside what this project's Supabase access can do):
-//   1. Vercel dashboard -> Project -> Settings -> Webhooks -> Add Webhook
-//        URL: https://vkcklvoizfpbnjdgaxai.supabase.co/functions/v1/deploy-changelog
-//        Events: Deployment Succeeded
-//      Vercel will hand you a signing secret when you save it.
-//   2. Set that same secret on this project:
-//        supabase secrets set DEPLOY_WEBHOOK_SECRET=<the secret from step 1> --project-ref vkcklvoizfpbnjdgaxai
+// Triggered by a GitHub Actions workflow on push to main (.github/workflows/changelog.yml)
+// rather than a Vercel deployment webhook -- Vercel only offers deployment webhooks on its
+// Pro plan. A push to main is a fine proxy for "this shipped": every merge in this repo's
+// history is exactly that (see the PR-only workflow this project follows).
+//
+// One-time setup (outside what this project's Supabase access can do):
+//   supabase secrets set DEPLOY_WEBHOOK_SECRET=<shared secret> --project-ref vkcklvoizfpbnjdgaxai
+// The same value must also be set as the CHANGELOG_DEPLOY_SECRET repo secret in GitHub
+// (Settings -> Secrets and variables -> Actions) -- the workflow sends it as a header.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -18,20 +19,12 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0
 }
 
-async function verifySignature(rawBody: string, signature: string | null, secret: string): Promise<boolean> {
-  if (!signature) return false
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
-  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody))
-  const hex = Array.from(new Uint8Array(mac)).map((b) => b.toString(16).padStart(2, '0')).join('')
-  return timingSafeEqual(hex, signature)
-}
-
 // A merge-commit subject is just "Merge pull request #193 from owner/branch" -- the actual
 // PR title is the next non-empty line. Falls back to the raw first line for a direct push
-// (no merge commit at all), so a hotfix deploy still gets a sensible title.
+// (no merge commit at all), so a hotfix push still gets a sensible title.
 function titleAndBodyFromCommitMessage(message: string): { title: string; body: string } {
   const lines = message.split('\n').map((l) => l.trim()).filter(Boolean)
-  if (lines.length === 0) return { title: 'Production deploy', body: 'No commit message was provided.' }
+  if (lines.length === 0) return { title: 'Update', body: 'No commit message was provided.' }
   const mergeMatch = lines[0].match(/^Merge pull request (#\d+)/)
   if (mergeMatch && lines.length > 1) {
     return { title: `${mergeMatch[1]}: ${lines[1]}`, body: lines.slice(1).join('\n') }
@@ -45,35 +38,27 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
   const secret = Deno.env.get('DEPLOY_WEBHOOK_SECRET')
-  const rawBody = await req.text()
-  if (!secret || !(await verifySignature(rawBody, req.headers.get('x-vercel-signature'), secret))) {
-    return json({ error: 'Invalid signature' }, 401)
+  const provided = req.headers.get('x-changelog-secret')
+  if (!secret || !provided || !timingSafeEqual(provided, secret)) {
+    return json({ error: 'Forbidden' }, 403)
   }
 
-  let event: Record<string, unknown>
+  let body: Record<string, unknown>
   try {
-    event = JSON.parse(rawBody)
+    body = await req.json()
   } catch {
     return json({ error: 'Invalid JSON body' }, 400)
   }
 
-  if (event.type !== 'deployment.succeeded') return json({ ignored: true, reason: 'not a deployment.succeeded event' })
-
-  const payload = (event.payload ?? {}) as Record<string, unknown>
-  const deployment = (payload.deployment ?? {}) as Record<string, unknown>
-  const target = (payload.target as string | undefined) ?? (deployment.target as string | undefined)
-  if (target !== 'production') return json({ ignored: true, reason: 'not a production deployment' })
-
-  const meta = (deployment.meta ?? {}) as Record<string, unknown>
-  const commitMessage = (meta.githubCommitMessage as string | undefined) ?? (deployment.name as string | undefined) ?? 'Production deploy'
-  const { title, body } = titleAndBodyFromCommitMessage(commitMessage)
+  const commitMessage = typeof body.commitMessage === 'string' && body.commitMessage ? body.commitMessage : 'Update'
+  const { title, body: entryBody } = titleAndBodyFromCommitMessage(commitMessage)
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const entry_date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
 
   const { data, error } = await admin
     .from('changelog_entries')
-    .insert({ entry_date, kind: 'feature', title, body })
+    .insert({ entry_date, kind: 'feature', title, body: entryBody })
     .select('id, entry_date, kind, title, body')
     .single()
   if (error) return json({ error: error.message }, 500)
