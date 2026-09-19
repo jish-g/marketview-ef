@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Banner, Disclaimer, Metric } from '@/components/ui/ds'
+import { Banner, Disclaimer } from '@/components/ui/ds'
 import { useChartColors } from '@/hooks/use-chart-colors'
 import { PALETTE } from '@/lib/chart/palette'
 import { fmt } from '@/lib/format'
@@ -165,27 +165,39 @@ export function OiHistoryView() {
         not a price prediction or a trade signal.
       </Banner>
 
-      <div className="market-open-tiles">
-        <Metric label="PCR" value={fmt.ratio(latest.pcr)} sub={
-          <span className={pcrDelta === 0 ? '' : pcrDelta > 0 ? 'positive' : 'negative'}>
-            {pcrDelta === 0 ? 'Flat since open' : `${pcrDelta > 0 ? '+' : '−'}${Math.abs(pcrDelta).toFixed(2)} since open`}
-          </span>
-        } />
-        <Metric label="Max pain" value={fmt.strike(latest.maxPain)} sub={maxPainMoved ? `Was ${fmt.strike(first.maxPain)} at open` : 'Unchanged since open'} />
-        <Metric label="OI support" value={fmt.strike(latest.support)} sub={
-          <span className={actionTone(supportEvent?.change ?? 'Flat') === 'flat' ? '' : actionTone(supportEvent?.change ?? 'Flat') === 'up' ? 'positive' : 'negative'}>
-            {supportEvent ? `${supportEvent.change} · ${supportEvent.time}` : 'Flat since open'}
-          </span>
-        } />
-        <Metric label="OI resistance" value={fmt.strike(latest.resistance)} sub={
-          <span className={actionTone(resistanceEvent?.change ?? 'Flat') === 'flat' ? '' : actionTone(resistanceEvent?.change ?? 'Flat') === 'up' ? 'positive' : 'negative'}>
-            {resistanceEvent ? `${resistanceEvent.change} · ${resistanceEvent.time}` : 'Flat since open'}
-          </span>
-        } />
+      <div className="oi-card">
+        <div className="oi-tile-grid">
+          <div className="oi-tile">
+            <span className="oi-tile-label">PCR</span>
+            <strong className="oi-tile-value">{fmt.ratio(latest.pcr)}</strong>
+            <span className={`oi-tile-sub ${pcrDelta === 0 ? '' : pcrDelta > 0 ? 'positive' : 'negative'}`}>
+              {pcrDelta === 0 ? 'Flat since open' : `${pcrDelta > 0 ? '+' : '−'}${Math.abs(pcrDelta).toFixed(2)} since open`}
+            </span>
+          </div>
+          <div className="oi-tile">
+            <span className="oi-tile-label">Max pain</span>
+            <strong className="oi-tile-value">{fmt.strike(latest.maxPain)}</strong>
+            <span className="oi-tile-sub">{maxPainMoved ? `Was ${fmt.strike(first.maxPain)} at open` : 'Unchanged since open'}</span>
+          </div>
+          <div className="oi-tile">
+            <span className="oi-tile-label">OI support</span>
+            <strong className="oi-tile-value">{fmt.strike(latest.support)}</strong>
+            <span className={`oi-tile-sub ${actionTone(supportEvent?.change ?? 'Flat') === 'flat' ? '' : actionTone(supportEvent?.change ?? 'Flat') === 'up' ? 'positive' : 'negative'}`}>
+              {supportEvent ? `${supportEvent.change} · ${supportEvent.time}` : 'Flat since open'}
+            </span>
+          </div>
+          <div className="oi-tile">
+            <span className="oi-tile-label">OI resistance</span>
+            <strong className="oi-tile-value">{fmt.strike(latest.resistance)}</strong>
+            <span className={`oi-tile-sub ${actionTone(resistanceEvent?.change ?? 'Flat') === 'flat' ? '' : actionTone(resistanceEvent?.change ?? 'Flat') === 'up' ? 'positive' : 'negative'}`}>
+              {resistanceEvent ? `${resistanceEvent.change} · ${resistanceEvent.time}` : 'Flat since open'}
+            </span>
+          </div>
+        </div>
       </div>
 
-      <section className="metric-group">
-        <div className="group-heading"><h3>PCR &amp; max pain — full session</h3><span className="oi-group-range">09:15 – 15:30 IST</span></div>
+      <div className="oi-card">
+        <div className="oi-card-head"><h3>PCR &amp; max pain — full session</h3><span className="oi-group-range">09:15 – 15:30 IST</span></div>
         <ResponsiveContainer width="100%" height={160}>
           <LineChart data={points} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
             <XAxis dataKey="time" stroke={colors.faint} fontSize={10} tickLine={false} axisLine={{ stroke: colors.rule }} interval="preserveStartEnd" />
@@ -201,10 +213,10 @@ export function OiHistoryView() {
           <span><i className="oi-swatch oi-swatch--dashed" style={{ borderColor: PALETTE.violet }} />Max pain</span>
         </div>
         <SessionRead paragraphs={session.reads.pcr} />
-      </section>
+      </div>
 
-      <section className="metric-group">
-        <div className="group-heading"><h3>OI support / resistance — full session</h3><span className="oi-group-range">strike, ₹</span></div>
+      <div className="oi-card">
+        <div className="oi-card-head"><h3>OI support / resistance — full session</h3><span className="oi-group-range">strike, ₹</span></div>
         <ResponsiveContainer width="100%" height={160}>
           <LineChart data={points} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
             <XAxis dataKey="time" stroke={colors.faint} fontSize={10} tickLine={false} axisLine={{ stroke: colors.rule }} interval="preserveStartEnd" />
@@ -221,10 +233,10 @@ export function OiHistoryView() {
           <span><i className="oi-swatch oi-swatch--tri-down" />Unwinding</span>
         </div>
         <SessionRead paragraphs={session.reads.sr} />
-      </section>
+      </div>
 
-      <section className="metric-group">
-        <div className="group-heading"><h3>Support / resistance events</h3><span className="oi-group-range">{events.length} today</span></div>
+      <div className="oi-card">
+        <div className="oi-card-head"><h3>Support / resistance events</h3><span className="oi-group-range">{events.length} today</span></div>
         <div className="oi-event-list">
           {events.map((e, i) => (
             <div className="oi-event-row" key={i}>
@@ -237,7 +249,7 @@ export function OiHistoryView() {
           ))}
         </div>
         <SessionRead paragraphs={session.reads.events} />
-      </section>
+      </div>
 
       <Disclaimer source="Upstox option chain (oi_snapshot_log, sample data — not yet wired)" />
     </section>
