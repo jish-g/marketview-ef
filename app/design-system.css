@@ -283,3 +283,50 @@
    each row's score IS a signed contribution to the bias. */
 .ds-score--up { color: var(--up); }
 .ds-score--down { color: var(--down); }
+
+/* ---------------------------------------------------------------- OI History
+   The tile deltas and the events-table Change column are the other two places a signed OI
+   move gets colour (support Addition / resistance Unwinding = strengthening, and vice versa) --
+   see oi-history-view.tsx's actionTone(). Panels reuse .ds-card via the .oi-panel wrapper so
+   spacing and border stay identical to every other Card on the page. */
+.oi-panel { display: grid; gap: var(--s-3); }
+.oi-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); }
+.oi-panel-head h3 { margin: 0; font-size: var(--text-body); font-weight: 600; color: var(--ink-2); }
+.oi-panel-head span { font-size: var(--text-label); color: var(--faint); font-family: var(--font-figure); }
+
+.oi-legend { display: flex; flex-wrap: wrap; gap: var(--s-4); font-size: var(--text-label); color: var(--muted); }
+.oi-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.oi-swatch { width: 12px; height: 2px; border-radius: 1px; display: inline-block; }
+.oi-swatch--dashed { background: none !important; border-top: 1.5px dashed; width: 14px; height: 0; }
+.oi-swatch--tri-up, .oi-swatch--tri-down {
+  width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent;
+}
+.oi-swatch--tri-up { border-bottom: 7px solid var(--up); }
+.oi-swatch--tri-down { border-top: 7px solid var(--down); }
+
+.oi-delta--up { color: var(--up); }
+.oi-delta--down { color: var(--down); }
+.oi-delta--flat { color: var(--muted); }
+
+.oi-events-table { display: grid; font-size: var(--text-meta); }
+.oi-events-row { display: grid; grid-template-columns: 72px 110px 1fr 140px; gap: var(--s-3); padding: 9px 4px; border-bottom: 1px solid var(--border); align-items: center; }
+.oi-events-row:last-child { border-bottom: none; }
+.oi-events-row--head span { font-size: var(--text-label); letter-spacing: 0.03em; text-transform: uppercase; color: var(--faint); font-weight: 500; }
+.oi-change-tag { display: inline-flex; align-items: center; gap: 5px; }
+.oi-change-tag i { font-style: normal; font-size: 9px; }
+.oi-change-tag--up { color: var(--up); }
+.oi-change-tag--down { color: var(--down); }
+.oi-change-tag--flat { color: var(--faint); }
+@media (max-width: 640px) { .oi-events-row { grid-template-columns: 56px 84px 1fr 108px; font-size: 12px; } }
+
+/* Session read: same provenance convention as the GlobalCue narrative (.thesis-hero-note) --
+   computed figures stay in the tiles/chart/table above; this prose only explains them. */
+.oi-read { margin-top: var(--s-2); padding-top: var(--s-3); border-top: 1px solid var(--border); }
+.oi-read-label {
+  display: flex; align-items: center; gap: 6px; margin: 0 0 var(--s-2);
+  font-size: var(--text-label); letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); font-family: var(--font-figure);
+}
+.oi-read-label::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--info); flex: none; }
+.oi-read p { margin: 0 0 var(--s-2); font-size: var(--text-meta); line-height: 1.6; color: var(--ink-2); max-width: var(--measure); }
+.oi-read p:last-of-type { margin-bottom: 0; }
+.oi-read-foot { font-size: 11px !important; color: var(--faint) !important; margin-top: var(--s-2) !important; padding-top: var(--s-2); border-top: 1px dashed var(--border); }
