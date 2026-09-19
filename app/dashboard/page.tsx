@@ -816,7 +816,7 @@ function VerdictInstrument({ row, instrument, agentOpen }: { row: Row; instrumen
   const summaryPrev = rawNum(row, `prev_close_${suffix}`)
   const summaryGapPct = summaryGapPts != null && summaryPrev ? (summaryGapPts / summaryPrev) * 100 : null
   const summary = `${row.trade_date} · ${row.day_name}: ${instrument} opened ${fmt.pct(summaryGapPct)} (${fmt.pts(summaryGapPts)}). ${agentOpen ? `${agentOpen.agent_bias ? `${agentOpen.agent_bias} bias, ` : ''}${agentStrategyName}${agentOpen.confidence ? `, ${agentOpen.confidence} confidence` : ''}.` : 'View of record pending.'} VIX ${fmt.ratio(calc.vix)}, ATM IV ${fmt.ratio(calc.iv)}, PCR ${fmt.ratio(calc.pcr)}, max pain ${fmt.strike(calc.maxPain)}, ${calc.dte} day${calc.dte === 1 ? '' : 's'} to expiry.`
-  return <article className="verdict-instrument">
+  return <article className="verdict-instrument verdict-box">
     <div className="verdict-instrument-head">
       <h3>{instrument}<button type="button" className="semantic-info verdict-info" aria-label={`${instrument} verdict details`}><Info size={14} aria-hidden="true" /><span className="semantic-tooltip" role="tooltip">{summary}</span></button></h3>
     </div>

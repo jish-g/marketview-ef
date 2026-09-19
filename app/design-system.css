@@ -365,6 +365,28 @@
   padding-top: var(--s-5) !important;
 }
 
+/* ---------------------------------------------------------------- Verdict
+   Same request again: box Nifty's and Sensex's verdict/trade-builder cards. Named .verdict-box
+   rather than reusing .verdict-card, an existing class already used deep inside this article
+   (the Move/Target tiles) -- reusing it here would have doubled up two unrelated things under
+   one name. Scoped by construction, not by a selector: only VerdictInstrument's own return adds
+   this class, not PostInstrumentCard's (Post-market), which renders the same shared
+   ".verdict-instrument" base class for its own, differently-shaped card.
+
+   Unlike the other three modules, .verdict-instrument carries no ledger divider rule at all
+   (grepped app/ledger.css -- no ".verdict-instrument" selector, bare or child-combinator), and
+   the parent .verdict-instruments wrapper already sets gap:28px, so this box needs neither an
+   !important override nor a margin of its own -- the box is genuinely the only change here.
+   Everything inside (the sync strip, the Move/Target/Stop-loss tiles, the strategy builder) is
+   left exactly as it renders today; re-boxing that nested detail is a separate, larger call this
+   pass doesn't make. */
+.verdict-box {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--s-5);
+}
+
 /* ---------------------------------------------------------------- GlobalCue/News
    Same request again, same shape as OI History (#183) and Pre-market (#184): box the section
    groups (Verdicts, Why/Watch next, drivers, market basket, headlines, ...) instead of the
