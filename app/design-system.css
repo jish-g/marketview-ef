@@ -387,6 +387,30 @@
   padding: var(--s-5);
 }
 
+/* ---------------------------------------------------------------- GEX
+   Same request again: box the three sections (context tiles, Net GEX hero, regime levels).
+   GEX is built entirely on ds.tsx's Card/Metric -- both of which ARE in ledger's own stripped
+   list ("border:0; background:none; padding:0", ledger §1, app/ledger.css), unconditionally,
+   not via a sibling or divider rule like the other five modules' fixes. So .gex-card needs
+   !important on every property, every time: it isn't overriding an ADDED rule (a divider,
+   a reset row-form), it's fighting the base "you are not a box" reset those two components
+   carry into every screen that uses them under .app-shell. The wrapper div around each
+   ds-grid--3 row exists only to carry this box -- Metric/Card's own classes are untouched, so
+   a Metric used bare elsewhere (Post-market's tiles, say) is unaffected.
+   .ds-stack (the screen's own root) is `display:grid;gap:var(--s-5)`, so top-level cards need
+   no margin. The box rule itself deliberately sets nothing but border/background/padding --
+   the Net GEX hero card is a bare Card (".ds-metric" supplies its own `display:flex;gap`
+   internally, which a `display:grid` here would silently override); the one wrapper that
+   stacks two children of its own (regime levels: a tile row, then Peak gamma) adds
+   .gex-card-stack alongside for that layout instead of baking it into every card. */
+.gex-card {
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--surface) !important;
+  padding: var(--s-5) !important;
+}
+.gex-card-stack { display: grid; gap: var(--s-4); }
+
 /* ---------------------------------------------------------------- GlobalCue/News
    Same request again, same shape as OI History (#183) and Pre-market (#184): box the section
    groups (Verdicts, Why/Watch next, drivers, market basket, headlines, ...) instead of the
