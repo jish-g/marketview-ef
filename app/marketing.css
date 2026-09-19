@@ -173,7 +173,13 @@
    ============================================================ */
 
 /* ---- Hero: an ambient wash instead of a flat surface, and the
-   snapshot card lifted off the page instead of sitting flush. ---- */
+   snapshot card lifted off the page instead of sitting flush.
+
+   Pass two shipped this at 13% brand opacity -- correct in theory,
+   invisible in practice: it read on a colour picker but not at a
+   glance, which is the whole complaint this pass exists to fix.
+   Turned up to 22% and widened so it's legible as a design choice
+   on first look, not something you have to go hunting for. ---- */
 .landing-hero {
   position: relative;
   isolation: isolate;
@@ -181,19 +187,33 @@
 .landing-hero::before {
   content: '';
   position: absolute;
-  inset: -10% -10% 0;
+  inset: -14% -10% 0;
   z-index: -1;
-  background: radial-gradient(ellipse 60% 70% at 78% 0%, color-mix(in srgb, var(--brand) 13%, transparent), transparent 65%);
+  background: radial-gradient(ellipse 75% 85% at 78% 0%, color-mix(in srgb, var(--brand) 22%, transparent), transparent 68%);
   pointer-events: none;
 }
 .landing-shell .landing-snapshot-card {
-  box-shadow: 0 28px 64px -30px rgba(0, 0, 0, 0.55);
+  position: relative;
+  box-shadow: 0 32px 72px -28px rgba(0, 0, 0, 0.6);
   border-color: var(--border-strong);
+}
+/* A top accent bar, not just a shadow -- the one card on the page
+   that should read as "the instrument", not another bordered box. */
+.landing-shell .landing-snapshot-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: linear-gradient(90deg, var(--brand), color-mix(in srgb, var(--brand) 30%, transparent));
 }
 
 /* ---- Differentiators: the strongest claim gets the brand treatment,
-   Rule 2's amber-is-identity spent on exactly one card, not the CTA. ---- */
+   Rule 2's amber-is-identity spent on exactly one card, not the CTA.
+   A top accent bar on top of the tint -- colour alone at 8% background
+   read as a slightly warmer grey, not a deliberately promoted card. ---- */
 .landing-shell .landing-diff-card {
+  position: relative;
   transition: transform 160ms ease, border-color 160ms ease;
 }
 .landing-shell .landing-diff-card:hover {
@@ -201,14 +221,25 @@
   border-color: var(--border-strong);
 }
 .landing-shell .landing-diff-card:last-child {
-  border-color: color-mix(in srgb, var(--brand) 45%, var(--border));
-  background: linear-gradient(160deg, color-mix(in srgb, var(--brand) 8%, var(--surface)), var(--surface) 65%);
+  border-color: color-mix(in srgb, var(--brand) 55%, var(--border));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--brand) 14%, var(--surface)), var(--surface) 65%);
+}
+.landing-shell .landing-diff-card:last-child::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--brand);
 }
 
 /* ---- What you get / On the chart: same lift, and the lead card in
    each grid spans wider so the grid reads as composed rather than a
-   uniform stack of equal boxes. ---- */
+   uniform stack of equal boxes. The lead card also gets a quieter
+   version of the same accent bar so "this one is first" is a colour
+   signal, not just a layout one. ---- */
 .landing-shell .landing-feature {
+  position: relative;
   transition: transform 160ms ease, border-color 160ms ease;
 }
 .landing-shell .landing-feature:hover {
@@ -217,13 +248,24 @@
 }
 .landing-shell .landing-features-grid .landing-feature:first-child {
   grid-column: span 2;
+  border-color: color-mix(in srgb, var(--brand) 35%, var(--border));
+}
+.landing-shell .landing-features-grid .landing-feature:first-child::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: color-mix(in srgb, var(--brand) 70%, transparent);
 }
 @media (max-width: 640px) {
   .landing-shell .landing-features-grid .landing-feature:first-child { grid-column: span 1; }
 }
 
 /* ---- Today's numbers: pills, matching the hero CTAs, instead of the
-   same bordered block used for every other card on the page. ---- */
+   same bordered block used for every other card on the page. Hover
+   now tints toward the brand instead of a neutral surface swap, so
+   the whole row reads as "live data" rather than a plain nav list. ---- */
 .landing-shell .landing-evergreen-link {
   border-radius: var(--radius-full);
   padding: 12px 18px;
@@ -232,7 +274,8 @@
 }
 .landing-shell .landing-evergreen-link:hover {
   transform: translateY(-1px);
-  background: var(--surface-2);
+  border-color: color-mix(in srgb, var(--brand) 50%, var(--border));
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface-2));
 }
 
 /* ---- Testimonials: same lift as the other card grids, for one
@@ -246,7 +289,9 @@
 }
 
 /* ---- Closing band: bookends the hero's wash so the page opens and
-   closes on the same visual idea instead of just stopping. ---- */
+   closes on the same visual idea instead of just stopping. Same 22%
+   bump as the hero, so the two actually feel matched rather than the
+   close being a faint echo of the open. ---- */
 .landing-closing {
   position: relative;
   isolation: isolate;
@@ -256,7 +301,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: radial-gradient(ellipse 55% 90% at 50% 100%, color-mix(in srgb, var(--brand) 12%, transparent), transparent 70%);
+  background: radial-gradient(ellipse 60% 95% at 50% 100%, color-mix(in srgb, var(--brand) 20%, transparent), transparent 70%);
   pointer-events: none;
 }
 
