@@ -406,6 +406,29 @@
   text-decoration: none;
 }
 
+/* ---- Login / signup / auth error: the last pre-login surface.
+   /login, /signup and /auth/error all render the same
+   <main className="landing-shell"><section className="login-shell">
+   structure, so they already inherit the homepage topbar -- the one
+   thing that was still flat is the card itself, sitting flush with
+   no focal weight despite being the only thing on the page. ---- */
+.login-shell {
+  position: relative;
+  isolation: isolate;
+}
+.login-shell::before {
+  content: '';
+  position: absolute;
+  inset: -15% -10%;
+  z-index: -1;
+  background: radial-gradient(ellipse 55% 60% at 50% 30%, color-mix(in srgb, var(--brand) 10%, transparent), transparent 65%);
+  pointer-events: none;
+}
+.login-card {
+  box-shadow: 0 28px 64px -30px rgba(0, 0, 0, 0.55);
+  border-color: var(--border-strong);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing-shell .landing-diff-card,
   .landing-shell .landing-feature,
