@@ -37,6 +37,18 @@ const features = [
   { title: 'Nifty and Sensex, both sides', body: 'Both indices read each session, with Sensex prediction suppressed where it has no leading indicator rather than faked.' },
 ]
 
+// The Chart screen's own feature set -- a distinct product surface from the pre-market/
+// post-market scoring `features` array above, so kept as its own list rather than merged into
+// it. Mirrors lib/indicators-content.ts's shipped indicators; update both together.
+const chartFeatures = [
+  { title: 'Market Profile (TPO)', body: 'Where the session actually spent its time, not just where price moved -- the point of control and value area, on every chart.' },
+  { title: 'Power Scanner', body: 'Flagged the moment fresh open interest starts building or leaving at the strike a level is being tested on.' },
+  { title: 'Market Pulse', body: 'One line: range-bound or trending, and whether order flow agrees with the move.' },
+  { title: 'Derivatives Positioning', body: 'PCR bias, OI-wall momentum, and the pull toward max pain, read together instead of three separate checks.' },
+  { title: 'Options Print & Greeks', body: 'The full option chain near the money -- OI, volume and every Greek, per strike, without leaving the platform.' },
+  { title: 'OI History', body: 'How PCR, max pain, and the key OI strikes moved through the whole session, not just where they sit right now.' },
+]
+
 const testimonials = [
   {
     quote: 'I was spending 45 minutes every morning interpreting PCR, gap analysis, and OI levels across Nifty and Sensex. MarketCue cut that down to 3 minutes — and I actually trust the read more because the rules are documented.',
@@ -308,6 +320,22 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
               </li>
             ))}
           </ul>
+        </div>
+      </section>
+
+      <section className="landing-band landing-features landing-chart-features">
+        <div className="landing-section-inner">
+          <h2 className="eyebrow">On the chart</h2>
+          <p className="landing-body-text">Beyond the pre-market and post-market calls, the live Chart screen runs its own set of options-intelligence tools, each reading real Nifty and Sensex data.</p>
+          <ul className="landing-features-grid">
+            {chartFeatures.map(({ title, body }) => (
+              <li className="landing-feature" key={title}>
+                <strong>{title}</strong>
+                <p>{body}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="landing-about-links"><Link href="/indicators">See the full indicator reference</Link></p>
         </div>
       </section>
 
