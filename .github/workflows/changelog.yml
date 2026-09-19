@@ -1,0 +1,22 @@
+name: Changelog
+
+# Every push to main is a merge landing (this repo is PR-only, see AGENTS.md/CLAUDE.md
+# workflow), which is as close to "this shipped" as we can get without a paid Vercel
+# deployment webhook. Reports the merge commit's message to the deploy-changelog edge
+# function, which turns it into a changelog_entries row (see
+# supabase/functions/deploy-changelog).
+on:
+  push:
+    branches: [main]
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report merge to changelog
+        run: |
+          curl --fail-with-body -sS -X POST \
+            "https://vkcklvoizfpbnjdgaxai.supabase.co/functions/v1/deploy-changelog" \
+            -H "Content-Type: application/json" \
+            -H "x-changelog-secret: ${{ secrets.CHANGELOG_DEPLOY_SECRET }}" \
+            -d "$(jq -n --arg msg "${{ github.event.head_commit.message }}" '{commitMessage: $msg}')"
