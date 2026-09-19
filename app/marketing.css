@@ -156,3 +156,113 @@
   line-height: 1.12;
   letter-spacing: var(--tracking-display);
 }
+
+/* ============================================================
+   Pass two: depth and hierarchy.
+
+   Pass one (the three commits above) matched the prototype's pill
+   buttons and type scale but kept every card and band flat -- same
+   border, same surface, same weight, nothing to look at twice. This
+   is what still reads "textbook" next to Sensibull/TrueData: not
+   the copy, not the palette, just the total absence of depth or a
+   focal point anywhere on the page.
+
+   CSS-only, same as pass one: no copy, no markup, no new colours --
+   every wash below is var(--brand)/var(--up) mixed toward
+   transparent, so it tracks the theme toggle automatically.
+   ============================================================ */
+
+/* ---- Hero: an ambient wash instead of a flat surface, and the
+   snapshot card lifted off the page instead of sitting flush. ---- */
+.landing-hero {
+  position: relative;
+  isolation: isolate;
+}
+.landing-hero::before {
+  content: '';
+  position: absolute;
+  inset: -10% -10% 0;
+  z-index: -1;
+  background: radial-gradient(ellipse 60% 70% at 78% 0%, color-mix(in srgb, var(--brand) 13%, transparent), transparent 65%);
+  pointer-events: none;
+}
+.landing-shell .landing-snapshot-card {
+  box-shadow: 0 28px 64px -30px rgba(0, 0, 0, 0.55);
+  border-color: var(--border-strong);
+}
+
+/* ---- Differentiators: the strongest claim gets the brand treatment,
+   Rule 2's amber-is-identity spent on exactly one card, not the CTA. ---- */
+.landing-shell .landing-diff-card {
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+.landing-shell .landing-diff-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+}
+.landing-shell .landing-diff-card:last-child {
+  border-color: color-mix(in srgb, var(--brand) 45%, var(--border));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--brand) 8%, var(--surface)), var(--surface) 65%);
+}
+
+/* ---- What you get / On the chart: same lift, and the lead card in
+   each grid spans wider so the grid reads as composed rather than a
+   uniform stack of equal boxes. ---- */
+.landing-shell .landing-feature {
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+.landing-shell .landing-feature:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+}
+.landing-shell .landing-features-grid .landing-feature:first-child {
+  grid-column: span 2;
+}
+@media (max-width: 640px) {
+  .landing-shell .landing-features-grid .landing-feature:first-child { grid-column: span 1; }
+}
+
+/* ---- Today's numbers: pills, matching the hero CTAs, instead of the
+   same bordered block used for every other card on the page. ---- */
+.landing-shell .landing-evergreen-link {
+  border-radius: var(--radius-full);
+  padding: 12px 18px;
+  text-align: center;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+.landing-shell .landing-evergreen-link:hover {
+  transform: translateY(-1px);
+  background: var(--surface-2);
+}
+
+/* ---- Testimonials: same lift as the other card grids, for one
+   consistent "this is interactive" language across the page. ---- */
+.landing-shell .landing-testimonial-card {
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+.landing-shell .landing-testimonial-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+}
+
+/* ---- Closing band: bookends the hero's wash so the page opens and
+   closes on the same visual idea instead of just stopping. ---- */
+.landing-closing {
+  position: relative;
+  isolation: isolate;
+}
+.landing-closing::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(ellipse 55% 90% at 50% 100%, color-mix(in srgb, var(--brand) 12%, transparent), transparent 70%);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-shell .landing-diff-card,
+  .landing-shell .landing-feature,
+  .landing-shell .landing-evergreen-link,
+  .landing-shell .landing-testimonial-card { transition: none; }
+}
