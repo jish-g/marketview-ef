@@ -138,8 +138,13 @@
 /* The headline carries the product name -- "AI-Agentic Option Intelligence Platform" --
    verbatim from the eyebrow above it. Colouring just that phrase brand amber gives the
    thirty-word sentence a scan point instead of forcing the whole thing to be read start to
-   end; matches the prototype's <em> treatment on its five-word version. */
-.landing-shell .landing-headline-accent { color: var(--brand); }
+   end; matches the prototype's <em> treatment on its five-word version.
+
+   .landing-headline-accent itself is NOT defined here -- it already exists in globals.css
+   (search "Marketing accent: --brand amber"), pre-wired with the contrast rationale for
+   exactly this use and previously applied by no markup. Wiring the span up in home-client.tsx
+   was the missing half; redefining the same rule a second time here would just be dead
+   duplicate CSS the next person has to notice is redundant. */
 
 /* Nav CTA: the topbar's one real action (Sign in) was pure neutral -- border, muted text,
    no colour at all, so nothing in the bar signalled "this is the thing to click" the way the
