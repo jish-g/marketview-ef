@@ -343,6 +343,28 @@
   padding-top: var(--s-5) !important;
 }
 
+/* ---------------------------------------------------------------- Market open
+   Same request again: box Nifty's and Sensex's "at the open" sections. .market-open-card rides
+   alongside .metric-group.open-instrument, same box as .premarket-card -- but the divider it
+   has to cancel is different. These two sections are direct children of .phase-view with no
+   .metric-groups gap wrapper around them, and ledger targets them unconditionally (not with a
+   "+" sibling rule): ".app-shell.app-shell .phase-view > .open-instrument { border-top;
+   padding-top; margin-top }" (ledger §7) fires on EVERY such child, first included, not just
+   the second. So the override below resets it on every card (not a "+" pair) and margin-bottom
+   on the base rule does the between-cards spacing job .metric-groups' gap does elsewhere. */
+.market-open-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--s-5) !important;
+  margin-bottom: var(--s-4);
+}
+.phase-view > .market-open-card {
+  border-top: 0 !important;
+  margin-top: 0 !important;
+  padding-top: var(--s-5) !important;
+}
+
 /* ---------------------------------------------------------------- GlobalCue/News
    Same request again, same shape as OI History (#183) and Pre-market (#184): box the section
    groups (Verdicts, Why/Watch next, drivers, market basket, headlines, ...) instead of the

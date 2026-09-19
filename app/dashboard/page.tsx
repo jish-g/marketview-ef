@@ -1335,7 +1335,7 @@ function OpenInstrument({ row, instrument, heading, call }: { row: Row; instrume
     { name: 'Aggressive', move: calc.aggressive, target: calc.aggressiveTarget, stop: calc.aggressiveStop },
   ]
 
-  return <section className="metric-group open-instrument">
+  return <section className="metric-group open-instrument market-open-card">
     <div className="group-heading"><h3>{heading} — at the open</h3></div>
     {/* The agent's one-line view for this instrument, stamped violet. Data tiles below are unchanged. */}
     {view
