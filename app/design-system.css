@@ -285,13 +285,28 @@
 .ds-score--down { color: var(--down); }
 
 /* ---------------------------------------------------------------- OI History
-   This screen follows the ledger treatment (app/ledger.css) the rest of the dashboard already
-   uses under .app-shell -- .metric-group/.group-heading for section rhythm, .market-open-tiles
-   for the summary row, ruled rows (not boxes) for a list. It does NOT use Card/.ds-card: under
-   .app-shell that class is unboxed to nothing (ledger §1), so a screen built on Card renders
-   with no visible separation at all -- which is what shipped here the first time. The event
-   rows mirror .mid-agent-row's 56px time gutter + hairline-bottom pattern exactly. */
+   Boxed panels, deliberately -- by request, this screen does NOT follow the rest of the
+   dashboard's unboxed ledger treatment (app/ledger.css). .oi-card is its own class rather than
+   Card/.ds-card so ledger's ".app-shell.app-shell .ds-card { border:0; background:none }" reset
+   (ledger §1) can't strip it under .app-shell: that reset is exactly why the first pass of this
+   screen (built on Card) rendered with no visible separation at all. Scoped to this module only
+   -- other screens keep the ledger's hairline rows until a separate decision changes them too. */
+.oi-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--s-5);
+  margin-bottom: var(--s-4);
+}
+.oi-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-3); }
+.oi-card-head h3 { margin: 0; font-size: var(--text-body); font-weight: 600; color: var(--ink-2); }
 .oi-group-range { font-size: var(--text-label); color: var(--faint); font-family: var(--font-figure); }
+
+.oi-tile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s-5); }
+.oi-tile { display: grid; gap: var(--s-2); align-content: start; }
+.oi-tile-label { font-size: var(--text-label); letter-spacing: 0.03em; text-transform: uppercase; color: var(--faint); }
+.oi-tile-value { font: 600 var(--text-value) var(--font-figure); color: var(--ink); font-variant-numeric: tabular-nums; }
+.oi-tile-sub { font-size: var(--text-meta); color: var(--ink-2); font-variant-numeric: tabular-nums; }
 
 .oi-legend { display: flex; flex-wrap: wrap; gap: var(--s-4); margin-top: var(--s-2); font-size: var(--text-label); color: var(--muted); }
 .oi-legend span { display: inline-flex; align-items: center; gap: 6px; }
