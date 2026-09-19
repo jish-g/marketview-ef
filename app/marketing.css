@@ -135,6 +135,20 @@
 }
 .landing-shell .landing-cta-secondary:hover { background: var(--surface-2); color: var(--ink); }
 
+/* The headline carries the product name -- "AI-Agentic Option Intelligence Platform" --
+   verbatim from the eyebrow above it. Colouring just that phrase brand amber gives the
+   thirty-word sentence a scan point instead of forcing the whole thing to be read start to
+   end; matches the prototype's <em> treatment on its five-word version. */
+.landing-shell .landing-headline-accent { color: var(--brand); }
+
+/* Nav CTA: the topbar's one real action (Sign in) was pure neutral -- border, muted text,
+   no colour at all, so nothing in the bar signalled "this is the thing to click" the way the
+   hero's amber eyebrow dot or CTA row do. A brand-tinted icon plus a brand border on hover is
+   enough to give it a colour identity without competing with Rule 2's neutral primary CTA --
+   this is a wayfinding link, not the page's primary action. */
+.landing-shell .sign-in-link svg { color: var(--brand); }
+.landing-shell .sign-in-link:hover { border-color: color-mix(in srgb, var(--brand) 55%, var(--border)); }
+
 /* ---- Daily reads hub, matched to the prototype ----
    Bias renders as a band badge with its arrow rather than plain text: rule 8, colour is
    never the only signal. The filter becomes the segmented control the design system uses
@@ -487,3 +501,71 @@
   .blog-post-shell .blog-scorecard-compare-card,
   .blog-post-shell .blog-post-related li a { transition: none; }
 }
+
+/* ============================================================
+   "On the chart": each card gets its illustrative visual back.
+   Six cards describing six chart tools, all identical text blocks,
+   was the one place left on the page that was purely typographic --
+   the prototype showed what each tool draws; production only
+   described it. Decorative and stylised (fixed representative
+   shapes, not a live read), same spirit as the differentiator
+   icons above, just built for this specific grid in home-client.tsx
+   rather than a generic icon slot.
+   ============================================================ */
+.chart-feature-visual { margin-top: 14px; }
+
+/* Market Profile (TPO): a horizontal histogram with the point-of-control
+   row picked out in brand amber -- the one row a trader actually reads. */
+.chart-feature-visual-tpo {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+.tpo-rows { flex: 1; display: grid; gap: 3px; min-width: 0; }
+.tpo-row { display: flex; align-items: center; gap: 8px; }
+.tpo-row-px {
+  flex: 0 0 auto;
+  width: 54px;
+  text-align: right;
+  color: var(--faint);
+  font-family: var(--font-figure);
+  font-size: 10.5px;
+}
+.tpo-row-bar { height: 8px; border-radius: 2px; background: color-mix(in srgb, var(--info) 45%, transparent); }
+.tpo-row.is-poc .tpo-row-px { color: var(--brand); font-weight: 600; }
+.tpo-row.is-poc .tpo-row-bar { background: var(--brand); }
+.tpo-side { flex: 0 0 auto; display: grid; gap: 10px; }
+.tpo-stat { display: grid; gap: 2px; }
+.tpo-stat span { color: var(--faint); font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; }
+.tpo-stat strong { font-family: var(--font-figure); font-size: var(--text-meta); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tpo-stat-poc { color: var(--brand); }
+@media (max-width: 520px) {
+  .chart-feature-visual-tpo { flex-direction: column; align-items: stretch; }
+  .tpo-side { flex-direction: row; gap: 24px; }
+}
+
+/* Power Scanner / OI History: a plain line, one colour each so the two
+   sparkline cards don't read as the same card twice. */
+.chart-feature-spark { display: block; width: 100%; height: 36px; }
+.chart-feature-spark polyline { stroke: var(--info); }
+.chart-feature-spark.spark-brand polyline { stroke: var(--brand); }
+.chart-feature-spark .spark-flag { fill: var(--brand); }
+
+/* Market Pulse: a small arc gauge, needle fixed toward "trending". */
+.chart-feature-gauge { display: flex; align-items: center; gap: 10px; }
+.chart-feature-gauge .gauge-track { stroke: var(--border-strong); }
+.chart-feature-gauge .gauge-fill { stroke: var(--up); }
+.chart-feature-gauge .gauge-dot { fill: var(--up); }
+.chart-feature-gauge span { font-family: var(--font-figure); font-size: var(--text-label); color: var(--muted); }
+
+/* Derivatives Positioning: alternating info/caution bars -- the two
+   signals ("PCR bias" vs "OI-wall pull") this card's body text names. */
+.chart-feature-bars { display: flex; align-items: flex-end; gap: 5px; height: 38px; }
+.chart-feature-bars span { flex: 1; border-radius: 2px 2px 0 0; background: var(--info); }
+.chart-feature-bars span:nth-child(2n) { background: var(--caution); }
+.chart-feature-bars span:nth-child(4) { background: var(--brand); }
+
+/* Options Print & Greeks: a compact readout row, the actual shape of
+   the per-strike data this card describes. */
+.chart-feature-greeks { display: flex; gap: 14px; flex-wrap: wrap; font-family: var(--font-figure); font-size: 11px; color: var(--faint); }
+.chart-feature-greeks em { display: block; font-style: normal; color: var(--muted); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; }
