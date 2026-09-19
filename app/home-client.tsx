@@ -50,6 +50,97 @@ const chartFeatures = [
   { title: 'OI History', body: 'How PCR, max pain, and the key OI strikes moved through the whole session, not just where they sit right now.' },
 ]
 
+// One illustrative visual per chartFeatures entry, same index order. Decorative only --
+// stylised, not a live read -- so each is built from fixed, representative shapes rather than
+// real numbers, the same way the differentiator icons above are decorative rather than data.
+function TpoProfileVisual() {
+  const rows: Array<{ px: string; pct: number; poc?: boolean }> = [
+    { px: '25,220', pct: 18 },
+    { px: '25,180', pct: 34 },
+    { px: '25,140', pct: 58 },
+    { px: '25,100', pct: 92, poc: true },
+    { px: '25,060', pct: 71 },
+    { px: '25,020', pct: 40 },
+    { px: '24,980', pct: 15 },
+  ]
+  return (
+    <div className="chart-feature-visual chart-feature-visual-tpo">
+      <div className="tpo-rows">
+        {rows.map((row) => (
+          <div className={`tpo-row${row.poc ? ' is-poc' : ''}`} key={row.px}>
+            <span className="tpo-row-px">{row.px}</span>
+            <span className="tpo-row-bar" style={{ width: `${row.pct}%` }} />
+          </div>
+        ))}
+      </div>
+      <div className="tpo-side">
+        <div className="tpo-stat">
+          <span>Point of control</span>
+          <strong className="tpo-stat-poc">25,100</strong>
+        </div>
+        <div className="tpo-stat">
+          <span>Value area</span>
+          <strong>25,040&ndash;25,160</strong>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SparkVisual({ tone, points, flagAt }: { tone: 'brand' | 'info'; points: string; flagAt?: [number, number] }) {
+  return (
+    <svg className={`chart-feature-visual chart-feature-spark spark-${tone}`} viewBox="0 0 240 40" preserveAspectRatio="none" aria-hidden="true">
+      <polyline points={points} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+      {flagAt && <circle cx={flagAt[0]} cy={flagAt[1]} r="3.5" className="spark-flag" />}
+    </svg>
+  )
+}
+
+function PulseGaugeVisual() {
+  return (
+    <div className="chart-feature-visual chart-feature-gauge">
+      <svg width="52" height="32" viewBox="0 0 52 32" aria-hidden="true">
+        <path d="M4 28 A22 22 0 0 1 48 28" fill="none" className="gauge-track" strokeWidth="5" />
+        <path d="M4 28 A22 22 0 0 1 35 8" fill="none" className="gauge-fill" strokeWidth="5" strokeLinecap="round" />
+        <circle cx="35" cy="8" r="3" className="gauge-dot" />
+      </svg>
+      <span>Trending, flow agrees</span>
+    </div>
+  )
+}
+
+function PositioningBarsVisual() {
+  const bars = [40, 65, 30, 85, 50]
+  return (
+    <div className="chart-feature-visual chart-feature-bars">
+      {bars.map((h, i) => (
+        // eslint-disable-next-line react/no-array-index-key
+        <span key={i} style={{ height: `${h}%` }} />
+      ))}
+    </div>
+  )
+}
+
+function GreeksVisual() {
+  const greeks = [['Δ', '0.52'], ['Γ', '0.004'], ['Θ', '−4.1'], ['V', '18.2']]
+  return (
+    <div className="chart-feature-visual chart-feature-greeks">
+      {greeks.map(([label, value]) => (
+        <span key={label}><em>{label}</em>{value}</span>
+      ))}
+    </div>
+  )
+}
+
+const chartFeatureVisuals = [
+  <TpoProfileVisual key="tpo" />,
+  <SparkVisual key="power-scanner" tone="info" points="0,30 40,26 80,28 110,12 150,18 190,10 230,16" flagAt={[110, 12]} />,
+  <PulseGaugeVisual key="market-pulse" />,
+  <PositioningBarsVisual key="positioning" />,
+  <GreeksVisual key="greeks" />,
+  <SparkVisual key="oi-history" tone="brand" points="0,20 40,24 80,14 120,18 160,10 200,16 240,6" />,
+]
+
 const testimonials = [
   {
     quote: 'I was spending 45 minutes every morning interpreting PCR, gap analysis, and OI levels across Nifty and Sensex. MarketCue cut that down to 3 minutes — and I actually trust the read more because the rules are documented.',
@@ -213,7 +304,7 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
       <section className="landing-hero">
         <div className="landing-hero-copy">
           <p className="eyebrow">AI-Agentic Option Intelligence Platform for Indian Stock Market</p>
-          <h1 className="landing-headline">MarketCue is an AI-Agentic Option Intelligence Platform for Indian Stock Market</h1>
+          <h1 className="landing-headline">MarketCue is an <span className="landing-headline-accent">AI-Agentic Option Intelligence Platform</span> for Indian Stock Market</h1>
           <div className="landing-hero-ctas">
             <Link href="/dashboard" className="landing-cta-primary">Verdict <ArrowRight size={15} /></Link>
             <Link href="/nifty-sensex-today" className="landing-cta-secondary"><Newspaper size={15} /> Nifty and Sensex today</Link>
@@ -332,10 +423,11 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           <h2 className="eyebrow">On the chart</h2>
           <p className="landing-body-text">Beyond the pre-market and post-market calls, the live Chart screen runs its own set of options-intelligence tools, each reading real Nifty and Sensex data.</p>
           <ul className="landing-features-grid">
-            {chartFeatures.map(({ title, body }) => (
+            {chartFeatures.map(({ title, body }, i) => (
               <li className="landing-feature" key={title}>
                 <strong>{title}</strong>
                 <p>{body}</p>
+                {chartFeatureVisuals[i]}
               </li>
             ))}
           </ul>
