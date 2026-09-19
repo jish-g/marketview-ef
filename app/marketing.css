@@ -804,3 +804,93 @@
 @keyframes mc-grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes mc-grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes mc-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+
+/* ============================================================
+   Hero: the "One read" panel.
+
+   Replaces the live pre/post-market snapshot card. Six input chips
+   collapse -- literally, through a bracket and an amber arrow -- into
+   one row per index: direction badge, the two scores, the structure
+   type. It is an example and says so twice (the stamp, the note under
+   it), and it links to /rules because the table that picks the
+   structure is the proof. --up/--down appear only on things that ARE a
+   direction: the input ticks and the Bullish/Bearish badges.
+
+   The frame, shadow, accent bar and rise-in come from
+   .landing-snapshot-card (globals.css + pass two above); this block is
+   the inside. The chips and rows stagger in with the same mc-fade the
+   old card's rows used, so the collapse plays as two beats.
+   ============================================================ */
+.landing-read { padding: 18px 20px 16px; background: linear-gradient(160deg, color-mix(in srgb, var(--brand) 12%, var(--surface)), var(--surface) 60%); }
+.landing-read-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.landing-shell .landing-read-head .eyebrow { font-size: 11px; }
+.landing-read-stamp { font: var(--text-label) var(--font-mono); color: var(--faint); }
+
+.landing-read-inputs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin: 16px 0 0; padding: 0; list-style: none; }
+.landing-read-input {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2);
+  font: 10.5px var(--font-mono); color: var(--muted); text-align: center; line-height: 1.2;
+}
+.landing-read-input i { font-style: normal; font-size: 12px; font-weight: 700; line-height: 1; }
+.landing-read-input.dir-up i { color: var(--up); }
+.landing-read-input.dir-down i { color: var(--down); }
+.landing-read-input.dir-flat i { color: var(--faint); }
+
+.landing-read-collapse {
+  position: relative; height: 24px; margin: 4px 22px 2px;
+  border: 1px solid var(--border-strong); border-top: 0; border-radius: 0 0 10px 10px;
+}
+.landing-read-collapse::after {
+  content: '\2193'; position: absolute; left: 50%; bottom: -9px; translate: -50% 0;
+  width: 18px; height: 18px; border-radius: 50%; background: var(--brand); color: var(--action-ink);
+  font: 700 11px/18px var(--font-mono); text-align: center;
+}
+.landing-shell.dark .landing-read-collapse::after, .landing-read-collapse::after { color: var(--ground); }
+
+.landing-read-rows { display: grid; gap: 8px; margin-top: 16px; }
+.landing-read-row {
+  display: grid; grid-template-columns: 62px auto 1fr; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+  color: inherit; text-decoration: none; transition: border-color 140ms ease, transform 140ms ease;
+}
+.landing-read-row:hover { border-color: color-mix(in srgb, var(--brand) 50%, var(--border)); transform: translateY(-1px); }
+.landing-read-idx { font: 700 var(--text-label) var(--font-mono); letter-spacing: .06em; color: var(--ink); }
+.landing-read-dir { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--radius-full); font: 600 var(--text-label) var(--font-mono); white-space: nowrap; }
+.landing-read-dir.dir-up { background: color-mix(in srgb, var(--up) 18%, transparent); color: var(--up); }
+.landing-read-dir.dir-down { background: color-mix(in srgb, var(--down) 18%, transparent); color: var(--down); }
+.landing-read-scores { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+.landing-read-scores span { font: 10.5px var(--font-mono); color: var(--faint); font-variant-numeric: tabular-nums; }
+.landing-read-scores strong { font-size: var(--text-label); font-weight: 600; color: var(--brand); }
+
+.landing-read-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);
+  font: var(--text-label) var(--font-mono); color: var(--muted);
+}
+.landing-read-foot a { display: inline-flex; align-items: center; gap: 4px; color: var(--brand); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.landing-read-foot a:hover { text-decoration: underline; }
+.landing-read-note { margin: 8px 0 0; font-size: 11px; line-height: 1.4; color: var(--faint); }
+
+@media (max-width: 420px) {
+  .landing-read-inputs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .landing-read-row { grid-template-columns: 1fr auto; }
+  .landing-read-scores { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; }
+  .landing-read-foot { flex-direction: column; align-items: flex-start; }
+}
+
+/* Two-beat arrival: chips first, then the arrow, then the rows -- the collapse acted out.
+   Same keyframes and reduced-motion gate as the old card's rows in globals.css. */
+@media (prefers-reduced-motion: no-preference) {
+  .landing-read-input { animation: mc-fade 420ms ease-out both; }
+  .landing-read-input:nth-child(1) { animation-delay: 160ms; }
+  .landing-read-input:nth-child(2) { animation-delay: 210ms; }
+  .landing-read-input:nth-child(3) { animation-delay: 260ms; }
+  .landing-read-input:nth-child(4) { animation-delay: 310ms; }
+  .landing-read-input:nth-child(5) { animation-delay: 360ms; }
+  .landing-read-input:nth-child(6) { animation-delay: 410ms; }
+  .landing-read-collapse { animation: mc-fade 420ms ease-out 560ms both; }
+  .landing-read-row:nth-child(1) { animation: mc-fade 520ms ease-out 700ms both; }
+  .landing-read-row:nth-child(2) { animation: mc-fade 520ms ease-out 820ms both; }
+  .landing-read-foot, .landing-read-note { animation: mc-fade 520ms ease-out 960ms both; }
+}

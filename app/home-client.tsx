@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { fmt } from '@/lib/format'
 import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import useSWR from 'swr'
@@ -43,10 +42,29 @@ const predictedMoveRows = [
 // Two rows from the Bias/IV/VIX/DTE strategy map (app/dashboard/page.tsx `biasStrategyMap`),
 // shown as an example of the output's shape. Marked illustrative where it renders: the live
 // call is computed on the dashboard from the day's row, and this card does not fetch it.
+// Structure TYPES only, never a strike, price, quantity or entry -- the public page describes
+// the feature; it does not publish a recommendation. See the note on `heroRead` too.
 const strategyExample = [
   { idx: 'Nifty', bias: 'Bearish · Cheap IV', strat: 'Put Debit Spread' },
   { idx: 'Sensex', bias: 'Neutral · Expensive IV', strat: 'Iron Condor' },
 ]
+
+// The hero's "One read" panel: six inputs collapsing into one call per index. Every value is
+// an example -- the panel is labelled so, and the site's not-an-adviser line sits under it --
+// chosen so both directions show (green and red are used only where the thing IS a direction).
+// The ticks are the six inputs the pre-market read scores (gap, OI, PCR, max pain, IV, VIX);
+// the rows are the Verdict's output shape: direction, Bias and Readiness scores, structure type.
+const heroRead = {
+  inputs: [
+    { label: 'Gap', dir: 'up' }, { label: 'OI', dir: 'down' }, { label: 'PCR', dir: 'up' },
+    { label: 'Max pain', dir: 'flat' }, { label: 'IV', dir: 'flat' }, { label: 'VIX', dir: 'up' },
+  ] as Array<{ label: string; dir: 'up' | 'down' | 'flat' }>,
+  rows: [
+    { idx: 'NIFTY', dir: 'up' as const, label: 'Bullish', bias: 62, readiness: 71, strat: 'Call Debit Spread' },
+    { idx: 'SENSEX', dir: 'down' as const, label: 'Bearish', bias: 38, readiness: 55, strat: 'Call Credit Spread' },
+  ],
+  move: 'Expected move ±142 pts · Target 71 / Stop 43',
+}
 
 // A real sentence from a real published read, credited to its date -- not composed for the
 // homepage. If that post is ever unpublished, swap this for another one, not for invented copy.
@@ -119,19 +137,8 @@ type HomeClientProps = {
   initialTicker: TickerData | null
 }
 
-function fmtPct(v: any) {
-  if (v === null || v === undefined || v === '') return null
-  return fmt.pct(Number(v))
-}
-function tone(v: any) {
-  const n = Number(v)
-  return Number.isNaN(n) || n === 0 ? '' : n > 0 ? 'positive' : 'negative'
-}
 function todayIST() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
-}
-function nowLabelIST() {
-  return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date())
 }
 function istHour() {
   return Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: false }).format(new Date()))
@@ -174,43 +181,14 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
     { fallbackData: tradeDate === initialTradeDate ? initialPost : undefined }
   )
 
-  // Pre-market note line: the "today's opening read" this used to show reads
-  // market_bias_nifty/sensex, which is only computed once the 9:30 AM open phase runs -- so
-  // showing it on the 8:58 AM pre-market card was either blank or stale. What's genuinely
-  // known at that hour is how the PRIOR day went, so this fetches the most recent
-  // postmarket_summary row strictly before today and shows a short recap of that instead --
-  // same "prefer the AI recap_story, fall back to a short rules sentence" pattern already used
-  // on the dashboard's own Pre-market banner (see app/dashboard/page.tsx priorDayLines).
-  const { data: priorDay } = useSWR(
-    ['home-priorday', tradeDate],
-    async () => {
-      const { data, error } = await supabase.from('postmarket_summary').select('trade_date, day_change_pct_nifty, day_change_pct_sensex, recap_story_nifty').lt('trade_date', tradeDate).order('trade_date', { ascending: false }).limit(1).maybeSingle()
-      if (error) throw error
-      return data as Row | null
-    }
-  )
-
+  // The hero no longer renders today's figures (it shows the product's output shape as a
+  // labelled example instead), so the prior-day recap fetch that only fed the old card is
+  // gone. What the two fetches above still decide is the panel's footer: whether today's
+  // read is published yet, and which phase it is -- a true statement about the live site
+  // without putting a live number next to example ones.
   const showPost = preferPost && !!post
   const pending = showPost ? !post : !pre
-  // Pre-market can't know today's gap -- that needs today's actual open price, which doesn't
-  // exist until the market opens at 9:15 AM. What IS genuinely known pre-market is how the
-  // prior session closed, so the card shows "Prev close" (% and points) instead of a "Gap" that
-  // would otherwise always read null/misleading before the open phase has run.
-  const fmtPrevClose = (pct: any, pts: any) => pct != null ? `${fmtPct(pct)}${pts != null ? ` (${fmt.pts(Number(pts))})` : ''}` : null
-  const prevCloseNifty = fmtPrevClose(pre?.prev_day_change_pct_nifty, pre?.prev_day_change_pts_nifty)
-  const prevCloseSensex = fmtPrevClose(pre?.prev_day_change_pct_sensex, pre?.prev_day_change_pts_sensex)
-
-  // Short fallback sentence when the prior day has no AI-phrased recap_story yet (e.g. it
-  // predates that feature, or the AI call failed that day) -- built only from the prior day's
-  // own close-to-close % move, so it stays honest about what's actually known rather than
-  // guessing at bias language.
-  const priorDayFallback = priorDay?.day_change_pct_nifty != null
-    ? `Nifty closed ${fmt.pct(Number(priorDay.day_change_pct_nifty))}${priorDay.day_change_pct_sensex != null ? `, Sensex ${fmt.pct(Number(priorDay.day_change_pct_sensex))}` : ''} in the prior session.`
-    : null
-
-  const readLine = showPost
-    ? (post?.recap_story_nifty ?? null)
-    : (priorDay?.recap_story_nifty ?? priorDayFallback)
+  const phaseLabel = showPost ? 'post-market' : 'pre-market'
 
   return (
     <main className="landing-shell">
@@ -254,57 +232,41 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
         </div>
 
         <div className="landing-hero-showcase">
-          <div className="landing-snapshot-card">
-            <div className="landing-snapshot-head">
-              <span className="landing-live-dot" aria-hidden="true" />
-              <span className="landing-snapshot-meta">{showPost ? 'Post-market' : 'Pre-market'} snapshot · {nowLabelIST()}</span>
-              <span className={`landing-snapshot-badge ${showPost ? 'landing-snapshot-badge-post' : 'landing-snapshot-badge-pre'}`}>{showPost ? 'Post-market' : 'Pre-market'}</span>
+          {/* Reuses .landing-snapshot-card for the frame, shadow, accent bar and the rise-in
+              animation globals.css already gives it; everything inside is the read panel. */}
+          <div className="landing-snapshot-card landing-read">
+            <div className="landing-read-head">
+              <span className="eyebrow">One read, every session</span>
+              <span className="landing-read-stamp">Example read</span>
             </div>
-            {pending ? (
-              <div className="landing-snapshot-pending">
-                <p>{showPost ? 'Post-market wrap lands here shortly after the close.' : 'Pre-market snapshot lands here at 8:59 AM IST.'}</p>
-              </div>
-            ) : (
-              <>
-                <div className="landing-snapshot-rows">
-                  <div className="landing-snapshot-row">
-                    <div>
-                      <span className="landing-snapshot-row-label">Nifty 50</span>
-                      <span className="landing-snapshot-row-sub">{showPost ? (post?.day_low_nifty != null && post?.day_high_nifty != null ? `${post.day_low_nifty} – ${post.day_high_nifty}` : '') : (pre?.days_to_expiry_nifty != null ? `${pre.days_to_expiry_nifty}d to expiry` : '')}</span>
-                    </div>
-                    <div className="landing-snapshot-row-value">
-                      <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Prev Close'}</span>
-                      <strong>{showPost ? (fmtPct(post?.day_change_pct_nifty) && <em className={tone(post?.day_change_pct_nifty)}>{fmtPct(post?.day_change_pct_nifty)}</em>) : (prevCloseNifty != null && <em className={tone(pre?.prev_day_change_pct_nifty)}>{prevCloseNifty}</em>)}</strong>
-                    </div>
-                  </div>
-                  <div className="landing-snapshot-divider" />
-                  <div className="landing-snapshot-row">
-                    <div>
-                      <span className="landing-snapshot-row-label">Sensex</span>
-                      <span className="landing-snapshot-row-sub">{showPost ? (post?.day_low_sensex != null && post?.day_high_sensex != null ? `${post.day_low_sensex} – ${post.day_high_sensex}` : '') : (pre?.days_to_expiry_sensex != null ? `${pre.days_to_expiry_sensex}d to expiry` : '')}</span>
-                    </div>
-                    <div className="landing-snapshot-row-value">
-                      <span className="landing-snapshot-row-tag">{showPost ? 'Closed' : 'Prev Close'}</span>
-                      <strong>{showPost ? (fmtPct(post?.day_change_pct_sensex) && <em className={tone(post?.day_change_pct_sensex)}>{fmtPct(post?.day_change_pct_sensex)}</em>) : (prevCloseSensex != null && <em className={tone(pre?.prev_day_change_pct_sensex)}>{prevCloseSensex}</em>)}</strong>
-                    </div>
-                  </div>
-                </div>
-                {!showPost && pre?.india_vix != null && (
-                  <div className="landing-snapshot-vix">
-                    <span>India VIX</span>
-                    <strong>{pre.india_vix}</strong>
-                  </div>
-                )}
-                {readLine && (
-                  <div className="landing-snapshot-note">
-                    <p>{readLine}</p>
-                  </div>
-                )}
-                <div className="landing-snapshot-link">
-                  <Link href="/nifty-sensex-today">Read the full {showPost ? 'post-market' : 'pre-market'} <ArrowRight size={13} /></Link>
-                </div>
-              </>
-            )}
+            <ul className="landing-read-inputs" aria-label="The six inputs every read scores">
+              {heroRead.inputs.map(({ label, dir }) => (
+                <li className={`landing-read-input dir-${dir}`} key={label}>
+                  <i aria-hidden="true">{dir === 'up' ? '↑' : dir === 'down' ? '↓' : '·'}</i>
+                  {label}
+                </li>
+              ))}
+            </ul>
+            <div className="landing-read-collapse" aria-hidden="true" />
+            <div className="landing-read-rows">
+              {heroRead.rows.map(({ idx, dir, label, bias, readiness, strat }) => (
+                <Link href="/rules" className="landing-read-row" key={idx} title="How the rules pick a structure">
+                  <span className="landing-read-idx">{idx}</span>
+                  <span className={`landing-read-dir dir-${dir}`}>{dir === 'up' ? '↑' : '↓'} {label}</span>
+                  <span className="landing-read-scores">
+                    <span>Bias {bias} &middot; Readiness {readiness}</span>
+                    <strong>{strat}</strong>
+                  </span>
+                </Link>
+              ))}
+            </div>
+            <div className="landing-read-foot">
+              <span>{heroRead.move}</span>
+              <Link href="/nifty-sensex-today">{pending ? `Today’s ${phaseLabel}` : `Today’s ${phaseLabel} read is live`} <ArrowRight size={13} /></Link>
+            </div>
+            <p className="landing-read-note">
+              Example read, not investment advice &middot; {pending ? 'today’s publishes at 8:59 AM IST.' : `today’s ${phaseLabel} read is published.`}
+            </p>
           </div>
         </div>
       </section>
@@ -351,8 +313,8 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
 
             <article className="landing-card landing-reveal">
               <span className="landing-icon-tile tone-caution"><ClipboardCheck size={18} /></span>
-              <strong>Strategy Recommendation</strong>
-              <p>Bias, IV vs. VIX, and days&#8209;to&#8209;expiry mapped to one strategy per index &mdash; not a generic call.</p>
+              <strong>Strategy call, by the rules</strong>
+              <p>Bias, IV vs. VIX, and days&#8209;to&#8209;expiry mapped to one structure type per index by a published table &mdash; not a generic call, and not a tip.</p>
               <div className="landing-strategy-rows">
                 {strategyExample.map(({ idx, bias, strat }) => (
                   <div className="landing-strategy-row" key={idx}>
@@ -362,7 +324,8 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
                   </div>
                 ))}
               </div>
-              <span className="landing-illustrative">Illustrative &mdash; the live call is on the dashboard</span>
+              <Link href="/rules" className="landing-card-link">See the strategy map <ArrowRight size={13} /></Link>
+              <span className="landing-illustrative">Illustrative structure types &mdash; the live call is on the dashboard</span>
             </article>
 
             <article className="landing-card landing-card-wide landing-reveal">
