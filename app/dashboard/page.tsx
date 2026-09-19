@@ -10,17 +10,18 @@ import { JournalView } from '@/components/journal-view'
 import { ChartView } from '@/components/chart-view'
 import { GexView } from '@/components/gex-view'
 import { OiHistoryView } from '@/components/oi-history-view'
+import { OptionsPrintView } from '@/components/options-print-view'
 import { GlobalCuesView } from '@/components/global-cues-view'
 import { useSession } from '@/hooks/use-session'
 import { fmt, freshness } from '@/lib/format'
 import { Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, CheckpointTimeline, Progress, PhaseAside, Label, Metric, Banner, TradeLevels, Card, Sparkline } from '@/components/ui/ds'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { useChartColors } from '@/hooks/use-chart-colors'
-import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CandlestickChart, CheckCircle2, ChevronRight, Clock3, Gauge, Globe, History, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sigma, Sun } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CandlestickChart, CheckCircle2, ChevronRight, Clock3, Gauge, Globe, History, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sigma, Sun, Table2 } from 'lucide-react'
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 type Row = Record<string, string | number | boolean | null>
-type Phase = 'premarket' | 'cues' | 'open' | 'verdict' | 'chart' | 'oi_history' | 'gex' | 'mid' | 'post' | 'journal' | 'rules' | 'history' | 'trade'
-const PHASE_VALUES: Phase[] = ['premarket', 'cues', 'open', 'verdict', 'chart', 'oi_history', 'gex', 'mid', 'post', 'journal', 'rules', 'history', 'trade']
+type Phase = 'premarket' | 'cues' | 'open' | 'verdict' | 'chart' | 'oi_history' | 'options_print' | 'gex' | 'mid' | 'post' | 'journal' | 'rules' | 'history' | 'trade'
+const PHASE_VALUES: Phase[] = ['premarket', 'cues', 'open', 'verdict', 'chart', 'oi_history', 'options_print', 'gex', 'mid', 'post', 'journal', 'rules', 'history', 'trade']
 const phases = [
   { id: 'cues' as Phase, label: 'GlobalCue/News', subtitle: 'Global → India intelligence', icon: Globe },
   { id: 'premarket' as Phase, label: 'Pre-market', subtitle: 'Overnight setup', icon: Clock3 },
@@ -28,6 +29,7 @@ const phases = [
   { id: 'verdict' as Phase, label: 'Verdict', subtitle: 'Strategy selection', icon: CheckCircle2 },
   { id: 'chart' as Phase, label: 'Chart', subtitle: 'Price action', icon: CandlestickChart },
   { id: 'oi_history' as Phase, label: 'OI History', subtitle: 'PCR · max pain · S/R', icon: History },
+  { id: 'options_print' as Phase, label: 'Options Print', subtitle: 'Per-strike OI & Greeks', icon: Table2 },
   { id: 'gex' as Phase, label: 'GEX', subtitle: 'Dealer positioning', icon: Sigma },
   { id: 'mid' as Phase, label: 'Mid-market', subtitle: 'Intraday read', icon: Gauge },
   { id: 'trade' as Phase, label: 'Trade', subtitle: 'Live positions', icon: ArrowUp },
@@ -1726,5 +1728,5 @@ export default function Dashboard() {
       </span>
       {!latestIsPrevious && <button type="button" className="archive-bar-exit" onClick={() => goToSession(null)}>Back to today</button>}
     </div>}
-    <div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile === true && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)} aria-current={phase === id ? 'page' : undefined}><span><strong>{label}</strong><small>{subtitle}</small></span></button>)}<div className="side-rule" /><div className="side-source"><span className="side-label">Data source</span><strong>NSE option chain</strong><small>{capturedLabel}</small></div></aside>{isMobile === true && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView row={row} /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} agentCalls={agentCalls} /> : phase === 'chart' ? <ChartView row={row} /> : phase === 'oi_history' ? <OiHistoryView /> : phase === 'gex' ? <GexView /> : phase === 'cues' ? <GlobalCuesView /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} agentCalls={agentCalls} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} agentCalls={agentCalls} /> : phase === 'open' && row && row.gap_points_nifty != null ? <MarketOpenView row={row} capturedAt={(row.updated_at ?? null) as string | null} agentCalls={agentCalls} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} onSeeVerdict={() => setPhase('verdict')} agentCalls={agentCalls} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
+    <div className="workspace"><aside id="session-map" className={`sidebar ${navOpen ? '' : 'closed'}`} aria-hidden={isMobile === true && !navOpen}><div className="side-label">SESSION MAP</div>{visiblePhases.map(({ id, label, subtitle }) => <button key={id} className={`phase-nav ${phase === id ? 'active' : ''}`} onClick={() => selectPhase(id)} aria-current={phase === id ? 'page' : undefined}><span><strong>{label}</strong><small>{subtitle}</small></span></button>)}<div className="side-rule" /><div className="side-source"><span className="side-label">Data source</span><strong>NSE option chain</strong><small>{capturedLabel}</small></div></aside>{isMobile === true && navOpen && <button type="button" className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}<div className="content">{phase === 'rules' ? <RulesView row={row} /> : phase === 'history' ? <HistoryView data={historyData} /> : phase === 'verdict' ? <VerdictView row={row} agentCalls={agentCalls} /> : phase === 'chart' ? <ChartView row={row} /> : phase === 'oi_history' ? <OiHistoryView /> : phase === 'options_print' ? <OptionsPrintView /> : phase === 'gex' ? <GexView /> : phase === 'cues' ? <GlobalCuesView /> : phase === 'mid' ? <MidMarketView row={row} midCheckpoints={midCheckpoints} agentCalls={agentCalls} /> : phase === 'trade' ? (isAdmin ? <TradeView /> : null) : phase === 'post' ? <PostMarketView row={row} postSummary={postSummary} agentCalls={agentCalls} /> : phase === 'open' && row && row.gap_points_nifty != null ? <MarketOpenView row={row} capturedAt={(row.updated_at ?? null) as string | null} agentCalls={agentCalls} /> : phase === 'journal' ? (isAdmin ? <JournalView /> : null) : <PhaseView phase={phase} row={row} historyData={historyData} onSeeVerdict={() => setPhase('verdict')} agentCalls={agentCalls} />}<footer className="data-footer"><span><CheckCircle2 size={14} /> {liveRow ? 'Live Supabase data' : 'Visual preview data'}</span><span>Snapshot: {row.trade_date}</span></footer></div></div></main>
 }
