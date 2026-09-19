@@ -13,11 +13,12 @@ import { OiHistoryView } from '@/components/oi-history-view'
 import { OptionsPrintView } from '@/components/options-print-view'
 import { GlobalCuesView } from '@/components/global-cues-view'
 import { useSession } from '@/hooks/use-session'
+import { isAdminEmail } from '@/lib/is-admin'
 import { fmt, freshness } from '@/lib/format'
 import { Disclaimer, EmptyState, Band, FreshnessStamp, ProvenanceBadge, CheckpointTimeline, Progress, PhaseAside, Label, Metric, Banner, TradeLevels, Card, Sparkline } from '@/components/ui/ds'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { useChartColors } from '@/hooks/use-chart-colors'
-import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CandlestickChart, CheckCircle2, ChevronRight, Clock3, Gauge, Globe, History, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, Sigma, Sun, Table2 } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, BookOpen, CandlestickChart, CheckCircle2, ChevronRight, Clock3, Gauge, Globe, History, Info, Layers3, LogIn, LogOut, Menu, Moon, PenLine, RefreshCw, RotateCcw, ShieldCheck, Sigma, Sun, Table2 } from 'lucide-react'
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 type Row = Record<string, string | number | boolean | null>
 type Phase = 'premarket' | 'cues' | 'open' | 'verdict' | 'chart' | 'oi_history' | 'options_print' | 'gex' | 'mid' | 'post' | 'journal' | 'rules' | 'history' | 'trade'
@@ -1545,7 +1546,7 @@ export default function Dashboard() {
   // render signed-out also grants admin locally. Both halves are build-time constants, so
   // `next build` folds this to false and drops it -- see components/auth-guard.tsx.
   const DEV_BYPASS = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true'
-  const isAdmin = DEV_BYPASS || session?.user?.email === 'jishnu@ziovy.com'
+  const isAdmin = DEV_BYPASS || isAdminEmail(session?.user?.email)
   const visiblePhases = isAdmin ? phases : phases.filter((p) => p.id !== 'trade' && p.id !== 'journal')
   useEffect(() => { if (!sessionLoading && !isAdmin && phase === 'trade') setPhase('premarket') }, [sessionLoading, isAdmin, phase])
   // Which trading session the whole dashboard is showing. null means "the newest published
@@ -1718,7 +1719,7 @@ export default function Dashboard() {
     {/* The topbar's TODAY button is gone. It only ever appeared when archived -- exactly when
         the archive bar below is also showing its "Back to today" -- so the two rendered
         together and did the same thing. The bar's is the one to keep: it sits inside the
-        state it exits. */}<div className="topbar-meta">{/* The freshness stamp lived here and in every screen's own header, saying the same thing twice on one view. The screen-level one is kept -- it sits beside the read it qualifies, which is where it means something. */}<button type="button" className="icon-button" onClick={() => setDark(!dark)} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'} aria-pressed={!dark}>{dark ? <Sun size={16} /> : <Moon size={16} />}</button>{!sessionLoading && (session ? <button type="button" className="topbar-toggle" onClick={() => signOut()}>Sign out</button> : <Link href="/login" className="topbar-toggle">Sign in</Link>)}</div></header>
+        state it exits. */}<div className="topbar-meta">{/* The freshness stamp lived here and in every screen's own header, saying the same thing twice on one view. The screen-level one is kept -- it sits beside the read it qualifies, which is where it means something. */}<button type="button" className="icon-button" onClick={() => setDark(!dark)} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'} aria-pressed={!dark}>{dark ? <Sun size={16} /> : <Moon size={16} />}</button>{!sessionLoading && isAdmin && <Link href="/admin" className="topbar-toggle" style={{ gap: 6 }}><ShieldCheck size={14} /> Admin</Link>}{!sessionLoading && (session ? <button type="button" className="topbar-toggle" onClick={() => signOut()}>Sign out</button> : <Link href="/login" className="topbar-toggle">Sign in</Link>)}</div></header>
     {isArchived && <div className="archive-bar" role="status">
       <span className="archive-bar-tag">{latestIsPrevious ? 'Previous session' : 'Archived session'}</span>
       <span className="archive-bar-text">

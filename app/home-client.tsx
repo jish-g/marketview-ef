@@ -5,8 +5,9 @@ import { fmt } from '@/lib/format'
 import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import useSWR from 'swr'
-import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Menu, Moon, Newspaper, Send, Sun, X } from 'lucide-react'
+import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Menu, Moon, Newspaper, Send, ShieldCheck, Sun, X } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
+import { isAdminEmail } from '@/lib/is-admin'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { createClient } from '@/lib/supabase/client'
 import MarketTicker from '@/components/market-ticker'
@@ -189,6 +190,9 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           <div className={`landing-nav-links ${menuOpen ? 'is-open' : ''}`}>
             <Link href="/nifty-sensex-today" className="topbar-link" onClick={() => setMenuOpen(false)}>Nifty and Sensex today</Link>
             <Link href="/global-cues-today" className="topbar-link" onClick={() => setMenuOpen(false)}>Global cues</Link>
+            {!loading && isAdminEmail(session?.user?.email) && (
+              <Link href="/admin" className="sign-in-link" onClick={() => setMenuOpen(false)}><ShieldCheck size={13} /> Admin</Link>
+            )}
             {!loading && (session ? (
               <button type="button" className="sign-in-link" onClick={() => { setMenuOpen(false); signOut() }}><LogOut size={13} /> Sign out</button>
             ) : (
