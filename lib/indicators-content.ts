@@ -100,8 +100,19 @@ export const INDICATOR_SECTIONS = [
     ],
   },
   {
+    id: 'marketpulse',
+    title: '10. Market Pulse — Session Regime & CVD Confirmation',
+    intro:
+      "A one-line session read combining two things already computed elsewhere on this chart, not a new data source. Regime is a light heuristic -- how much of today's own high-low range the net move actually covers -- not the calibrated, history-trained session classifier used elsewhere in the product's own scoring; a close near the open despite a wide range reads as range-bound, a close near one extreme reads as trending. CVD confirmation restates whether today's net move and the CVD-proxy's running sign agree. Draws nothing -- legend-only, context rather than a level to react to bar by bar.",
+    columns: ['Element', 'Basis', 'Notes'],
+    rows: [
+      ['Regime', '|close − open| ÷ (session high − low), >60% = trending', 'Heuristic, not the calibrated classifier'],
+      ['CVD confirmation', "Agreement between today's net move and the CVD-proxy's sign", 'Same futures data the CVD-proxy indicator already loads'],
+    ],
+  },
+  {
     id: 'fiidii',
-    title: '10. FII / DII — Cash Market Net Flow',
+    title: '11. FII / DII — Cash Market Net Flow',
     intro:
       "The most recent FII and DII cash-market net flow on record, read from the daily post-market pipeline job. Unlike every other indicator on this chart, it draws nothing -- it's a legend-only line, because it isn't a price level and isn't an intraday signal. It's a slow, end-of-day figure, and the underlying data itself can lag by several days depending on when the upstream source publishes it, which is why the data date is always shown alongside the numbers rather than implying it's today's flow. Read it as regime context -- who's been net buying or selling the cash market lately -- not as something to react to bar by bar.",
     columns: ['Element', 'Source', 'Notes'],
