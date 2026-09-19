@@ -1,4 +1,6 @@
 // Backs the /admin panel (Changelog + Pipeline health sections) in the Next.js app.
+// Changelog entries themselves are written by the deploy-changelog function instead,
+// triggered by Vercel's production-deploy webhook -- this function only ever reads them.
 //
 // This project only holds market data, not the app's auth users -- the app's login lives
 // in a separate, single-admin Supabase auth project (see lib/supabase/auth-client.ts).
@@ -68,28 +70,6 @@ Deno.serve(async (req) => {
         .limit(200)
       if (error) throw error
       return json({ entries: data ?? [] })
-    }
-
-    if (action === 'changelog_insert') {
-      const entry_date = body.entry_date
-      const kind = body.kind
-      const title = body.title
-      const entryBody = body.body
-      if (
-        typeof entry_date !== 'string' || !entry_date ||
-        (kind !== 'feature' && kind !== 'daily') ||
-        typeof title !== 'string' || !title.trim() ||
-        typeof entryBody !== 'string' || !entryBody.trim()
-      ) {
-        return json({ error: 'entry_date, kind (feature|daily), title and body are required' }, 400)
-      }
-      const { data, error } = await admin
-        .from('changelog_entries')
-        .insert({ entry_date, kind, title: title.trim(), body: entryBody.trim() })
-        .select('id, entry_date, kind, title, body, created_at')
-        .single()
-      if (error) throw error
-      return json({ entry: data })
     }
 
     if (action === 'health') {
