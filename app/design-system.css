@@ -83,6 +83,10 @@
 }
 .ds-table tbody tr { border-top: 1px solid var(--border); }
 .ds-table .ds-table__rowhead { font-weight: 500; color: var(--ink); }
+/* The ATM strike row in a per-strike chain table (Options Print) -- a subtle tint, not a border,
+   so it reads as "the center" without competing with the up/down score colors used elsewhere. */
+.ds-table tbody tr.ds-row--atm { background: var(--surface-2); }
+.ds-table tbody tr.ds-row--atm .ds-table__rowhead { font-weight: 700; }
 /* Declared after the generic cell rule so right-alignment actually wins -- the handoff's
    reference HTML loses this contest and renders every figure left-aligned. */
 .ds-table th.ds-num-col, .ds-table td.ds-num-col { text-align: right; font-variant-numeric: tabular-nums; }
