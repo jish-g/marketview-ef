@@ -318,6 +318,31 @@
 .oi-swatch--tri-up { border-bottom: 7px solid var(--up); }
 .oi-swatch--tri-down { border-top: 7px solid var(--down); }
 
+/* ---------------------------------------------------------------- Pre-market
+   Same request as OI History (#183): box the data groups instead of the ledger's hairline
+   rows. .premarket-card rides alongside .metric-group -- it keeps that class's own layout
+   (display:grid, the field-grid/field-card markup) and only adds the box. Scoped to the
+   Pre-market phase only (see renderGroup's `phase === 'premarket'` check in page.tsx) so Market
+   open, which falls back to the same renderGroup before its gap data lands, is untouched. The
+   parent .metric-groups already sets gap:18px, so cards need no margin of their own.
+
+   The reset below cancels ledger's ".metric-group + .metric-group" divider (app/ledger.css §7),
+   which is app-shell-scoped at (0,3,0) and loads after this file -- on a tied specificity it
+   would otherwise win and stack its own top-rule + padding on top of this box's own border,
+   double-lining the gap between two stacked cards. !important is the only reliable way to beat
+   a rule that loads later at equal specificity. */
+.premarket-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--s-5) !important;
+}
+.premarket-card + .premarket-card {
+  border-top: 1px solid var(--border) !important;
+  margin-top: 0 !important;
+  padding-top: var(--s-5) !important;
+}
+
 .oi-event-list { display: grid; margin-top: var(--s-2); }
 .oi-event-row {
   display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: var(--s-3);
