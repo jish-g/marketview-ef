@@ -206,7 +206,10 @@
 .landing-hero::before {
   content: '';
   position: absolute;
-  inset: -14% -10% 0;
+  /* No horizontal bleed: a negative x-inset paints past the container and, with nothing
+     clipping it, gave the whole page a sideways scrollbar. The ellipse is wider than the
+     box anyway, so ending it at the edge loses nothing visible. */
+  inset: -14% 0 0;
   z-index: -1;
   background: radial-gradient(ellipse 75% 85% at 78% 0%, color-mix(in srgb, var(--brand) 22%, transparent), transparent 68%);
   pointer-events: none;
@@ -227,59 +230,10 @@
   background: linear-gradient(90deg, var(--brand), color-mix(in srgb, var(--brand) 30%, transparent));
 }
 
-/* ---- Differentiators: the strongest claim gets the brand treatment,
-   Rule 2's amber-is-identity spent on exactly one card, not the CTA.
-   A top accent bar on top of the tint -- colour alone at 8% background
-   read as a slightly warmer grey, not a deliberately promoted card. ---- */
-.landing-shell .landing-diff-card {
-  position: relative;
-  transition: transform 160ms ease, border-color 160ms ease;
-}
-.landing-shell .landing-diff-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--border-strong);
-}
-.landing-shell .landing-diff-card:last-child {
-  border-color: color-mix(in srgb, var(--brand) 55%, var(--border));
-  background: linear-gradient(160deg, color-mix(in srgb, var(--brand) 14%, var(--surface)), var(--surface) 65%);
-}
-.landing-shell .landing-diff-card:last-child::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto;
-  height: 2px;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-  background: var(--brand);
-}
-
-/* ---- What you get / On the chart: same lift, and the lead card in
-   each grid spans wider so the grid reads as composed rather than a
-   uniform stack of equal boxes. The lead card also gets a quieter
-   version of the same accent bar so "this one is first" is a colour
-   signal, not just a layout one. ---- */
-.landing-shell .landing-feature {
-  position: relative;
-  transition: transform 160ms ease, border-color 160ms ease;
-}
-.landing-shell .landing-feature:hover {
-  transform: translateY(-2px);
-  border-color: var(--border-strong);
-}
-.landing-shell .landing-features-grid .landing-feature:first-child {
-  grid-column: span 2;
-  border-color: color-mix(in srgb, var(--brand) 35%, var(--border));
-}
-.landing-shell .landing-features-grid .landing-feature:first-child::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto;
-  height: 2px;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-  background: color-mix(in srgb, var(--brand) 70%, transparent);
-}
-@media (max-width: 640px) {
-  .landing-shell .landing-features-grid .landing-feature:first-child { grid-column: span 1; }
-}
+/* The "What makes it different" and "What you get" grids that passes one and two styled
+   (.landing-diff-card, .landing-feature) no longer render: the homepage's middle sections
+   were rebuilt around .landing-card in the block at the end of this file. Their rules were
+   removed here rather than left to rot as selectors matching nothing. */
 
 /* ---- Today's numbers: pills, matching the hero CTAs, instead of the
    same bordered block used for every other card on the page. Hover
@@ -348,7 +302,7 @@
 .rules-doc-shell .doc-hero::before {
   content: '';
   position: absolute;
-  inset: -40px -10% 0;
+  inset: -40px 0 0;
   z-index: -1;
   background: radial-gradient(ellipse 55% 90% at 85% 0%, color-mix(in srgb, var(--brand) 11%, transparent), transparent 65%);
   pointer-events: none;
@@ -404,7 +358,7 @@
 .blog-index-shell .archive-hero::before {
   content: '';
   position: absolute;
-  inset: -20% -10% 0;
+  inset: -20% 0 0;
   z-index: -1;
   background: radial-gradient(ellipse 60% 100% at 20% 0%, color-mix(in srgb, var(--brand) 12%, transparent), transparent 65%);
   pointer-events: none;
@@ -483,7 +437,7 @@
 .login-shell::before {
   content: '';
   position: absolute;
-  inset: -15% -10%;
+  inset: -15% 0;
   z-index: -1;
   background: radial-gradient(ellipse 55% 60% at 50% 30%, color-mix(in srgb, var(--brand) 10%, transparent), transparent 65%);
   pointer-events: none;
@@ -570,7 +524,283 @@
 .chart-feature-bars span:nth-child(2n) { background: var(--caution); }
 .chart-feature-bars span:nth-child(4) { background: var(--brand); }
 
-/* Options Print & Greeks: a compact readout row, the actual shape of
-   the per-strike data this card describes. */
-.chart-feature-greeks { display: flex; gap: 14px; flex-wrap: wrap; font-family: var(--font-figure); font-size: 11px; color: var(--faint); }
-.chart-feature-greeks em { display: block; font-style: normal; color: var(--muted); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; }
+/* ============================================================
+   Pass three: the rebuilt middle of the homepage.
+
+   Everything between the hero and "About" was redesigned against the
+   final prototype: a five-phase session journey replaces the abstract
+   three-step "How it works"; "What you get" becomes four cards that do
+   not restate the journey; Global cues and Gamma Exposure get sections
+   of their own; "On the chart" lists the full twelve-indicator catalogue
+   instead of a curated four. The old "Why MarketCue" band and the
+   differentiators grid are gone from the markup.
+
+   Shared vocabulary below: .landing-section-wide (the hero's 1120px,
+   not .landing-section-inner's 820px -- five columns need it),
+   .landing-card with -featured / -wide / -full modifiers, and
+   .landing-icon-tile with tone modifiers. Tones are --brand, --info and
+   --caution only. --up/--down appear solely where the thing IS a
+   direction or a sign: gamma above/below zero, a sentiment band.
+   ============================================================ */
+
+.landing-section-wide { max-width: 1120px; margin: 0 auto; padding-inline: 32px; }
+@media (max-width: 640px) { .landing-section-wide { padding-inline: 18px; } }
+
+.landing-journey, .landing-outputs, .landing-cues, .landing-chart-features, .landing-gex { padding: clamp(56px, 8vw, 92px) 0; }
+.landing-outputs, .landing-chart-features { border-bottom: 1px solid var(--border); }
+
+.landing-section-head { max-width: 680px; margin-bottom: 32px; }
+.landing-section-head .eyebrow { display: inline-flex; }
+.landing-section-title {
+  margin: 10px 0 0;
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: var(--tracking-display);
+  color: var(--ink);
+  text-wrap: balance;
+}
+.landing-section-head .landing-body-text { margin-top: 12px; max-width: 60ch; }
+
+/* ---- Card ---- */
+.landing-card {
+  position: relative;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+.landing-card:hover { transform: translateY(-2px); border-color: var(--border-strong); }
+.landing-card > strong { font-size: var(--read-sm); font-weight: 600; letter-spacing: -.01em; color: var(--ink); }
+.landing-card > p { margin: 0; color: var(--muted); font-size: var(--text-meta); line-height: 1.55; }
+.landing-card-featured {
+  border-color: color-mix(in srgb, var(--brand) 55%, var(--border));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--brand) 14%, var(--surface)), var(--surface) 65%);
+}
+.landing-card-featured::before {
+  content: '';
+  position: absolute; inset: 0 0 auto; height: 2px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--brand);
+}
+.landing-card-link {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: auto; padding-top: 6px;
+  color: var(--brand); font-size: var(--text-label); font-weight: 600; text-decoration: none;
+}
+.landing-card-link:hover { text-decoration: underline; }
+.landing-illustrative { margin-top: auto; padding-top: 8px; color: var(--faint); font-size: 11px; line-height: 1.4; }
+
+.landing-icon-tile {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 36px; height: 36px; margin-bottom: 2px; border-radius: 9px;
+  background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--brand);
+}
+.landing-icon-tile.tone-info { background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info); }
+.landing-icon-tile.tone-caution { background: color-mix(in srgb, var(--caution) 14%, transparent); color: var(--caution); }
+
+/* ---- The session, phase by phase ---- */
+.landing-journey-grid {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0;
+  margin: 0; padding: 0; list-style: none;
+  border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden;
+}
+.landing-journey-step { position: relative; padding: 22px 18px; background: var(--surface); border-left: 1px solid var(--border); }
+.landing-journey-step:first-child { border-left: none; }
+.landing-journey-step.tone-brand { background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 10%, var(--surface)), var(--surface) 70%); }
+.landing-journey-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; margin-bottom: 10px; border-radius: 50%;
+  border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--muted);
+}
+.landing-journey-n { display: block; font: 600 var(--text-label) var(--font-mono); color: var(--brand); }
+.landing-journey-step > strong { display: block; margin-top: 4px; font-size: var(--read-sm); font-weight: 600; }
+.landing-journey-step > p { margin: 8px 0 0; color: var(--muted); font-size: var(--text-meta); line-height: 1.5; }
+.landing-journey-step.tone-info .landing-journey-n { color: var(--info); }
+.landing-journey-step.tone-info .landing-journey-icon { border-color: color-mix(in srgb, var(--info) 60%, var(--border-strong)); color: var(--info); background: color-mix(in srgb, var(--info) 14%, var(--surface-2)); }
+.landing-journey-step.tone-caution .landing-journey-n { color: var(--caution); }
+.landing-journey-step.tone-caution .landing-journey-icon { border-color: color-mix(in srgb, var(--caution) 60%, var(--border-strong)); color: var(--caution); background: color-mix(in srgb, var(--caution) 14%, var(--surface-2)); }
+.landing-journey-step.tone-brand .landing-journey-icon { border-color: var(--brand); color: var(--brand); background: color-mix(in srgb, var(--brand) 16%, var(--surface-2)); }
+@media (max-width: 900px) {
+  .landing-journey-grid { grid-template-columns: 1fr; }
+  .landing-journey-step { border-left: none; border-top: 1px solid var(--border); }
+  .landing-journey-step:first-child { border-top: none; }
+}
+
+/* ---- What you get: 3 columns, two wide cards paired with two singles ---- */
+.landing-outputs-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.landing-card-wide { grid-column: span 2; }
+.landing-formula-rows {
+  display: grid; gap: 1px; margin: 10px 0 0;
+  background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+}
+.landing-formula-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; background: var(--surface); font-size: var(--text-label); }
+.landing-formula-row dt { color: var(--muted); }
+.landing-formula-row dd { margin: 0; font-family: var(--font-figure); color: var(--ink-2); text-align: right; }
+.landing-strategy-rows { display: grid; gap: 8px; margin-top: 12px; }
+.landing-strategy-row { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.landing-strategy-idx { font: 600 10.5px var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--faint); }
+.landing-strategy-bias { font-size: var(--text-label); color: var(--muted); }
+.landing-strategy-strat { font-size: var(--text-meta); font-weight: 600; color: var(--brand); }
+.landing-briefing {
+  margin: 12px 0 0; padding: 14px 16px;
+  border-left: 2px solid var(--info); border-radius: 10px; background: var(--surface-2);
+}
+.landing-briefing p { margin: 0; color: var(--ink-2); font-size: var(--text-meta); font-style: italic; line-height: 1.6; }
+.landing-briefing footer { margin-top: 10px; font: var(--text-label) var(--font-mono); color: var(--info); }
+.landing-briefing footer a { color: inherit; text-decoration: none; }
+.landing-briefing footer a:hover { text-decoration: underline; }
+@media (max-width: 900px) {
+  .landing-outputs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .landing-outputs-grid { grid-template-columns: 1fr; }
+  .landing-card-wide { grid-column: span 1; }
+}
+
+/* ---- Global -> India ---- */
+.landing-cues-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.landing-cues-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.landing-cues-badge { padding: 5px 10px; border-radius: var(--radius-full); font: 600 11px var(--font-mono); }
+.landing-cues-badge.tone-up { background: color-mix(in srgb, var(--up) 18%, transparent); color: var(--up); }
+.landing-cues-badge.tone-info { background: color-mix(in srgb, var(--info) 18%, transparent); color: var(--info); }
+.landing-cues .landing-about-links { margin-top: 20px; }
+.transmission { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+.transmission-node { flex: 1; padding: 14px 10px; text-align: center; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.transmission-node span { display: block; font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); }
+.transmission-node strong { display: block; margin-top: 6px; font-size: var(--text-meta); color: var(--up); }
+.transmission-arrow { display: flex; flex: none; flex-direction: column; align-items: center; gap: 4px; color: var(--info); }
+.transmission-arrow svg { width: 26px; height: 26px; }
+.transmission-arrow span { font: 10px var(--font-mono); color: var(--info); text-transform: uppercase; white-space: nowrap; }
+@media (max-width: 760px) { .landing-cues-grid { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .transmission { flex-direction: column; } .transmission-arrow svg { transform: rotate(90deg); } }
+
+/* ---- On the chart: the twelve-indicator catalogue ---- */
+.landing-chart-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
+.landing-card-full { grid-column: 1 / -1; }
+.landing-chart-features .landing-about-links { margin-top: 20px; }
+@media (max-width: 900px) { .landing-chart-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .landing-chart-grid { grid-template-columns: 1fr; } }
+
+/* OI Walls / Chart Levels / Pivots: a row per level -- dot, label, rule, price. */
+.level-rows { display: grid; gap: 6px; }
+.level-row { display: flex; align-items: center; gap: 8px; font: 11px var(--font-figure); }
+.level-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; }
+.level-label { flex: none; color: var(--muted); }
+.level-bar { flex: 1; height: 1px; background: var(--border); }
+.level-price { flex: none; color: var(--ink-2); }
+.level-row-res .level-dot { background: var(--down); }
+.level-row-res .level-label { color: var(--down); }
+.level-row-res .level-bar { background: color-mix(in srgb, var(--down) 55%, var(--border)); }
+.level-row-sup .level-dot { background: var(--up); }
+.level-row-sup .level-label { color: var(--up); }
+.level-row-sup .level-bar { background: color-mix(in srgb, var(--up) 55%, var(--border)); }
+.level-row-piv .level-dot { background: var(--faint); }
+.level-row-piv .level-bar { background: repeating-linear-gradient(90deg, var(--faint) 0 4px, transparent 4px 8px); }
+
+/* Volume: a per-bar histogram, coloured by that bar's own direction. */
+.volume-bars { display: flex; align-items: flex-end; gap: 3px; height: 30px; }
+.volume-bars span { flex: 1; border-radius: 1px 1px 0 0; background: color-mix(in srgb, var(--muted) 55%, transparent); }
+.volume-bars span.up { background: var(--up); }
+.volume-bars span.down { background: var(--down); }
+
+/* FII / DII: two opposing net-flow bars. */
+.flow-bars { display: flex; align-items: center; gap: 16px; }
+.flow-col { flex: 1; text-align: center; }
+.flow-track { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.flow-track i { display: block; height: 100%; }
+.flow-track-fii i { width: 62%; margin-left: auto; background: var(--down); }
+.flow-track-dii i { width: 74%; background: var(--up); }
+.flow-col span { display: block; margin-top: 6px; font: 10px var(--font-mono); letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
+
+/* ---- Gamma Exposure ---- */
+.landing-gex-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.landing-gex-metric { padding: 16px 18px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.landing-gex-metric span { display: block; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); }
+.landing-gex-metric strong { display: block; margin-top: 6px; font: 600 19px var(--font-figure); font-variant-numeric: tabular-nums; }
+.landing-gex-metric strong.tone-down { color: var(--down); }
+.landing-gex-metric strong.tone-up { color: var(--up); }
+.landing-gex-metric small { display: block; margin-top: 4px; color: var(--muted); font-size: 11.5px; }
+.landing-gex-chart { margin-top: 14px; }
+.landing-gex-chart:hover { transform: none; }
+.landing-gex-chart-label { display: inline-flex; align-items: center; gap: 6px; }
+.gex-bars { position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; height: 90px; margin-top: 12px; }
+.gex-bars::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--border); }
+.gex-bar { position: relative; display: flex; flex: 0 1 32px; flex-direction: column; justify-content: center; width: 32px; max-width: 32px; height: 100%; }
+.gex-fill { width: 100%; border-radius: 2px; }
+.gex-fill-pos { align-self: flex-end; background: var(--up); }
+.gex-fill-neg { align-self: flex-start; background: var(--down); }
+.gex-bar.is-flip::after { content: 'FLIP'; position: absolute; bottom: -18px; left: 50%; translate: -50% 0; font: 700 9px var(--font-mono); color: var(--brand); }
+.landing-gex-legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 24px; font-size: var(--text-label); color: var(--muted); }
+.landing-gex-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.landing-gex-legend i { width: 10px; height: 10px; border-radius: 2px; }
+.landing-gex-legend i.tone-up { background: var(--up); }
+.landing-gex-legend i.tone-down { background: var(--down); }
+.landing-gex-legend i.tone-brand { background: var(--brand); }
+@media (max-width: 760px) { .landing-gex-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---- Closing band now carries copy, not just two buttons ---- */
+.landing-shell .landing-closing-card .eyebrow { display: inline-flex; }
+.landing-shell .landing-closing-card .landing-section-title { margin: 12px auto 0; max-width: 24ch; }
+.landing-shell .landing-closing-card .landing-body-text { margin: 14px auto 0; max-width: 48ch; }
+.landing-shell .landing-closing-ctas { margin-top: 24px; }
+
+/* ============================================================
+   Motion. Two kinds, both CSS-only so nothing depends on JS and the
+   server-rendered HTML is what a crawler and a thumbnail get:
+
+   1. Reveal: cards and section heads rise in as they scroll into view,
+      driven by animation-timeline: view(). Browsers without it simply
+      show everything at rest -- the @supports gate means there is never
+      an opacity:0 that JS was supposed to undo. It animates `translate`,
+      not `transform`, so the hover lift above keeps working on top.
+   2. Grow-in: bars scale up from their baseline and sparklines draw
+      from left to right, once, when their card enters. pathLength=1 on
+      the SVG lines is what lets one dash rule fit every line.
+
+   The whole block is off under prefers-reduced-motion, like the hero's
+   own arrival animation in globals.css.
+   ============================================================ */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .landing-reveal {
+      animation: mc-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 35%;
+    }
+    .landing-reveal .tpo-row-bar,
+    .landing-reveal .level-bar,
+    .landing-reveal .flow-track i {
+      transform-origin: left center;
+      animation: mc-grow-x linear both;
+      animation-timeline: view();
+      animation-range: entry 10% entry 60%;
+    }
+    .landing-reveal .chart-feature-bars span,
+    .landing-reveal .volume-bars span,
+    .landing-reveal .gex-fill-pos {
+      transform-origin: center bottom;
+      animation: mc-grow-y linear both;
+      animation-timeline: view();
+      animation-range: entry 10% entry 60%;
+    }
+    .landing-reveal .gex-fill-neg {
+      transform-origin: center top;
+      animation: mc-grow-y linear both;
+      animation-timeline: view();
+      animation-range: entry 10% entry 60%;
+    }
+    .landing-reveal .chart-feature-spark polyline,
+    .landing-reveal .gauge-fill {
+      stroke-dasharray: 1;
+      animation: mc-draw linear both;
+      animation-timeline: view();
+      animation-range: entry 10% entry 70%;
+    }
+  }
+}
+@keyframes mc-reveal { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
+@keyframes mc-grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes mc-grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes mc-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
