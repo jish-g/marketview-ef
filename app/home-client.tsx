@@ -23,12 +23,29 @@ type IconType = ComponentType<{ size?: number }>
 // subtitles app/dashboard/page.tsx's `phases` list uses, so the homepage promises exactly the
 // journey a signed-in trader gets. Tone is a colour note only: brand marks the decision point,
 // caution and info bracket it. Never --up/--down, which are spoken for by price direction.
-const journey: Array<{ icon: IconType; step: string; sub: string; title: string; body: string; tone: 'info' | 'caution' | 'brand' }> = [
-  { icon: Clock3, step: '01', sub: 'Overnight setup', title: 'Pre-market', body: 'Gap, OI, PCR, IV and VIX read before the open, published at 8:59 AM IST.', tone: 'info' },
-  { icon: Activity, step: '02', sub: 'Opening auction', title: 'Market open', body: 'GIFT Nifty predicted open vs. actual gap, checked the moment the auction settles.', tone: 'caution' },
-  { icon: CheckCircle2, step: '03', sub: 'Strategy selection', title: 'Verdict', body: 'Market Bias score + Option Readiness score, combined into one Bias/IV/VIX/DTE strategy call.', tone: 'brand' },
-  { icon: Gauge, step: '04', sub: 'Intraday read', title: 'Mid-market', body: 'The bias is re-scored through the day, so a call that stops being true says so.', tone: 'caution' },
-  { icon: Layers3, step: '05', sub: 'Review & learn', title: 'Post-market', body: 'What the read expected, what the session actually did, and what carries into tomorrow.', tone: 'info' },
+// Each phase also carries a few example chips -- what that phase actually hands you, in its
+// own units. The GIFT Nifty, VIX and FII/DII figures are the ones the 18 Sept 2026 global-cues
+// read published; the rest are representative. The row is labelled an example session where
+// it renders. `dir` colours the VALUE only (a sign, so --up/--down are legitimate there); `tone:
+// 'brand'` boxes the one chip that is the call. Times are the documented publish times:
+// 08:59 pre-market, 09:15 open, 09:35 view of record, 10:30-14:30 checkpoints, 20:00 post.
+type Chip = { label: string; value: string; dir?: 'up' | 'down'; tone?: 'brand' }
+const journey: Array<{ icon: IconType; step: string; time: string; sub: string; title: string; body: string; tone: 'info' | 'caution' | 'brand'; chips: Chip[] }> = [
+  { icon: Clock3, step: '01', time: '08:59', sub: 'Overnight setup', title: 'Pre-market', body: 'Gap, OI, PCR, IV and VIX read before the open.', tone: 'info', chips: [
+    { label: 'GIFT Nifty', value: '+0.56%', dir: 'up' }, { label: 'India VIX', value: '12.29' }, { label: 'Prev close', value: '−0.34%', dir: 'down' }, { label: 'Exp. move', value: '±142' },
+  ] },
+  { icon: Activity, step: '02', time: '09:15', sub: 'Opening auction', title: 'Market open', body: 'GIFT Nifty predicted open vs. the actual gap, the moment the auction settles.', tone: 'caution', chips: [
+    { label: 'Predicted', value: '25,180' }, { label: 'Actual gap', value: '+38 pts', dir: 'up' }, { label: 'vs. predicted', value: '−16', dir: 'down' },
+  ] },
+  { icon: CheckCircle2, step: '03', time: '09:35', sub: 'Strategy selection', title: 'Verdict', body: 'Market Bias score + Option Readiness score, mapped to one structure per index.', tone: 'brand', chips: [
+    { label: '', value: '↑ Bullish', dir: 'up' }, { label: 'Bias', value: '62' }, { label: 'Readiness', value: '71' }, { label: '', value: 'Call Debit Spread', tone: 'brand' },
+  ] },
+  { icon: Gauge, step: '04', time: '10:30–14:30', sub: 'Intraday read', title: 'Mid-market', body: 'Re-scored five times through the day, so a call that stops being true says so.', tone: 'caution', chips: [
+    { label: 'Bias', value: '62 → 58 → 61' }, { label: '12:30', value: '−4', dir: 'down' }, { label: 'Call', value: 'held', dir: 'up' },
+  ] },
+  { icon: Layers3, step: '05', time: '20:00', sub: 'Review & learn', title: 'Post-market', body: 'What the read expected, what the session did, and what carries into tomorrow.', tone: 'info', chips: [
+    { label: 'Expected +142 · actual', value: '+154', dir: 'up' }, { label: 'Target', value: 'hit', dir: 'up' }, { label: 'FII', value: '−2,978cr', dir: 'down' }, { label: 'DII', value: '+2,686cr', dir: 'up' },
+  ] },
 ]
 
 // The formulas are the ones /rules publishes under "Predicted Open, Expected Move & Targets"
@@ -279,15 +296,23 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
             <p className="landing-body-text">The dashboard&apos;s own session map &mdash; the same five phases a signed-in trader moves through, in the same order.</p>
           </div>
           <ol className="landing-journey-grid">
-            {journey.map(({ icon: Icon, step, sub, title, body, tone }) => (
+            {journey.map(({ icon: Icon, step, time, sub, title, body, tone, chips }) => (
               <li className={`landing-journey-step tone-${tone} landing-reveal`} key={step}>
                 <span className="landing-journey-icon"><Icon size={15} /></span>
-                <span className="landing-journey-n">{step} &middot; {sub}</span>
+                <span className="landing-journey-n">{step} &middot; <span className="landing-journey-time">{time}</span> &middot; {sub}</span>
                 <strong>{title}</strong>
                 <p>{body}</p>
+                <ul className="landing-journey-chips" aria-label={`Example ${title} output`}>
+                  {chips.map(({ label, value, dir, tone: chipTone }) => (
+                    <li className={`landing-chip${dir ? ` dir-${dir}` : ''}${chipTone ? ` tone-${chipTone}` : ''}`} key={`${label}-${value}`}>
+                      {label && <>{label} </>}<b>{value}</b>
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
           </ol>
+          <p className="landing-journey-note">Example session &mdash; every figure above is illustrative; the live reads publish at these times, every trading day.</p>
         </div>
       </section>
 

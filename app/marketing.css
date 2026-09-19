@@ -894,3 +894,21 @@
   .landing-read-row:nth-child(2) { animation: mc-fade 520ms ease-out 820ms both; }
   .landing-read-foot, .landing-read-note { animation: mc-fade 520ms ease-out 960ms both; }
 }
+
+/* ---- Session journey: the clock time on each step, and example chips under it ----
+   Direction lives in the value only -- no tinted box -- so the chips stay one quiet family
+   and the call (the one tone-brand chip, on Verdict) is the single thing that reads as
+   highlighted. --up/--down colour a sign, nothing else. */
+.landing-journey-time { color: var(--faint); font-weight: 500; }
+.landing-journey-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 12px 0 0; padding: 0; list-style: none; }
+.landing-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 7px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2);
+  font: 10.5px/1.4 var(--font-mono); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.landing-chip b { font-weight: 600; color: var(--ink-2); }
+.landing-chip.dir-up b { color: var(--up); }
+.landing-chip.dir-down b { color: var(--down); }
+.landing-chip.tone-brand { border-color: color-mix(in srgb, var(--brand) 45%, var(--border)); background: color-mix(in srgb, var(--brand) 12%, var(--surface-2)); }
+.landing-chip.tone-brand b { color: var(--brand); }
+.landing-journey-note { margin: 12px 0 0; font: var(--text-label) var(--font-mono); color: var(--faint); }
