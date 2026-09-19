@@ -22,7 +22,7 @@ export default function AdminUsersPage() {
       {error && (
         <div className="state-card error">
           {error.message === 'Failed to fetch' || error.message.includes('404')
-            ? "The admin-users function isn't deployed yet — see supabase/admin-users-function/index.ts for the one-time deploy step."
+            ? "Couldn't reach the admin-users function — check it's deployed (see supabase/functions/admin-users) and that NEXT_PUBLIC_SUPABASE_URL points at the right project."
             : error.message}
         </div>
       )}

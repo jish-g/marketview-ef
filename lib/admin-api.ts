@@ -1,10 +1,10 @@
 import { createAuthClient } from '@/lib/supabase/auth-client'
 
-// Client for the `admin-api` edge function (deployed to the market-data project, see
-// supabase/functions/admin-api). It backs Changelog + Pipeline health. The Users section
-// calls a *different* function deployed to the auth project instead -- see
-// supabase/admin-users-function and callAdminUsersApi below -- because only that
-// project's own auth.users table can answer who has an account.
+// Client for the `admin-api` edge function (see supabase/functions/admin-api), backing
+// Changelog + Pipeline health. Users calls the separate `admin-users` function instead
+// (see callAdminUsersApi below) since it needs a different privileged call shape
+// (auth.users via the admin API, not a plain table read) -- both deploy to the same
+// project, despite once being written as if they were on separate projects.
 const ADMIN_API_URL = 'https://vkcklvoizfpbnjdgaxai.supabase.co/functions/v1/admin-api'
 
 async function getAccessToken(): Promise<string | null> {
@@ -28,13 +28,12 @@ export async function callAdminApi<T>(action: string, payload: Record<string, un
     }),
   })
   const body = await res.json()
-  if (!res.ok) throw new Error(body?.error ?? `Request failed (${res.status})`)
+  // `||`, not `??`: an empty-string error from the function is exactly as useless to show
+  // as a missing one, so both should fall back to the generic message.
+  if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`)
   return body as T
 }
 
-// Calls the separate admin-users function once it's deployed to the auth project (see
-// supabase/admin-users-function/index.ts for the deploy step). Until then this throws,
-// and the Users page shows that as a normal error state rather than crashing.
 export async function callAdminUsersApi<T>(): Promise<T> {
   const accessToken = await getAccessToken()
   if (!accessToken) throw new Error('Not signed in')
@@ -46,6 +45,6 @@ export async function callAdminUsersApi<T>(): Promise<T> {
     body: JSON.stringify({ accessToken }),
   })
   const body = await res.json()
-  if (!res.ok) throw new Error(body?.error ?? `Request failed (${res.status})`)
+  if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`)
   return body as T
 }

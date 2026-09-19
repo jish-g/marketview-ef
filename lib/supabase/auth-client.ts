@@ -1,8 +1,10 @@
 import { createBrowserClient } from '@supabase/ssr'
 
-// Dedicated client for the single-admin auth project connected to this app.
-// Distinct from `lib/supabase/client.ts`, which points at a separate,
-// externally-managed Supabase project used only for market data.
+// Dedicated client for auth/session, kept separate from `lib/supabase/client.ts` (market
+// data reads) so each caller only pulls in the concern it needs. NEXT_PUBLIC_SUPABASE_URL
+// here and the market-data project in `lib/supabase/client.ts` are, in fact, the same
+// Supabase project -- confirmed by querying auth.users directly (see supabase/functions/
+// admin-users) -- despite this file previously documenting them as separate projects.
 export function createAuthClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
