@@ -5,140 +5,82 @@ import { fmt } from '@/lib/format'
 import { BrandSymbol } from '@/components/brand-mark'
 import Link from 'next/link'
 import useSWR from 'swr'
-import { ArrowRight, BarChart3, BookOpen, CheckCircle2, Clock3, Gauge, LogIn, LogOut, Menu, Moon, Newspaper, Send, ShieldCheck, Sun, X } from 'lucide-react'
+import { Activity, ArrowRight, CheckCircle2, ClipboardCheck, Clock3, Gauge, Globe, Layers3, LogIn, LogOut, Menu, MessageSquareText, Moon, Newspaper, ShieldCheck, Sigma, Sun, Target, X } from 'lucide-react'
+import type { ComponentType, ReactNode } from 'react'
 import { useSession } from '@/hooks/use-session'
 import { isAdminEmail } from '@/lib/is-admin'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { createClient } from '@/lib/supabase/client'
 import MarketTicker from '@/components/market-ticker'
 import type { TickerData } from '@/lib/ticker'
+import {
+  FlowBarsVisual, GexStrikeBarsVisual, LevelRowsVisual, PositioningBarsVisual, PulseGaugeVisual,
+  SparkVisual, TpoProfileVisual, TransmissionVisual, VolumeBarsVisual, VolumeProfileVisual,
+} from '@/components/home-visuals'
 
-const differentiators = [
-  { icon: Gauge, title: 'Reads, not just reports', description: 'Weighted bias scoring from Gap, OI, PCR, and Max Pain — not a raw data dump.' },
-  { icon: Clock3, title: 'Built for the full session', description: 'Pre-market call, Mid-market check, Post-close review — same logic every time.' },
-  { icon: BookOpen, title: 'A playbook you can audit', description: 'Every view starts from a published playbook of weights and thresholds, and says when it departs from it.' },
-  { icon: CheckCircle2, title: 'One read, not six charts', description: 'Collapses the session into a single, explained read.' },
+type IconType = ComponentType<{ size?: number }>
+
+// The dashboard's own session map, in its own order -- the same five public phases and
+// subtitles app/dashboard/page.tsx's `phases` list uses, so the homepage promises exactly the
+// journey a signed-in trader gets. Tone is a colour note only: brand marks the decision point,
+// caution and info bracket it. Never --up/--down, which are spoken for by price direction.
+const journey: Array<{ icon: IconType; step: string; sub: string; title: string; body: string; tone: 'info' | 'caution' | 'brand' }> = [
+  { icon: Clock3, step: '01', sub: 'Overnight setup', title: 'Pre-market', body: 'Gap, OI, PCR, IV and VIX read before the open, published at 8:59 AM IST.', tone: 'info' },
+  { icon: Activity, step: '02', sub: 'Opening auction', title: 'Market open', body: 'GIFT Nifty predicted open vs. actual gap, checked the moment the auction settles.', tone: 'caution' },
+  { icon: CheckCircle2, step: '03', sub: 'Strategy selection', title: 'Verdict', body: 'Market Bias score + Option Readiness score, combined into one Bias/IV/VIX/DTE strategy call.', tone: 'brand' },
+  { icon: Gauge, step: '04', sub: 'Intraday read', title: 'Mid-market', body: 'The bias is re-scored through the day, so a call that stops being true says so.', tone: 'caution' },
+  { icon: Layers3, step: '05', sub: 'Review & learn', title: 'Post-market', body: 'What the read expected, what the session actually did, and what carries into tomorrow.', tone: 'info' },
 ]
 
-const howItWorks = [
-  { step: '01', title: 'We capture the session', description: 'Gap, OI, PCR, IV, and VIX, pulled at every phase of the trading day.' },
-  { step: '02', title: 'Rules produce a read', description: 'A documented scoring framework, not a model guessing at patterns.' },
-  { step: '03', title: 'You get one clear read', description: 'Published pre-market and post-market, every session.' },
+// The formulas are the ones /rules publishes under "Predicted Open, Expected Move & Targets"
+// (app/dashboard/page.tsx `formulas`), abbreviated to fit a card. Formulas, not figures.
+const predictedMoveRows = [
+  { k: 'Predicted open', v: 'GIFT Nifty gap % × prev close' },
+  { k: 'Expected move', v: 'ATM straddle ÷ √DTE, vs. 5D avg range' },
+  { k: 'Target / stop', v: 'Expected move × strike delta' },
 ]
 
-// Every line here restates something the site already commits to elsewhere -- /about names
-// the pre-market call and post-market recap, /rules publishes the scoring, /how-it-works
-// describes the three stages, /nifty-sensex-today is the archive. Nothing new is claimed.
-const features = [
-  { title: 'A pre-market call before the open', body: 'Gap, open interest, PCR, max pain, IV and India VIX scored into one read, published before the session starts.' },
-  { title: 'A post-market recap after the close', body: 'What the read expected, what the session actually did, and what carries into tomorrow.' },
-  { title: 'Five intraday checkpoints', body: 'The bias is re-scored through the day, so a call that stops being true says so rather than standing all session.' },
-  { title: 'Every rule written down', body: 'The full scoring framework is public. Each output traces back to a table lookup you can check yourself.' },
-  { title: 'A dated archive', body: 'Every prior session stays published — the calls that worked and the ones that did not.' },
-  { title: 'Nifty and Sensex, both sides', body: 'Both indices read each session, with Sensex prediction suppressed where it has no leading indicator rather than faked.' },
+// Two rows from the Bias/IV/VIX/DTE strategy map (app/dashboard/page.tsx `biasStrategyMap`),
+// shown as an example of the output's shape. Marked illustrative where it renders: the live
+// call is computed on the dashboard from the day's row, and this card does not fetch it.
+const strategyExample = [
+  { idx: 'Nifty', bias: 'Bearish · Cheap IV', strat: 'Put Debit Spread' },
+  { idx: 'Sensex', bias: 'Neutral · Expensive IV', strat: 'Iron Condor' },
 ]
 
-// The Chart screen's own feature set -- a distinct product surface from the pre-market/
-// post-market scoring `features` array above, so kept as its own list rather than merged into
-// it. Mirrors lib/indicators-content.ts's shipped indicators; update both together.
-const chartFeatures = [
-  { title: 'Market Profile (TPO)', body: 'Where the session actually spent its time, not just where price moved -- the point of control and value area, on every chart.' },
-  { title: 'Power Scanner', body: 'Flagged the moment fresh open interest starts building or leaving at the strike a level is being tested on.' },
-  { title: 'Market Pulse', body: 'One line: range-bound or trending, and whether order flow agrees with the move.' },
-  { title: 'Derivatives Positioning', body: 'PCR bias, OI-wall momentum, and the pull toward max pain, read together instead of three separate checks.' },
-  { title: 'Options Print & Greeks', body: 'The full option chain near the money -- OI, volume and every Greek, per strike, without leaving the platform.' },
-  { title: 'OI History', body: 'How PCR, max pain, and the key OI strikes moved through the whole session, not just where they sit right now.' },
+// A real sentence from a real published read, credited to its date -- not composed for the
+// homepage. If that post is ever unpublished, swap this for another one, not for invented copy.
+const briefingExcerpt = {
+  quote: 'Friday’s session saw the two indices part ways, with Nifty pressing higher while Sensex remained virtually unchanged — a divergence that underscores the selective nature of the week’s final rally.',
+  source: 'Post-market read, 18 September 2026',
+  href: '/nifty-sensex-today/postmarket-september-18-2026',
+}
+
+// The full shipped catalogue, in lib/indicators-content.ts's order and numbering -- one card
+// per INDICATOR_SECTIONS entry. Update both together. Bodies are the short marketing form of
+// each section's intro, not a new claim; the visuals are stylised shapes, not live data.
+const chartFeatures: Array<{ title: string; body: string; visual: ReactNode; featured?: boolean }> = [
+  { title: 'Market Profile (TPO)', body: 'Where the session actually spent its time -- the point of control and value area, on every chart.', visual: <TpoProfileVisual />, featured: true },
+  { title: 'Intraday & VWAP', body: 'Day open, the previous day’s High/Low/Close, and VWAP computed from the current-month futures contract.', visual: <SparkVisual tone="info" points="0,20 40,16 80,22 120,10 160,14 200,6 240,8" /> },
+  { title: 'OI Walls', body: 'Support and resistance zones from the options chain, plus max pain -- scaled so a wall never costs the candles’ readability.', visual: <LevelRowsVisual rows={[{ tone: 'res', label: 'Resistance', price: '25,300' }, { tone: 'piv', label: 'Max pain', price: '25,100' }, { tone: 'sup', label: 'Support', price: '24,900' }]} /> },
+  { title: 'Power Scanner', body: 'Flags the moment fresh OI starts building or leaving at the strike a level is being tested on.', visual: <SparkVisual tone="info" points="0,30 40,26 80,28 110,12 150,18 190,10 240,16" flagAt={[110, 12]} /> },
+  { title: 'Derivatives Positioning', body: 'PCR bias, OI-wall momentum, and the pull toward max pain, read together instead of three separate checks.', visual: <PositioningBarsVisual /> },
+  { title: 'Chart Levels', body: 'Swing highs and lows per timeframe -- the nearest above price draws as resistance, the nearest below as support.', visual: <LevelRowsVisual rows={[{ tone: 'res', label: 'Resistance', price: '25,260' }, { tone: 'sup', label: 'Support', price: '24,950' }]} /> },
+  { title: 'Pivots', body: 'Pre-market support and resistance, computed once before the open -- the same figures the Verdict screen uses.', visual: <LevelRowsVisual rows={[{ tone: 'res', label: 'R1', price: '25,240' }, { tone: 'piv', label: 'Pivot', price: '25,080' }, { tone: 'sup', label: 'S1', price: '24,920' }]} /> },
+  { title: 'Volume', body: 'Futures volume per bar, since NIFTY and SENSEX candles carry no volume of their own.', visual: <VolumeBarsVisual /> },
+  { title: 'Volume Profile', body: 'Futures volume aggregated by price instead of time -- the point of control is where the market did the most business.', visual: <VolumeProfileVisual /> },
+  { title: 'CVD (proxy)', body: 'Approximate order flow from where each bar’s close sits in its own range, weighted by futures volume.', visual: <SparkVisual tone="brand" points="0,22 40,18 80,20 120,10 160,14 200,4 240,6" /> },
+  { title: 'Market Pulse', body: 'One line: range-bound or trending, and whether the CVD-proxy confirms the move.', visual: <PulseGaugeVisual /> },
+  { title: 'FII / DII Flow', body: 'The most recent cash-market net flow on record -- legend-only, read as regime context, not a level to react to.', visual: <FlowBarsVisual /> },
 ]
 
-// One illustrative visual per chartFeatures entry, same index order. Decorative only --
-// stylised, not a live read -- so each is built from fixed, representative shapes rather than
-// real numbers, the same way the differentiator icons above are decorative rather than data.
-function TpoProfileVisual() {
-  const rows: Array<{ px: string; pct: number; poc?: boolean }> = [
-    { px: '25,220', pct: 18 },
-    { px: '25,180', pct: 34 },
-    { px: '25,140', pct: 58 },
-    { px: '25,100', pct: 92, poc: true },
-    { px: '25,060', pct: 71 },
-    { px: '25,020', pct: 40 },
-    { px: '24,980', pct: 15 },
-  ]
-  return (
-    <div className="chart-feature-visual chart-feature-visual-tpo">
-      <div className="tpo-rows">
-        {rows.map((row) => (
-          <div className={`tpo-row${row.poc ? ' is-poc' : ''}`} key={row.px}>
-            <span className="tpo-row-px">{row.px}</span>
-            <span className="tpo-row-bar" style={{ width: `${row.pct}%` }} />
-          </div>
-        ))}
-      </div>
-      <div className="tpo-side">
-        <div className="tpo-stat">
-          <span>Point of control</span>
-          <strong className="tpo-stat-poc">25,100</strong>
-        </div>
-        <div className="tpo-stat">
-          <span>Value area</span>
-          <strong>25,040&ndash;25,160</strong>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SparkVisual({ tone, points, flagAt }: { tone: 'brand' | 'info'; points: string; flagAt?: [number, number] }) {
-  return (
-    <svg className={`chart-feature-visual chart-feature-spark spark-${tone}`} viewBox="0 0 240 40" preserveAspectRatio="none" aria-hidden="true">
-      <polyline points={points} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-      {flagAt && <circle cx={flagAt[0]} cy={flagAt[1]} r="3.5" className="spark-flag" />}
-    </svg>
-  )
-}
-
-function PulseGaugeVisual() {
-  return (
-    <div className="chart-feature-visual chart-feature-gauge">
-      <svg width="52" height="32" viewBox="0 0 52 32" aria-hidden="true">
-        <path d="M4 28 A22 22 0 0 1 48 28" fill="none" className="gauge-track" strokeWidth="5" />
-        <path d="M4 28 A22 22 0 0 1 35 8" fill="none" className="gauge-fill" strokeWidth="5" strokeLinecap="round" />
-        <circle cx="35" cy="8" r="3" className="gauge-dot" />
-      </svg>
-      <span>Trending, flow agrees</span>
-    </div>
-  )
-}
-
-function PositioningBarsVisual() {
-  const bars = [40, 65, 30, 85, 50]
-  return (
-    <div className="chart-feature-visual chart-feature-bars">
-      {bars.map((h, i) => (
-        // eslint-disable-next-line react/no-array-index-key
-        <span key={i} style={{ height: `${h}%` }} />
-      ))}
-    </div>
-  )
-}
-
-function GreeksVisual() {
-  const greeks = [['Δ', '0.52'], ['Γ', '0.004'], ['Θ', '−4.1'], ['V', '18.2']]
-  return (
-    <div className="chart-feature-visual chart-feature-greeks">
-      {greeks.map(([label, value]) => (
-        <span key={label}><em>{label}</em>{value}</span>
-      ))}
-    </div>
-  )
-}
-
-const chartFeatureVisuals = [
-  <TpoProfileVisual key="tpo" />,
-  <SparkVisual key="power-scanner" tone="info" points="0,30 40,26 80,28 110,12 150,18 190,10 230,16" flagAt={[110, 12]} />,
-  <PulseGaugeVisual key="market-pulse" />,
-  <PositioningBarsVisual key="positioning" />,
-  <GreeksVisual key="greeks" />,
-  <SparkVisual key="oi-history" tone="brand" points="0,20 40,24 80,14 120,18 160,10 200,16 240,6" />,
+// GEX metrics as the dashboard's own GexView labels them (components/gex-view.tsx). Values are
+// an example of a short-gamma day and are marked illustrative where they render.
+const gexExample = [
+  { label: 'Net GEX', value: '−₹284cr', sub: 'Short gamma — amplifying regime', tone: 'down' as const },
+  { label: 'Zero-gamma flip', value: '25,050', sub: 'Regime pivot level' },
+  { label: 'Call wall', value: '25,300', sub: 'Largest call-side gamma' },
+  { label: 'Put wall', value: '24,900', sub: 'Largest put-side gamma' },
 ]
 
 const testimonials = [
@@ -308,7 +250,6 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
           <div className="landing-hero-ctas">
             <Link href="/dashboard" className="landing-cta-primary">Verdict <ArrowRight size={15} /></Link>
             <Link href="/nifty-sensex-today" className="landing-cta-secondary"><Newspaper size={15} /> Nifty and Sensex today</Link>
-            <a href="https://t.me/marketcue_in" target="_blank" rel="noopener noreferrer" className="landing-cta-secondary"><Send size={15} /> Join Telegram</a>
           </div>
         </div>
 
@@ -368,70 +309,155 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
         </div>
       </section>
 
-      <section className="landing-band landing-positioning">
-        <div className="landing-section-inner">
-          <h2 className="eyebrow">Why MarketCue</h2>
-          <p className="landing-body-text">Raw options data — gap, OI, PCR, max pain, IV, VIX — is available everywhere and looks the same on every terminal. The edge isn&apos;t access to data, it&apos;s reading it the same disciplined way every session.</p>
-          <p className="landing-body-text">MarketCue runs that data through a documented, rules-based framework to produce one read instead of six charts to interpret yourself.</p>
-        </div>
-      </section>
-
-      <section className="landing-differentiators">
-        <h2 className="eyebrow">What makes it different</h2>
-        <div className="landing-diff-grid">
-          {differentiators.map(({ icon: Icon, title, description }) => (
-            <article className="landing-diff-card" key={title}>
-              <span className="landing-diff-icon"><Icon size={17} /></span>
-              <strong>{title}</strong>
-              <p>{description}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="landing-band landing-how">
-        <div className="landing-section-inner">
-          <h2 className="eyebrow">How it works</h2>
-          <div className="landing-how-grid">
-            {howItWorks.map(({ step, title, description }) => (
-              <article className="landing-how-card" key={step}>
-                <span className="landing-how-step">{step}</span>
+      <section className="landing-band landing-journey">
+        <div className="landing-section-wide">
+          <div className="landing-section-head landing-reveal">
+            <h2 className="eyebrow">The session, phase by phase</h2>
+            <p className="landing-section-title">Five real phases, not three abstract steps.</p>
+            <p className="landing-body-text">The dashboard&apos;s own session map &mdash; the same five phases a signed-in trader moves through, in the same order.</p>
+          </div>
+          <ol className="landing-journey-grid">
+            {journey.map(({ icon: Icon, step, sub, title, body, tone }) => (
+              <li className={`landing-journey-step tone-${tone} landing-reveal`} key={step}>
+                <span className="landing-journey-icon"><Icon size={15} /></span>
+                <span className="landing-journey-n">{step} &middot; {sub}</span>
                 <strong>{title}</strong>
-                <p>{description}</p>
-              </article>
+                <p>{body}</p>
+              </li>
             ))}
+          </ol>
+        </div>
+      </section>
+
+      <section className="landing-outputs">
+        <div className="landing-section-wide">
+          <div className="landing-section-head landing-reveal">
+            <h2 className="eyebrow">What you get</h2>
+            <p className="landing-section-title">Outputs that aren&apos;t tied to a single phase.</p>
+            <p className="landing-body-text">The session, phase by phase, is above. What follows sits outside that timeline &mdash; a predicted move, a per-index strategy call, and how the read gets explained.</p>
+          </div>
+          <div className="landing-outputs-grid">
+            <article className="landing-card landing-card-featured landing-card-wide landing-reveal">
+              <span className="landing-icon-tile"><Target size={18} /></span>
+              <strong>A predicted move, not just a read</strong>
+              <p>GIFT Nifty&#8209;implied predicted open, an option&#8209;implied and historical expected move, and a concrete points target, stop&#8209;loss, and book&#8209;profit/book&#8209;stop &mdash; for buyer and seller strategies alike.</p>
+              <dl className="landing-formula-rows">
+                {predictedMoveRows.map(({ k, v }) => (
+                  <div className="landing-formula-row" key={k}><dt>{k}</dt><dd>{v}</dd></div>
+                ))}
+              </dl>
+              <Link href="/rules#methodology" className="landing-card-link">How the numbers are calculated <ArrowRight size={13} /></Link>
+            </article>
+
+            <article className="landing-card landing-reveal">
+              <span className="landing-icon-tile tone-caution"><ClipboardCheck size={18} /></span>
+              <strong>Strategy Recommendation</strong>
+              <p>Bias, IV vs. VIX, and days&#8209;to&#8209;expiry mapped to one strategy per index &mdash; not a generic call.</p>
+              <div className="landing-strategy-rows">
+                {strategyExample.map(({ idx, bias, strat }) => (
+                  <div className="landing-strategy-row" key={idx}>
+                    <span className="landing-strategy-idx">{idx}</span>
+                    <span className="landing-strategy-bias">{bias}</span>
+                    <span className="landing-strategy-strat">{strat}</span>
+                  </div>
+                ))}
+              </div>
+              <span className="landing-illustrative">Illustrative &mdash; the live call is on the dashboard</span>
+            </article>
+
+            <article className="landing-card landing-card-wide landing-reveal">
+              <span className="landing-icon-tile tone-info"><MessageSquareText size={18} /></span>
+              <strong>How the AI briefs the read</strong>
+              <p>Every pre-market, mid-market and post-market view is narrated in plain English, not just scored. Each explanation clears a two-stage check &mdash; a deterministic pass against the real numbers, then a second model verifying each claim &mdash; before it publishes.</p>
+              <blockquote className="landing-briefing">
+                <p>&ldquo;{briefingExcerpt.quote}&rdquo;</p>
+                <footer><Link href={briefingExcerpt.href}>{briefingExcerpt.source}</Link></footer>
+              </blockquote>
+            </article>
+
+            <article className="landing-card landing-reveal">
+              <span className="landing-icon-tile"><Globe size={18} /></span>
+              <strong>Nifty and Sensex, both sides</strong>
+              <p>Both indices read each session, with Sensex prediction suppressed where it has no leading indicator rather than faked.</p>
+            </article>
           </div>
         </div>
       </section>
 
-      <section className="landing-band landing-features">
-        <div className="landing-section-inner">
-          <h2 className="eyebrow">What you get</h2>
-          <ul className="landing-features-grid">
-            {features.map(({ title, body }) => (
-              <li className="landing-feature" key={title}>
-                <strong>{title}</strong>
-                <p>{body}</p>
-              </li>
-            ))}
-          </ul>
+      <section className="landing-band landing-cues">
+        <div className="landing-section-wide">
+          <div className="landing-section-head landing-reveal">
+            <h2 className="eyebrow">Global &rarr; India intelligence</h2>
+            <p className="landing-section-title">How world markets are shaping India, read continuously.</p>
+            <p className="landing-body-text">25 free market instruments, scored into a Global verdict and an India verdict, a transmission read between the two, and a regime call &mdash; updated through the day, not published once and left stale.</p>
+          </div>
+          <div className="landing-cues-grid">
+            <article className="landing-card landing-card-featured landing-reveal">
+              <strong>Global &amp; India verdicts</strong>
+              <p>US futures, crude, Asia and Europe scored into a Global read; Nifty, Bank Nifty, FII/DII and GIFT Nifty scored into an India read.</p>
+              <div className="landing-cues-badges">
+                <span className="landing-cues-badge tone-up">Global: Positive</span>
+                <span className="landing-cues-badge tone-up">India: Constructive</span>
+                <span className="landing-cues-badge tone-info">Moderate global influence</span>
+              </div>
+              <span className="landing-illustrative">Example bands from the 18 September 2026 read</span>
+            </article>
+            <article className="landing-card landing-reveal">
+              <strong>Transmission &amp; regime</strong>
+              <p>Whether today&apos;s global tone is actually carrying through to Indian price action, or decoupling &mdash; read as a single line, with the evidence underneath it.</p>
+              <TransmissionVisual global="Positive" india="Constructive" strength="Moderate" />
+            </article>
+          </div>
+          <p className="landing-about-links"><Link href="/global-cues-today">Read today&apos;s global cues</Link></p>
         </div>
       </section>
 
-      <section className="landing-band landing-features landing-chart-features">
-        <div className="landing-section-inner">
-          <h2 className="eyebrow">On the chart</h2>
-          <p className="landing-body-text">Beyond the pre-market and post-market calls, the live Chart screen runs its own set of options-intelligence tools, each reading real Nifty and Sensex data.</p>
-          <ul className="landing-features-grid">
-            {chartFeatures.map(({ title, body }, i) => (
-              <li className="landing-feature" key={title}>
+      <section className="landing-chart-features">
+        <div className="landing-section-wide">
+          <div className="landing-section-head landing-reveal">
+            <h2 className="eyebrow">On the chart</h2>
+            <p className="landing-section-title">Every indicator actually shipped, not a curated four.</p>
+            <p className="landing-body-text">Beyond the pre-market and post-market calls, the live Chart screen runs its own set of options-intelligence tools, each reading real Nifty and Sensex data.</p>
+          </div>
+          <ul className="landing-chart-grid">
+            {chartFeatures.map(({ title, body, visual, featured }) => (
+              <li className={`landing-card${featured ? ' landing-card-featured landing-card-full' : ''} landing-reveal`} key={title}>
                 <strong>{title}</strong>
                 <p>{body}</p>
-                {chartFeatureVisuals[i]}
+                {visual}
               </li>
             ))}
           </ul>
           <p className="landing-about-links"><Link href="/indicators">See the full indicator reference</Link></p>
+        </div>
+      </section>
+
+      <section className="landing-band landing-gex">
+        <div className="landing-section-wide">
+          <div className="landing-section-head landing-reveal">
+            <h2 className="eyebrow">Dealer positioning</h2>
+            <p className="landing-section-title">Gamma Exposure &mdash; how market-makers may hedge as Nifty moves.</p>
+            <p className="landing-body-text">Not a price prediction: a positive net GEX means dealer hedging tends to dampen swings, a calmer day. A negative net GEX means hedging tends to amplify moves &mdash; bigger, faster swings than usual.</p>
+          </div>
+          <div className="landing-gex-metrics">
+            {gexExample.map(({ label, value, sub, tone }) => (
+              <div className="landing-gex-metric landing-reveal" key={label}>
+                <span>{label}</span>
+                <strong className={tone ? `tone-${tone}` : undefined}>{value}</strong>
+                <small>{sub}</small>
+              </div>
+            ))}
+          </div>
+          <div className="landing-card landing-gex-chart landing-reveal">
+            <span className="eyebrow landing-gex-chart-label"><Sigma size={13} /> Gamma exposure by strike</span>
+            <GexStrikeBarsVisual />
+            <div className="landing-gex-legend">
+              <span><i className="tone-up" /> Positive gamma (dampening)</span>
+              <span><i className="tone-down" /> Negative gamma (amplifying)</span>
+              <span><i className="tone-brand" /> Zero-gamma flip</span>
+            </div>
+            <span className="landing-illustrative">Illustrative short-gamma day &mdash; the live snapshot runs on the dashboard during market hours</span>
+          </div>
         </div>
       </section>
 
@@ -496,9 +522,12 @@ export default function HomeClient({ tradeDate: initialTradeDate, initialPre, in
       </section>
 
       <section className="landing-closing">
-        <div className="landing-closing-card">
+        <div className="landing-closing-card landing-reveal">
+          <p className="eyebrow">Published before the open, every session</p>
+          <p className="landing-section-title">Built on a rules-based market read engine.</p>
+          <p className="landing-body-text">The full session, the full indicator catalogue, dealer positioning, and global-to-India transmission &mdash; with the rules behind every read documented.</p>
           <div className="landing-closing-ctas">
-            <Link href="/nifty-sensex-today" className="landing-cta-primary"><Newspaper size={15} /> Nifty and Sensex today</Link>
+            <Link href="/dashboard" className="landing-cta-primary">Verdict <ArrowRight size={15} /></Link>
             <Link href="/rules" className="landing-cta-secondary">Read the playbook</Link>
           </div>
         </div>
