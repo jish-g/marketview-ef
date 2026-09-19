@@ -1204,7 +1204,7 @@ button, input { font: inherit; }
 .gv-list small.gv-meter-scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-top: 4px; }
 .gv-verdict span .gv-label-badge { margin-left: 8px; vertical-align: middle; text-transform: none; letter-spacing: 0; }
 /* Event cards: a plain stacked card, never the two-column evidence tile. */
-.gv-event { display: grid; gap: 6px; align-content: start; padding: var(--s-4); }
+.gv-event { display: grid; gap: 6px; align-content: start; }
 .gv-event .gv-event-kicker { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); font-size: var(--text-label); }
 .gv-event .gv-event-kicker em { font-style: normal; margin-left: 4px; }
 .gv-event .gv-event-title { display: block; color: var(--ink); font: 600 var(--text-body) var(--font-sans); line-height: 1.35; letter-spacing: -.01em; }

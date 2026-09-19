@@ -164,7 +164,7 @@ const CATEGORY_LABEL: Record<string, string> = { macro: 'Macro', rates: 'Rates',
 function NewsEventCard({ e, now }: { e: EventRow; now: number }) {
   const tone: Tone = e.market_direction === 'risk_off' ? 'down' : e.market_direction === 'risk_on' ? 'up' : 'neutral'
   const outlets = (e.sources ?? []).filter((s) => s.url)
-  return <article className="ds-card gv-event">
+  return <article className="gv-event-card gv-event">
     <span className="gv-event-kicker">{CATEGORY_LABEL[e.category] ?? 'Event'} · {e.region === 'india' ? 'India' : 'Global'} · {ago(e.event_time, now)} <em className={`ds-badge ds-badge--${tone}`}>{e.market_direction === 'risk_off' ? 'Risk-off' : e.market_direction === 'risk_on' ? 'Risk-on' : 'Neutral'}</em></span>
     <strong className="gv-event-title">{e.title}</strong>
     <small className="gv-event-what">{e.summary}</small>
@@ -178,7 +178,7 @@ function NewsEventCard({ e, now }: { e: EventRow; now: number }) {
 function EventCard({ e, now }: { e: EventRow; now: number }) {
   const scale = timesUsual(e.evidence?.z)
   const tone: Tone = e.market_direction === 'risk_off' ? 'down' : e.market_direction === 'risk_on' ? 'up' : 'neutral'
-  return <article className="ds-card gv-event">
+  return <article className="gv-event-card gv-event">
     <span className="gv-event-kicker">{e.market_direction === 'risk_off' ? 'Risk-off move' : e.market_direction === 'risk_on' ? 'Risk-on move' : 'Move'} · {ago(e.updated_at, now)} <em className={`ds-badge ds-badge--${tone}`}>{scale ? `${Math.abs(Number(e.evidence?.z)).toFixed(1)}× usual` : 'notable'}</em></span>
     <strong className="gv-event-title">{stripPct(e.title)}</strong>
     <small className="gv-event-why">{e.india_impact || 'Driver unclear.'}</small>
@@ -252,7 +252,7 @@ export function GlobalCuesView() {
           {(newsEvents.length > 0 || events.length > 0) && <div className="agent-badges">{[...newsEvents.slice(0, 2), ...events.slice(0, 2)].map((e) => <button type="button" key={e.id} className={`ds-badge ${e.market_direction === 'risk_off' ? 'ds-badge--down' : e.market_direction === 'risk_on' ? 'ds-badge--up' : 'ds-badge--neutral'} gv-chip`} onClick={() => setTab('link')}>{stripPct(e.title)}</button>)}</div>}
         </div>
       </div>
-      <section className="metric-group">
+      <section className="metric-group gv-card">
         <div className="group-heading"><h3>Verdicts</h3></div>
         <div className="field-grid">
           <Verdict label="Global" band={ctx.global_band} tone={gTone} sub={gSub} />
@@ -262,7 +262,7 @@ export function GlobalCuesView() {
             sub={ctx.counterforces.length ? `Domestic factors appear to be offsetting: ${ctx.counterforces.slice(0, 2).map(lcFirst).join(' and ')}.` : ctx.channels.length ? `Evidence of transmission: ${lcFirst(ctx.channels[0])}.` : 'No single transmission channel stands out today.'} />
         </div>
       </section>
-      <section className="metric-group">
+      <section className="metric-group gv-card">
         <div className="group-heading"><h3>Why, and what comes next</h3></div>
         <div className="field-grid gv-grid2">
           <WordList label="Why" items={ctx.what_is_driving.slice(0, 4)} empty="Driver unclear. No input moved enough to stand out." />
@@ -273,7 +273,7 @@ export function GlobalCuesView() {
 
     {tab === 'global' && <>
       <div className="thesis-hero"><div className="thesis-hero-main"><Label tone="info">Global verdict</Label><strong className="thesis-hero-value">{ctx.global_band}</strong><p className="thesis-hero-note">{ctx.narrative?.global ?? `Regime: ${ctx.regime.toLowerCase()}. ${gSub}`}</p></div></div>
-      <section className="metric-group">
+      <section className="metric-group gv-card">
         <div className="group-heading"><h3>What is pulling the verdict</h3></div>
         <div className="field-grid gv-grid2">
           <WordList label="Working against risk" items={againstRisk(gd).map(words)} empty="Nothing is pushing against risk appetite right now." />
@@ -286,7 +286,7 @@ export function GlobalCuesView() {
 
     {tab === 'india' && <>
       <div className="thesis-hero"><div className="thesis-hero-main"><Label tone="info">India verdict</Label><strong className="thesis-hero-value">{ctx.india_band}</strong><p className="thesis-hero-note">{ctx.narrative?.india ?? iSub}</p></div></div>
-      <section className="metric-group">
+      <section className="metric-group gv-card">
         <div className="group-heading"><h3>What is pulling the verdict</h3></div>
         <div className="field-grid gv-grid2">
           <WordList label="Supporting" items={forRisk(id).map(words)} empty="No domestic input is supportive right now." />
@@ -299,7 +299,7 @@ export function GlobalCuesView() {
 
     {tab === 'link' && <>
       <div className="thesis-hero"><div className="thesis-hero-main"><Label tone="info">Global → India</Label><strong className="thesis-hero-value">{ctx.transmission_label}</strong><p className="thesis-hero-note">{ctx.narrative?.link ?? ctx.explanation}</p></div></div>
-      <section className="metric-group">
+      <section className="metric-group gv-card">
         <div className="group-heading"><h3>How it is transmitting</h3></div>
         <div className="field-grid">
           <div className="field-card gv-list">
@@ -314,12 +314,12 @@ export function GlobalCuesView() {
           <WordList label="Domestic counterforces" items={ctx.counterforces} empty="No domestic factor is leaning against the global tone." />
         </div>
       </section>
-      <section className="metric-group">
+      <section className="metric-group gv-card">
         <div className="group-heading"><h3>Key events</h3></div>
         {newsEvents.length ? <div className="field-grid gv-grid2">{newsEvents.map((e) => <NewsEventCard e={e} key={e.id} now={now} />)}</div>
           : <p className="chart-note">No analysed news event in the last 36 hours. Headlines are clustered every five minutes and analysed when several outlets or an official source carry the same story.</p>}
       </section>
-      <section className="metric-group">
+      <section className="metric-group gv-card">
         <div className="group-heading"><h3>Significant moves</h3></div>
         {events.length ? <div className="field-grid gv-grid2">{events.map((e) => <EventCard e={e} key={e.id} now={now} />)}</div>
           : <p className="chart-note">No instrument has moved beyond its usual daily range in the last 36 hours.</p>}
@@ -328,15 +328,15 @@ export function GlobalCuesView() {
 
     {tab === 'data' && <>
       <p className="chart-note">Every input behind the verdicts, with its own freshness. Scores run from −1 to +1; a positive score supports risk appetite.</p>
-      <section className="metric-group">
+      <section className="metric-group gv-card">
         <div className="group-heading"><h3>Global components</h3></div>
         <div className="field-grid drivers-grid">{gd.map((d) => <div className="field-card" key={d.key}><span>{d.label}</span><strong><em className={`ds-badge ds-badge--${d.tone}`}>{d.score > 0 ? '+' : ''}{d.score.toFixed(2)}</em></strong><small>{d.reading}</small></div>)}</div>
       </section>
-      <section className="metric-group">
+      <section className="metric-group gv-card">
         <div className="group-heading"><h3>India components</h3></div>
         <div className="field-grid drivers-grid">{id.map((d) => <div className="field-card" key={d.key}><span>{d.label}</span><strong><em className={`ds-badge ds-badge--${d.tone}`}>{d.score > 0 ? '+' : ''}{d.score.toFixed(2)}</em></strong><small>{d.reading}</small></div>)}</div>
       </section>
-      {ctx.measured && ctx.measured.correlation20 != null && <section className="metric-group">
+      {ctx.measured && ctx.measured.correlation20 != null && <section className="metric-group gv-card">
         <div className="group-heading"><h3>Measured relationship</h3></div>
         <div className="field-grid measured-grid">
           <div className="field-card"><span>20-day correlation with prior US session</span><strong>{ctx.measured.correlation20.toFixed(2)} <em className={`ds-badge ds-badge--${ctx.measured.label === 'Strong' ? 'down' : ctx.measured.label === 'Moderate' ? 'caution' : 'neutral'}`}>{ctx.measured.label}</em></strong><small>beta {ctx.measured.beta20?.toFixed(2) ?? 'n/a'} over {ctx.measured.pairs} sessions</small></div>
@@ -344,7 +344,7 @@ export function GlobalCuesView() {
           <div className="field-card"><span>Scores</span><strong>Global {Number(ctx.global_score) > 0 ? '+' : ''}{Number(ctx.global_score).toFixed(2)} · India {Number(ctx.india_score) > 0 ? '+' : ''}{Number(ctx.india_score).toFixed(2)}</strong><small>Coverage {Math.round((ctx.confidence_detail?.coverage ?? 0) * 100)}% · {ctx.confidence_detail?.note ?? ''}</small></div>
         </div>
       </section>}
-      {data && data.snaps.length > 0 && <section className="metric-group">
+      {data && data.snaps.length > 0 && <section className="metric-group gv-card">
         <div className="group-heading"><h3>Market basket</h3></div>
         <div className="basket">
           {GROUPS.map((g) => {
@@ -362,7 +362,7 @@ export function GlobalCuesView() {
           })}
         </div>
       </section>}
-      <section className="metric-group">
+      <section className="metric-group gv-card">
         <div className="group-heading"><h3>Headlines</h3></div>
         {!data?.news.length
           ? <p className="chart-note">No market-relevant headlines in the last 24 hours. Feeds are polled every five minutes.</p>

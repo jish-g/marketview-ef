@@ -343,6 +343,43 @@
   padding-top: var(--s-5) !important;
 }
 
+/* ---------------------------------------------------------------- GlobalCue/News
+   Same request again, same shape as OI History (#183) and Pre-market (#184): box the section
+   groups (Verdicts, Why/Watch next, drivers, market basket, headlines, ...) instead of the
+   ledger's hairline rows. .gv-card rides alongside .metric-group, same mechanics as
+   .premarket-card -- see that block's comment for why the "+" override needs !important.
+   .cues-view is itself `display:grid;gap:var(--s-4)` (globals.css), so cards need no margin.
+
+   ThesisHero stays in its left-accent-rule style on every tab (Summary/Global/India/Link) --
+   same call made for the info banners in the other two modules: it's the app's one consistent
+   "answer" pattern, and boxing only the GlobalCue instance of it would be the inconsistent
+   choice, not a fix. */
+.gv-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--s-5) !important;
+}
+.metric-group.gv-card + .metric-group.gv-card {
+  border-top: 1px solid var(--border) !important;
+  margin-top: 0 !important;
+  padding-top: var(--s-5) !important;
+}
+
+/* Event cards (Key events / Significant moves) sit INSIDE an already-boxed .gv-card section, so
+   they get a lighter, nested-tile treatment rather than the same heavy box repeated one level
+   down -- a subtler border and --surface-2 instead of --surface distinguishes "tile within
+   section" from "section within page" the way the reference materials do. */
+.gv-event-card {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  padding: var(--s-4);
+  /* The parent grid (.metric-group .field-grid, ledger §4) sets row-gap:0 -- fine for label/value
+     rows, not for stacked tiles -- so each tile carries its own bottom margin instead. */
+  margin-bottom: var(--s-3);
+}
+
 .oi-event-list { display: grid; margin-top: var(--s-2); }
 .oi-event-row {
   display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: var(--s-3);
