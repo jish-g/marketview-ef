@@ -81,13 +81,15 @@ export function GexView() {
 
       {data && (
         <>
-          <div className="ds-grid ds-grid--3">
-            <Metric label="Spot" value={fmt.level(data.spot)} weight="primary" />
-            <Metric label="ATM strike" value={<Num>{fmt.strike(data.atm_strike)}</Num>} />
-            <Metric label="Expiry" value={<Num>{data.expiry}</Num>} />
+          <div className="gex-card">
+            <div className="ds-grid ds-grid--3">
+              <Metric label="Spot" value={fmt.level(data.spot)} weight="primary" />
+              <Metric label="ATM strike" value={<Num>{fmt.strike(data.atm_strike)}</Num>} />
+              <Metric label="Expiry" value={<Num>{data.expiry}</Num>} />
+            </div>
           </div>
 
-          <Card className="ds-metric ds-metric--hero">
+          <Card className="ds-metric ds-metric--hero gex-card">
             <Label>Net GEX</Label>
             <strong className="ds-metric__value"><Num>{fmt.crores(data.net_gex)}</Num></strong>
             <span className="ds-metric__sub"><RegimeBadge netGex={data.net_gex} /></span>
@@ -102,15 +104,14 @@ export function GexView() {
           )}
 
           {!lowCoverage && (
-            <div className="ds-grid ds-grid--3">
-              <Metric label="Zero-gamma flip" value={<Num>{fmt.strike(data.flip_strike)}</Num>} sub="Regime pivot level" />
-              <Metric label="Call wall" value={<Num>{fmt.strike(data.call_wall_strike)}</Num>} sub="Largest call-side gamma" />
-              <Metric label="Put wall" value={<Num>{fmt.strike(data.put_wall_strike)}</Num>} sub="Largest put-side gamma" />
+            <div className="gex-card gex-card-stack">
+              <div className="ds-grid ds-grid--3">
+                <Metric label="Zero-gamma flip" value={<Num>{fmt.strike(data.flip_strike)}</Num>} sub="Regime pivot level" />
+                <Metric label="Call wall" value={<Num>{fmt.strike(data.call_wall_strike)}</Num>} sub="Largest call-side gamma" />
+                <Metric label="Put wall" value={<Num>{fmt.strike(data.put_wall_strike)}</Num>} sub="Largest put-side gamma" />
+              </div>
+              <Metric label="Peak gamma" value={<Num>{fmt.strike(data.peak_gamma_strike)}</Num>} sub="Single largest strike, either side" />
             </div>
-          )}
-
-          {!lowCoverage && (
-            <Metric label="Peak gamma" value={<Num>{fmt.strike(data.peak_gamma_strike)}</Num>} sub="Single largest strike, either side" />
           )}
 
           <Disclaimer source="Nifty option chain (approximate GEX model)" capturedAt={fmt.timeIST(data.updated_at) ?? undefined} />
