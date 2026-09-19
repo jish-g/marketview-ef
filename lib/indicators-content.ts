@@ -28,8 +28,19 @@ export const INDICATOR_SECTIONS = [
     ],
   },
   {
+    id: 'powerscanner',
+    title: '3. Power Scanner — OI Addition & Unwinding Events',
+    intro:
+      "Flags the moment fresh open interest starts building (Addition) or leaving (Unwinding) at the strike the chart is already watching as support or resistance, read from the 1-minute OI history. Addition/Unwinding is computed against the prior session's closing OI, not the previous minute's reading, so a status change is a genuine event rather than per-poll noise -- it won't fire on every tick. This is the narrow version: it watches only the two key strikes already surfaced by OI Walls, not every strike in the chain.",
+    columns: ['Element', 'Source', 'Notes'],
+    rows: [
+      ['Event marker', "oi_snapshot_log's 1-minute OI support/resistance history", 'One vertical marker per genuine status change'],
+      ['Legend line', 'Latest support/resistance strike and its current Addition/Unwinding/Flat state', 'Updates roughly every minute during market hours'],
+    ],
+  },
+  {
     id: 'levels',
-    title: '3. Chart Levels — Swing Support & Resistance',
+    title: '4. Chart Levels — Swing Support & Resistance',
     intro:
       'For each enabled timeframe, the loaded candles are aggregated to that timeframe and scanned for swing highs and lows -- a bar whose high (or low) beats every bar within a configurable number of bars on either side. The nearest swing above the last price draws as resistance, the nearest below as support, one or two levels per side. Every timeframe is its own independent switch, so any combination -- 1H with 1D, or 4H with 30m -- is available at once.',
     columns: ['Setting', 'Range', 'Default'],
@@ -41,7 +52,7 @@ export const INDICATOR_SECTIONS = [
   },
   {
     id: 'pivots',
-    title: '4. Pivots — Pre-Market Support & Resistance',
+    title: '5. Pivots — Pre-Market Support & Resistance',
     intro:
       "The chart's own pivot support and resistance, computed once before the market opens and read directly from the dashboard row -- the same figures the Verdict screen uses. Off by default.",
     columns: ['Element', 'Source'],
@@ -49,7 +60,7 @@ export const INDICATOR_SECTIONS = [
   },
   {
     id: 'volume',
-    title: '5. Volume — Futures Volume by Bar',
+    title: '6. Volume — Futures Volume by Bar',
     intro:
       'A lower-pane histogram of volume per bar. NIFTY and SENSEX candles carry no volume of their own -- these bars are the current-month futures contract, aggregated to the chart’s own timeframe and coloured by that bar’s own direction, always labelled as futures volume rather than index volume.',
     columns: ['Element', 'Source', 'Notes'],
@@ -57,7 +68,7 @@ export const INDICATOR_SECTIONS = [
   },
   {
     id: 'volumeprofile',
-    title: '6. Volume Profile — Point of Control',
+    title: '7. Volume Profile — Point of Control',
     intro:
       "Every other volume view on this chart aggregates by time; this aggregates the same futures volume by price instead. Each 1-minute bar's volume is spread evenly across every price bucket its high-low range touches -- the standard approximation for a volume profile when only open/high/low/close/volume is available, not individual trades. The Point of Control is the bucket that received the most volume: the price the market actually did the most business at, a different read from VWAP (an average) or the day's high/low (extremes).",
     columns: ['Instrument', 'Bucket size', 'Period'],
@@ -68,7 +79,7 @@ export const INDICATOR_SECTIONS = [
   },
   {
     id: 'marketprofile',
-    title: '7. Market Profile (TPO) — Value Area & Time-Price Point of Control',
+    title: '8. Market Profile (TPO) — Value Area & Time-Price Point of Control',
     intro:
       "Volume Profile aggregates today's futures volume by price; this aggregates the session's own bars by price instead, weighting every 30-minute period equally regardless of how much traded in it -- the classic Time Price Opportunity read. The TPO Point of Control is the price the session spent the most time at, not the most business (that's Volume Profile) or the average (that's VWAP). The value area is the tightest band of price levels holding 70% of the session's periods, built outward from the point of control.",
     columns: ['Instrument', 'Bucket size', 'Period length'],
@@ -79,7 +90,7 @@ export const INDICATOR_SECTIONS = [
   },
   {
     id: 'cvdproxy',
-    title: '8. CVD (proxy) — Approximate Order Flow',
+    title: '9. CVD (proxy) — Approximate Order Flow',
     intro:
       "Zerodha's Kite Connect API exposes one-minute candles, not individual trades with a buyer or seller side, so genuine order flow cannot be read directly. This approximates it: for each bar, where the close sits within that bar's own high-low range -- weighted by the bar's futures volume -- estimates whether the bar leaned toward buying or selling pressure. Summed running through the session, it becomes a proxy Cumulative Volume Delta line, sharing the volume pane on its own scale since its cumulative value was never a price. The number itself matters less than its direction relative to price -- a new price high the proxy does not confirm is the signal worth noticing, not the absolute level.",
     columns: ['Element', 'Formula', 'Notes'],
@@ -90,7 +101,7 @@ export const INDICATOR_SECTIONS = [
   },
   {
     id: 'fiidii',
-    title: '9. FII / DII — Cash Market Net Flow',
+    title: '10. FII / DII — Cash Market Net Flow',
     intro:
       "The most recent FII and DII cash-market net flow on record, read from the daily post-market pipeline job. Unlike every other indicator on this chart, it draws nothing -- it's a legend-only line, because it isn't a price level and isn't an intraday signal. It's a slow, end-of-day figure, and the underlying data itself can lag by several days depending on when the upstream source publishes it, which is why the data date is always shown alongside the numbers rather than implying it's today's flow. Read it as regime context -- who's been net buying or selling the cash market lately -- not as something to react to bar by bar.",
     columns: ['Element', 'Source', 'Notes'],
