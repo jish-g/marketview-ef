@@ -285,16 +285,15 @@
 .ds-score--down { color: var(--down); }
 
 /* ---------------------------------------------------------------- OI History
-   The tile deltas and the events-table Change column are the other two places a signed OI
-   move gets colour (support Addition / resistance Unwinding = strengthening, and vice versa) --
-   see oi-history-view.tsx's actionTone(). Panels reuse .ds-card via the .oi-panel wrapper so
-   spacing and border stay identical to every other Card on the page. */
-.oi-panel { display: grid; gap: var(--s-3); }
-.oi-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); }
-.oi-panel-head h3 { margin: 0; font-size: var(--text-body); font-weight: 600; color: var(--ink-2); }
-.oi-panel-head span { font-size: var(--text-label); color: var(--faint); font-family: var(--font-figure); }
+   This screen follows the ledger treatment (app/ledger.css) the rest of the dashboard already
+   uses under .app-shell -- .metric-group/.group-heading for section rhythm, .market-open-tiles
+   for the summary row, ruled rows (not boxes) for a list. It does NOT use Card/.ds-card: under
+   .app-shell that class is unboxed to nothing (ledger §1), so a screen built on Card renders
+   with no visible separation at all -- which is what shipped here the first time. The event
+   rows mirror .mid-agent-row's 56px time gutter + hairline-bottom pattern exactly. */
+.oi-group-range { font-size: var(--text-label); color: var(--faint); font-family: var(--font-figure); }
 
-.oi-legend { display: flex; flex-wrap: wrap; gap: var(--s-4); font-size: var(--text-label); color: var(--muted); }
+.oi-legend { display: flex; flex-wrap: wrap; gap: var(--s-4); margin-top: var(--s-2); font-size: var(--text-label); color: var(--muted); }
 .oi-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .oi-swatch { width: 12px; height: 2px; border-radius: 1px; display: inline-block; }
 .oi-swatch--dashed { background: none !important; border-top: 1.5px dashed; width: 14px; height: 0; }
@@ -304,20 +303,22 @@
 .oi-swatch--tri-up { border-bottom: 7px solid var(--up); }
 .oi-swatch--tri-down { border-top: 7px solid var(--down); }
 
-.oi-delta--up { color: var(--up); }
-.oi-delta--down { color: var(--down); }
-.oi-delta--flat { color: var(--muted); }
-
-.oi-events-table { display: grid; font-size: var(--text-meta); }
-.oi-events-row { display: grid; grid-template-columns: 72px 110px 1fr 140px; gap: var(--s-3); padding: 9px 4px; border-bottom: 1px solid var(--border); align-items: center; }
-.oi-events-row:last-child { border-bottom: none; }
-.oi-events-row--head span { font-size: var(--text-label); letter-spacing: 0.03em; text-transform: uppercase; color: var(--faint); font-weight: 500; }
-.oi-change-tag { display: inline-flex; align-items: center; gap: 5px; }
+.oi-event-list { display: grid; margin-top: var(--s-2); }
+.oi-event-row {
+  display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: var(--s-3);
+  padding: 10px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
+  align-items: baseline;
+}
+.oi-event-row:last-child { border-bottom: none; }
+.oi-event-time { font: 600 var(--text-meta) var(--font-figure); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.oi-event-time small { display: block; font-size: var(--text-label); font-weight: 400; color: var(--faint); }
+.oi-event-head { display: block; font-size: var(--text-body); color: var(--ink-2); margin-bottom: 3px; }
+.oi-event-head b { font-weight: 600; color: var(--ink); }
+.oi-change-tag { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-meta); }
 .oi-change-tag i { font-style: normal; font-size: 9px; }
 .oi-change-tag--up { color: var(--up); }
 .oi-change-tag--down { color: var(--down); }
 .oi-change-tag--flat { color: var(--faint); }
-@media (max-width: 640px) { .oi-events-row { grid-template-columns: 56px 84px 1fr 108px; font-size: 12px; } }
 
 /* Session read: same provenance convention as the GlobalCue narrative (.thesis-hero-note) --
    computed figures stay in the tiles/chart/table above; this prose only explains them. */
